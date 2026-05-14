@@ -1,0 +1,27 @@
+{
+  "name": "@continuum/adapter-export",
+  "version": "0.0.1",
+  "description": "Continuum export adapter — tails Claude session JSONL transcripts and writes turn observations into the Continuum DB.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "continuum-adapter-export": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@continuum/core": "0.0.1",
+    "chokidar": "^4.0.0"
+  },
+  "license": "Apache-2.0",
+  "author": "Riaan Kleynhans <riaan@number7even.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/number7even/CONTINUUM.git",
+    "directory": "packages/adapters/export"
+  }
+}

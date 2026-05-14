@@ -32,3 +32,11 @@ export {
   listSnapshots,
   type CheckpointInput,
 } from './checkpoint.js';
+
+export {
+  upsertSource,
+  insertObservation,
+  insertObservationsBulk,
+  privacyFilter,
+  type PrivacyResult,
+} from './observation.js';
