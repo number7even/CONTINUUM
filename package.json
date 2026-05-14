@@ -1,0 +1,50 @@
+{
+  "name": "continuum",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Persistent intelligence layer for AI coding assistants — MCP server that aggregates docs, memory, feedback, git, and AI session transcripts into checkpointed state + auto-generated session-start briefings + a live todo pipeline.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "ai-memory",
+    "rag",
+    "claude-code",
+    "cursor",
+    "ai-coding-assistant",
+    "persistent-memory",
+    "developer-tools"
+  ],
+  "homepage": "https://github.com/number7even/CONTINUUM#readme",
+  "bugs": {
+    "url": "https://github.com/number7even/CONTINUUM/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/number7even/CONTINUUM.git"
+  },
+  "license": "Apache-2.0",
+  "author": {
+    "name": "Riaan Kleynhans",
+    "email": "riaan@number7even.com",
+    "url": "https://github.com/number7even"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "packages/adapters/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "clean": "npm run clean --workspaces --if-present && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}
