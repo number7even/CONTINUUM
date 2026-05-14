@@ -1,12 +1,20 @@
 # Continuum — Architecture Map
 
-> **Status:** v0.2 draft — claude-mem reverse-engineering + ruv-FANN neural capability layer
+> **Status:** v0.3 draft — RuVector unified persistence layer added (phased V0.5)
 > **Date:** 2026-05-14
 > **Authors:** Riaan Kleynhans + Claude
 > **Working name:** Continuum (open — see D1)
 > **Repo:** [github.com/number7even/CONTINUUM](https://github.com/number7even/CONTINUUM) (Option A: standalone, locked 2026-05-14)
 >
-> **v0.2 changelog (this revision):**
+> **v0.3 changelog (this revision):**
+> Added **§10b Unified Persistence Layer (RuVector integration)** — replaces SQLite+Chroma split with single self-learning engine. Phased V0.5+.
+> Updated **§4 / §4a** — V0 keeps SQLite+Chroma+FTS5 (battle-tested, ships in week 1). V0.5+ supersedes with RuVector path (see §10b).
+> Updated **D2** — phased: SQLite+Chroma V0 → RuVector V0.5+ (locked pending RuVector readiness verification).
+> Updated **D4** — `ruvllm` joins the digest engine stack as V0.5 option (b).
+> Updated **§15 Roadmap** with RuVector phases.
+> Updated **§16 Related Documents** with RuVector + ruvllm links.
+>
+> **v0.2 changelog (previous revision):**
 > Added **§10a Neural Capability Layer** — ruv-FANN / ruv-swarm / Neuro-Divergent / midstream integration phased across V0.5 → V2.
 > Updated **§5** with future `continuum_spawn_swarm` MCP tool (V1.5).
 > Updated **§6** with ruv-FANN WASM-native local digest path (V0.5).
@@ -726,6 +734,163 @@ To avoid scope creep into V0:
 
 ---
 
+## 10b. Unified Persistence Layer (RuVector integration — V0.5+)
+
+V0 uses SQLite + Chroma + FTS5 (§4 / §4a) — battle-tested, ships in week 1.
+Beginning **V0.5**, the persistence layer migrates to [**RuVector**](https://github.com/ruvnet/RuVector) — a unified
+vector/graph/relational engine designed for AI-native workloads. This is not
+an additive layer; it **replaces** the SQLite + Chroma split, simplifying
+Continuum's storage from "two engines + custom diff logic" to "one engine with
+native semantics for everything we need."
+
+### Why migrate from SQLite + Chroma to RuVector at V0.5
+
+| Capability | V0 (SQLite + Chroma) | V0.5+ (RuVector) |
+|---|---|---|
+| **Vector search** | Chroma | Native, embedded |
+| **Keyword search** | SQLite FTS5 | Native, unified with vector |
+| **Relational queries** | SQLite | Native |
+| **Graph queries** (e.g., observation refs[]) | Manual joins | Native, GNN-indexed |
+| **Self-learning relevance** | None — same results every time | **GNN reinforces search paths from query patterns** |
+| **State snapshots** | Manual JSON serialization | **RVF cognitive containers — Git-like COW branching** |
+| **Snapshot size (1M vectors + 100 edits)** | ~hundreds of MB | **~2.5 MB** |
+| **Tamper resistance** | None | **Cryptographic witness chain** |
+| **state_diff / todo_delta** | Custom comparison logic | **Native Delta Behavior module (CRDTs + causal ordering)** |
+| **Multi-tenant (V2)** | Migrate to Postgres + RLS | **Native multi-tenant "collections"** |
+| **Scale path** | Postgres rewrite | **Raft consensus, multi-master replication, auto-sharding** |
+
+### The five integration vectors (mapped to Continuum's §3, §4, §5 surface)
+
+```
+                    ┌─────────────────────────────────┐
+                    │      Continuum Aggregator        │
+                    │  (privacy-scrubbed Observations) │
+                    └────────────────┬────────────────┘
+                                     │
+                                     ▼
+                    ┌─────────────────────────────────┐
+                    │            RuVector              │
+                    │  ┌───────────────────────────┐  │
+                    │  │  Vector + Graph + KV +    │  │
+                    │  │  Relational (one engine)  │  │
+                    │  │                           │  │
+                    │  │  + GNN learns from        │  │
+                    │  │    query sequences        │  │
+                    │  │  + RVF COW snapshots      │  │
+                    │  │  + Delta Behavior CRDTs   │  │
+                    │  │  + ruvllm local AI        │  │
+                    │  │  + multi-tenant native    │  │
+                    │  └───────────────────────────┘  │
+                    └─────────────────────────────────┘
+                                     ▲
+                                     │ unified read/write
+                                     │
+              ┌──────────────────────┼──────────────────────┐
+              ▼                      ▼                      ▼
+       continuum_search       continuum_get_state    continuum_record_
+       (GNN-reinforced)       (RVF snapshot fetch)   checkpoint
+                                                     (RVF COW branch)
+```
+
+### 1. Unified self-learning persistence (replaces §4a hybrid)
+
+Where V0 dual-writes every Observation to SQLite-FTS5 AND Chroma, V0.5+ writes
+once to RuVector. The GNN ("Graph Neural Network") layer learns from **query
+sequences and timing** — when an AI client searches for "voice cutoff" then
+immediately fetches a specific observation, RuVector reinforces that path.
+Over weeks, `continuum_search` gets measurably better at predicting which
+observations the AI will want next — without any model retraining.
+
+**Net effect:** the longer you use Continuum, the smarter its memory becomes.
+This is the core defensible moat for the V1+ hosted product.
+
+### 2. RVF cognitive containers as native snapshots
+
+`continuum_record_checkpoint` currently (V0 plan) serializes a JSON state file.
+At V0.5+ it instead creates an **RVF branch** — Git-like copy-on-write of the
+entire database state. Querying `continuum_get_state(at: '2026-05-14')` becomes
+a cheap branch checkout, not a JSON parse.
+
+**Size profile** (verified RuVector benchmark): ~2.5 MB per snapshot of a 1M-vector
++ 100-edit corpus. Means we can keep **hundreds** of historical snapshots in the
+single-user case without storage pressure.
+
+**Tamper-evident witness chain** — every snapshot is cryptographically linked to
+its parent. State history cannot be silently rewritten (closes a category of
+attacks/mistakes that pure-filesystem-snapshot approaches leave open).
+
+### 3. `ruvllm` local AI runtime (joins §10a digest options)
+
+RuVector ships with **ruvllm** — an embedded GGUF model runtime supporting
+Metal (Apple Silicon), CUDA (NVIDIA), and WebGPU (cross-platform). This means
+the Digest Generator (§5, §10a) can:
+
+- Run a local GGUF model (~3-7B parameters) for narrative digest composition
+- Achieve <500ms digest generation on M-series Macs
+- Zero API cost, zero data egress
+
+**Updated digest stack** (D4):
+
+```
+V0    — template fallback only (no LLM)
+V0.5+ — three options, operator picks (or feature-flags):
+        a) ruvllm (RuVector built-in, GGUF model, Metal/CUDA/WebGPU)
+        b) ruv-FANN (§10a, pure WASM, lighter weight)
+        c) External LLM (OpenAI/Anthropic, opt-in override)
+```
+
+### 4. Native Delta Behavior (replaces custom diff logic)
+
+Continuum's Digest model (§4) requires `state_diff` and `todo_delta` fields.
+V0 plan: write custom comparison logic per entity type. V0.5+ with RuVector:
+the Delta Behavior module emits structured deltas natively, using **CRDTs and
+causal ordering** to merge concurrent writes safely.
+
+**Operator-visible benefit:** when two AI clients (Claude Code + Cursor) modify
+state in parallel during the same window, the digest still shows a coherent
+narrative — not a "race condition" mess.
+
+### 5. Multi-tenant native (closes V2 deployment gap)
+
+§6's V2 (Hosted SaaS) plan requires a separate persistence rewrite to support
+multi-tenant + auth + cross-device sync. **RuVector's native multi-tenant
+collections** mean the V2 migration is config, not code:
+
+```
+V0.5 local:   one RuVector instance per project at ~/.continuum/{project}/
+V2 hosted:    one RuVector cluster, each tenant = one collection
+                + Raft consensus
+                + multi-master replication
+                + auto-sharding
+```
+
+**Same engine, same query layer, same MCP tools.** No rewrite. This is the
+single largest derisk for the Continuum SaaS business model.
+
+### Phasing & verification gate before V0.5
+
+Before V0.5 builds on RuVector:
+
+- [ ] Verify RuVector v1.0+ release maturity (production-readiness)
+- [ ] Verify Node.js/TypeScript SDK ergonomics (we don't want to FFI from TS into Rust if it's painful)
+- [ ] Verify embedded WASM build size + cold-start time
+- [ ] Benchmark vs the V0 SQLite-FTS5 + Chroma baseline on real /docs corpus
+- [ ] Confirm migration tool: V0 state → RuVector ingestion
+
+If any gate fails, V0.5 stays on the V0 path and migration deferred to V1.
+
+### Hard separation from V0
+
+- **No RuVector dependency in V0 packages.** `packages/core` stays pure-TS with
+  better-sqlite3 + chromadb until V0.5 gate passes.
+- **Storage adapter pattern in V0:** the Indexer talks to an abstract
+  `StorageBackend` interface from day one. V0 implementation = SQLite+Chroma.
+  V0.5 swap-in = RuVector. Same interface, different backend.
+- **Migration is reversible:** RuVector → SQLite+Chroma export tool ships
+  alongside the migration tool, so we never get locked in by storage choice.
+
+---
+
 ## 11. Repo Structure (standalone — locked: Option A)
 
 ```
@@ -801,9 +966,9 @@ Locked tonight or before code begins.
 |---|---|---|---|---|
 | **D0** | Repo strategy | Standalone / inside VC / inside engine | **Standalone** | ✅ Locked 2026-05-14 |
 | **D1** | Working name | Continuum / Anchor / Recall / Through / Memex / other | Continuum | pending |
-| **D2** | Embedding store | Chroma / sqlite-vss / pgvector | Chroma (matches claude-mem) | ✅ Locked 2026-05-14 (per §4a — hybrid FTS5 + Chroma verified pattern) |
+| **D2** | Persistence engine | SQLite+Chroma / pgvector / RuVector / other | phased — see §10b | ✅ Locked 2026-05-14 — **Phased: V0 SQLite-FTS5 + Chroma (battle-tested, ships week 1) → V0.5+ RuVector (unified vector/graph/relational, GNN-reinforced search, RVF COW snapshots, native multi-tenant). Storage adapter pattern keeps V0 and V0.5 swappable.** Migration gate: RuVector v1.0+ maturity, Node SDK ergonomics, embedded build size, benchmark vs V0 baseline. |
 | **D3** | Monorepo tool | pnpm workspaces / turborepo / nx | pnpm (smallest) | ⚠️ Decided: **npm workspaces** for V0 (pnpm not installed; migration trivial). Locked 2026-05-14 |
-| **D4** | Digest generation engine | external LLM only / ruv-FANN local-first / template-only | phased — see §10a | ✅ Locked 2026-05-14 — **Phased: V0 template fallback → V0.5+ ruv-FANN local (CPU-native, zero-cost) → external LLM as optional override**. No external API dependency in default config. |
+| **D4** | Digest generation engine | external LLM / ruv-FANN / ruvllm / template | phased — see §10a + §10b | ✅ Locked 2026-05-14 — **Phased: V0 template fallback → V0.5+ operator picks among (a) ruvllm (RuVector built-in, GGUF Metal/CUDA/WebGPU, §10b), (b) ruv-FANN (pure WASM, lighter, §10a), (c) external LLM optional override**. No external API dependency in default config. |
 | **D5** | License | MIT / Apache-2.0 / dual | Apache-2.0 (matches claude-mem) | ✅ Locked 2026-05-14 — Apache-2.0. Easy to embed in MCP servers, agent harnesses, enterprise stacks. Matches claude-mem. |
 | **D6** | GitHub org | own org / under VoiceCosmos / personal | own org for OSS clarity | ✅ Locked 2026-05-14 — `number7even` (matches existing VC-Hospitality, VC-Spa, VC-Restaurants, number7evencrm). Repo: github.com/number7even/CONTINUUM |
 | **D7** | claude-mem relationship | adapter (we consume) / fork / competitor | adapter — orchestrate, don't reinvent | ✅ Locked 2026-05-14 (verified install at `~/.claude/plugins/marketplaces/thedotmack/` — proven runtime model adopted in §3, §4a, §5, §6, §8) |
@@ -813,12 +978,12 @@ Locked tonight or before code begins.
 
 ## 15. Roadmap (post-V0)
 
-- **V0** (this week): dogfood-ready, 4 MCP tools, 3 source adapters (docs/git/export), local-only, **no neural layer**
-- **V0.5** (week 2-3): claude-mem + sona adapters, todo manager, **ruv-FANN WASM embedded for local digest generation** (§10a)
-- **V1** (month 1): Docker self-host, MCP over HTTP/SSE, Apache-2.0 OSS release, **ruv-swarm for per-adapter ephemeral source aggregation** (§10a)
-- **V1.5** (month 2): web UI (status dashboard, manual checkpoint controls), **`continuum_spawn_swarm` MCP tool** (§10a), **OpenClaw Gateway distribution** (§6)
-- **V2** (month 3): hosted SaaS — multi-tenant, OAuth, billing, team workspaces, **Neuro-Divergent predictive snapshots** (§10a), **midstream streaming transport** (§10a)
-- **V3** (quarter 2): ARIA hotel integration — same engine, tenant-scoped, embedded in Voice OS
+- **V0** (this week): dogfood-ready, 4 MCP tools, 3 source adapters (docs/git/export), local-only, **SQLite + Chroma + FTS5 storage**, no neural layer
+- **V0.5** (week 2-3): claude-mem + sona adapters, todo manager, **ruv-FANN OR ruvllm for local digest** (§10a + §10b), **RuVector migration** if gates pass (§10b)
+- **V1** (month 1): Docker self-host, MCP over HTTP/SSE, Apache-2.0 OSS release, **ruv-swarm for per-adapter ephemeral source aggregation** (§10a), **RVF COW snapshots replace JSON checkpoints** (§10b)
+- **V1.5** (month 2): web UI (status dashboard, manual checkpoint controls), **`continuum_spawn_swarm` MCP tool** (§10a), **OpenClaw Gateway distribution** (§6), **GNN-reinforced search** matures (§10b)
+- **V2** (month 3): hosted SaaS — **RuVector native multi-tenant collections** (no DB rewrite — §10b), OAuth, billing, team workspaces, **Neuro-Divergent predictive snapshots** (§10a), **midstream streaming transport** (§10a)
+- **V3** (quarter 2): ARIA hotel integration — same RuVector engine, tenant-scoped, embedded in Voice OS
 
 ---
 
@@ -837,9 +1002,14 @@ Locked tonight or before code begins.
 
 ### Neural capability layer (V0.5+ — see §10a)
 
-- [**ruv-FANN**](https://github.com/ruvnet/ruv-FANN) — WASM-native neural framework. Powers local digest generation (V0.5), source-adapter swarms (V1), `continuum_spawn_swarm` (V1.5).
+- [**ruv-FANN**](https://github.com/ruvnet/ruv-FANN) — WASM-native neural framework. Powers local digest generation (V0.5 option b), source-adapter swarms (V1), `continuum_spawn_swarm` (V1.5).
 - [**ruv-FANN / Neuro-Divergent**](https://github.com/ruvnet/ruv-FANN/tree/main/neuro-divergent) — 27+ forecasting models. Powers V2 predictive snapshots.
 - [**midstream**](https://github.com/ruvnet/midstream) — real-time streaming primitives. Powers V1+ multi-client subscription transport.
+
+### Unified persistence layer (V0.5+ — see §10b)
+
+- [**RuVector**](https://github.com/ruvnet/RuVector) — unified vector/graph/relational engine with GNN-reinforced search, RVF cognitive containers (Git-like COW snapshots), tamper-evident witness chain, Delta Behavior CRDTs, native multi-tenant collections. Replaces V0's SQLite+Chroma split.
+- **ruvllm** (RuVector subsystem) — embedded GGUF model runtime supporting Metal / CUDA / WebGPU. Powers V0.5 local digest option (a).
 
 ---
 
