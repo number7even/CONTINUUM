@@ -1,0 +1,317 @@
+#!/usr/bin/env node
+/**
+ * Continuum MCP stdio server (V0).
+ *
+ * Exposes 4 tools to MCP-aware AI clients (Claude Code, Cursor, etc.):
+ *
+ *   1. continuum_record_checkpoint  — write immutable state snapshot
+ *   2. continuum_get_state           — fetch state at timestamp (or now)
+ *   3. continuum_get_digest          — fetch composed narrative for window
+ *   4. continuum_search_docs         — FTS5 keyword search over observations
+ *
+ * Progressive Disclosure scaffolding (ARCHITECTURE.md §5) is in place — V0
+ * ships layer-1 (search returning compact hits) only. Layer-2 timeline +
+ * Layer-3 batch get_observations land in V0.5.
+ *
+ * Transport: stdio (V0). HTTP/SSE/WebSocket land in V1 per §6.
+ *
+ * Registration: add to ~/.claude.json or per-project .mcp.json:
+ *
+ *   {
+ *     "mcpServers": {
+ *       "continuum": {
+ *         "command": "node",
+ *         "args": ["/absolute/path/to/dist/index.js"],
+ *         "env": {
+ *           "CONTINUUM_PROJECT_ID": "vc-hospitality"
+ *         }
+ *       }
+ *     }
+ *   }
+ */
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
+import {
+  openDb,
+  recordCheckpoint,
+  getStateAt,
+  listSnapshots,
+  type CheckpointInput,
+  type StateEntry,
+} from '@continuum/core';
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+const projectId = process.env.CONTINUUM_PROJECT_ID ?? 'default';
+const db = openDb(projectId);
+
+const server = new Server(
+  {
+    name: 'continuum-mcp',
+    version: '0.0.1',
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
+  },
+);
+
+// ── Tool registry ─────────────────────────────────────────────────────────────
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: [
+    {
+      name: 'continuum_record_checkpoint',
+      description:
+        'Write an immutable state snapshot. Provide active/dormant/broken entries and a reason. ' +
+        'Returns the persisted snapshot with hash. Use this at session end, after significant ' +
+        'commits, or when state has materially changed.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          reason: {
+            type: 'string',
+            description: 'Why this checkpoint — manual reason or auto-trigger label.',
+          },
+          active: {
+            type: 'array',
+            description: 'Entries currently active in production.',
+            items: { $ref: '#/definitions/StateEntry' },
+          },
+          dormant: {
+            type: 'array',
+            description: 'Entries built but not the active path.',
+            items: { $ref: '#/definitions/StateEntry' },
+          },
+          broken: {
+            type: 'array',
+            description: 'Known failures with repro.',
+            items: { $ref: '#/definitions/StateEntry' },
+          },
+        },
+        required: ['reason', 'active'],
+        definitions: {
+          StateEntry: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              where: { type: 'string' },
+              verifyCommand: { type: 'string' },
+              landedAt: { type: 'string' },
+              verifiedAt: { type: 'string' },
+              description: { type: 'string' },
+            },
+            required: ['name', 'where', 'verifyCommand', 'verifiedAt'],
+          },
+        },
+      },
+    },
+    {
+      name: 'continuum_get_state',
+      description:
+        'Fetch the StateSnapshot in effect at the given ISO-8601 timestamp (or now if omitted). ' +
+        'Answers "what was true on May 14?" — returns the most recent snapshot at or before ' +
+        'the requested time. Returns null if no snapshots exist yet.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          at: {
+            type: 'string',
+            description: 'ISO-8601 timestamp. Defaults to now.',
+          },
+        },
+      },
+    },
+    {
+      name: 'continuum_get_digest',
+      description:
+        'Fetch a composed narrative for a time window. V0 returns template-based digests ' +
+        'derived from recent checkpoints + observations. V0.5+ adds ruvllm/ruv-FANN local-AI ' +
+        'narrative generation.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          window: {
+            type: 'string',
+            enum: ['24h', '7d', 'session'],
+            description: 'Time window. Default 24h.',
+          },
+        },
+      },
+    },
+    {
+      name: 'continuum_search_docs',
+      description:
+        'Full-text keyword search across indexed observations. V0 uses SQLite FTS5 for ' +
+        'high-precision exact/code-snippet matching. V0.5+ adds semantic vector fusion (RuVector). ' +
+        'Returns Progressive Disclosure Layer-1 hits — compact, ~50-100 tokens per result.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search terms. FTS5 syntax supported (e.g., "voice AND cutoff").',
+          },
+          limit: {
+            type: 'number',
+            description: 'Max results. Default 20.',
+          },
+        },
+        required: ['query'],
+      },
+    },
+  ],
+}));
+
+// ── Tool dispatcher ───────────────────────────────────────────────────────────
+
+server.setRequestHandler(CallToolRequestSchema, async request => {
+  const { name, arguments: args } = request.params;
+
+  try {
+    switch (name) {
+      case 'continuum_record_checkpoint': {
+        const input = args as unknown as CheckpointInput;
+        if (!input?.reason || !Array.isArray(input?.active)) {
+          throw new Error('reason and active[] are required');
+        }
+        const snapshot = recordCheckpoint(db, input);
+        return {
+          content: [
+            { type: 'text', text: JSON.stringify(snapshot, null, 2) },
+          ],
+        };
+      }
+
+      case 'continuum_get_state': {
+        const at = (args as { at?: string })?.at;
+        const snapshot = getStateAt(db, at);
+        if (!snapshot) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  message: 'No checkpoints recorded yet. Use continuum_record_checkpoint to create the first one.',
+                }),
+              },
+            ],
+          };
+        }
+        return {
+          content: [
+            { type: 'text', text: JSON.stringify(snapshot, null, 2) },
+          ],
+        };
+      }
+
+      case 'continuum_get_digest': {
+        const window = (args as { window?: string })?.window ?? '24h';
+        const snapshots = listSnapshots(db, 10);
+        const hoursWindow = window === '7d' ? 168 : window === 'session' ? 8 : 24;
+        const cutoff = new Date(Date.now() - hoursWindow * 3600 * 1000).toISOString();
+        const recent = snapshots.filter(s => s.timestamp >= cutoff);
+
+        const narrative = templateDigest(recent, window);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                window,
+                windowStart: cutoff,
+                windowEnd: new Date().toISOString(),
+                narrative,
+                snapshotsInWindow: recent.length,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'continuum_search_docs': {
+        const { query, limit } = args as { query: string; limit?: number };
+        if (!query?.trim()) throw new Error('query is required');
+
+        const rows = db.prepare(`
+          SELECT o.id, o.source_id, o.type, o.content, o.timestamp,
+                 bm25(observations_fts) AS rank
+          FROM observations_fts
+          JOIN observations o ON o.rowid = observations_fts.rowid
+          WHERE observations_fts MATCH ?
+          ORDER BY rank
+          LIMIT ?
+        `).all(query, limit ?? 20) as Array<{
+          id: string;
+          source_id: string;
+          type: string;
+          content: string;
+          timestamp: string;
+          rank: number;
+        }>;
+
+        const hits = rows.map(r => ({
+          id: r.id,
+          source: r.source_id.split(':')[0],
+          type: r.type,
+          timestamp: r.timestamp,
+          title: r.content.slice(0, 80).replace(/\s+/g, ' '),
+          score: -r.rank, // bm25 returns negative — flip for "higher = better"
+          hasMore: r.content.length > 2000,
+        }));
+
+        return {
+          content: [
+            { type: 'text', text: JSON.stringify({ query, count: hits.length, hits }, null, 2) },
+          ],
+        };
+      }
+
+      default:
+        throw new Error(`Unknown tool: ${name}`);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ error: message }) }],
+      isError: true,
+    };
+  }
+});
+
+// ── Template digest (V0 — replaced by ruvllm/ruv-FANN in V0.5) ────────────────
+
+function templateDigest(snapshots: Array<{ timestamp: string; reason: string; active: StateEntry[]; broken: StateEntry[] }>, window: string): string {
+  if (snapshots.length === 0) {
+    return `No state snapshots in window "${window}". Use continuum_record_checkpoint to capture state.`;
+  }
+  const latest = snapshots[0]!;
+  const lines = [
+    `Continuum digest (${window}, ${snapshots.length} snapshot${snapshots.length === 1 ? '' : 's'}):`,
+    '',
+    `Latest checkpoint: ${latest.timestamp} — ${latest.reason}`,
+    `Active in production: ${latest.active.length} entries`,
+    `Known broken: ${latest.broken.length} entries`,
+    '',
+  ];
+  if (snapshots.length > 1) {
+    lines.push('Checkpoint history (newest → oldest):');
+    for (const s of snapshots) {
+      lines.push(`  - ${s.timestamp.slice(0, 19)}Z — ${s.reason}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+// ── Connect to stdio ──────────────────────────────────────────────────────────
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
+
+// Suppress stdout — MCP communicates over stdio, console.log would corrupt protocol
+process.stderr.write(`[continuum-mcp] project=${projectId} db=ready\n`);

@@ -1,0 +1,27 @@
+{
+  "name": "@continuum/mcp-server",
+  "version": "0.0.1",
+  "description": "Continuum MCP stdio server — exposes 4 V0 tools to AI clients (Claude Code, Cursor, etc.)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "continuum-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@continuum/core": "0.0.1",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "license": "Apache-2.0",
+  "author": "Riaan Kleynhans <riaan@number7even.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/number7even/CONTINUUM.git",
+    "directory": "packages/mcp-server"
+  }
+}

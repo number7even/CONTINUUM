@@ -1,0 +1,14 @@
+{
+  "_comment": "Continuum V0 MCP server registration. Drop this into a project as .mcp.json (or merge into ~/.claude.json). Adjust 'args' absolute path and 'CONTINUUM_PROJECT_ID' for the project being dogfooded.",
+  "mcpServers": {
+    "continuum": {
+      "command": "node",
+      "args": [
+        "/Users/emporiumcollection/Development/supabase-projects/CONTINUUM/packages/mcp-server/dist/index.js"
+      ],
+      "env": {
+        "CONTINUUM_PROJECT_ID": "vc-hospitality"
+      }
+    }
+  }
+}
