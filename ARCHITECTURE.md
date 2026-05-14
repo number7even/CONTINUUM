@@ -1,10 +1,20 @@
 # Continuum — Architecture Map
 
-> **Status:** v0 draft — design before code
+> **Status:** v0.1 draft — claude-mem reverse-engineering integrated
 > **Date:** 2026-05-14
 > **Authors:** Riaan Kleynhans + Claude
 > **Working name:** Continuum (open — see D1)
-> **Repo:** to be created at `voicecosmos/continuum` (Option A: standalone, locked 2026-05-14)
+> **Repo:** [github.com/number7even/CONTINUUM](https://github.com/number7even/CONTINUUM) (Option A: standalone, locked 2026-05-14)
+>
+> **v0.1 changelog (this revision):**
+> Reverse-engineered 5 verified patterns from `thedotmack/claude-mem` v13.2.0
+> (installed at `~/.claude/plugins/marketplaces/thedotmack/`):
+> §3 — 5 lifecycle hook listeners replace generic source-change trigger.
+> §4 — Hybrid SQLite-FTS5 + Chroma interaction made explicit.
+> §5 — Progressive Disclosure (3-layer MCP tools) replaces flat search tools — ~10x token savings.
+> §6 — Background Worker Service added as V0 component (Bun/Node HTTP).
+> §8 — `<private>` elevated from convention to **core invariant**, enforced at Aggregator.
+> §14 — D2 (Chroma) and D7 (claude-mem as adapter) locked.
 >
 > _The product we're building to solve the AI-collaborator memory problem.
 > Dogfooded first for our own VoiceCosmos dev workflow, then shipped as
@@ -56,7 +66,14 @@ A persistent intelligence layer between you and any AI coding assistant. An MCP 
 
 **Inputs:** filesystem, Supabase, claude-mem SQLite, git, Claude session JSONL.
 **Outputs:** MCP tool responses, checkpoint files, digest markdown, todo state.
-**Consumer:** any MCP-aware AI client. Primary target: Claude Code.
+**Consumer:** any MCP-aware AI client. **Primary target: Open Claude Code** (and the broader Anthropic CC family). Open Claude Code's first-class MCP support unlocks all 4 transports Continuum exposes:
+
+- **stdio** — local subprocess invocation (V0 default — invoked by AI client per project)
+- **SSE (Server-Sent Events)** — streaming responses over HTTP (V1 — Docker self-host)
+- **Streamable HTTP** — bidirectional MCP over HTTP (V1 — preferred over SSE where supported)
+- **WebSocket** — full-duplex realtime (V1+ — for hosted multi-client scenarios)
+
+By supporting all four, Continuum runs as a local subprocess for solo devs (V0), as a Docker service for small teams (V1), and as a hosted multi-tenant service (V2) — without changing the MCP contract or forcing client migrations.
 
 ---
 
@@ -106,34 +123,60 @@ A persistent intelligence layer between you and any AI coding assistant. An MCP 
 
 ## 3. Data Flow
 
-**Ingest path (continuous + on-demand):**
+Continuum's ingest path is **hook-driven**, not poll-driven. We mirror
+`claude-mem`'s 5-lifecycle-hook architecture so every AI-client event becomes
+an opportunity to capture, correlate, or checkpoint. Each hook is also exposed
+to external source adapters (git, docs watcher, SONA webhook) via the same
+internal event bus.
+
+**The 5 lifecycle hooks (Continuum + AI client wiring):**
 
 ```
-Source change (git commit, file edit, session tick, sona event)
-   ↓
-Source adapter detects (poll or webhook)
-   ↓
-Aggregator normalizes to a canonical Observation record
-   ↓
-Indexer writes: SQLite row + Chroma embedding
-   ↓
-If checkpoint trigger fires → Checkpoint Engine writes immutable snapshot
-   ↓
-If todo signal detected → Todo Manager updates state
+SessionStart       → Worker boots (if not running)
+                     → Aggregator loads recent context window
+                     → MCP server emits session-start briefing
+                       (current StateSnapshot + latest Digest + open Todos)
+
+UserPromptSubmit   → Aggregator records prompt as Observation
+                     → Adapters pre-warm: relevant /docs chunks for prompt topic
+                     → Optional: claude-mem-style context injection
+
+PostToolUse        → Tool output captured as Observation (type-tagged)
+                     → Indexer writes SQLite + Chroma
+                     → Todo Manager checks: did this resolve an open commitment?
+                     → If verify_command on a Todo matched and passed → mark done
+
+Stop               → Mid-session state capture (lightweight)
+                     → No checkpoint write (avoid noise)
+
+SessionEnd         → Checkpoint Engine writes immutable product_state[]
+                     → Digest Generator composes session digest
+                     → Todo Manager reconciles open commitments vs new commits
+                     → Worker flushes write buffers
 ```
 
-**Query path (session-start, on-demand):**
+**External source adapters bridge to the same hooks:**
 
 ```
-AI client calls MCP tool (e.g. get_digest, search_memory)
+git commit (post-commit hook)        → emits PostToolUse-equivalent
+docs/ file change (chokidar watcher) → emits UserPromptSubmit-equivalent
+sona_events insert (Supabase webhook) → emits PostToolUse-equivalent
+session.jsonl tail follow            → emits PostToolUse-equivalent per turn
+claude-mem observation write          → forwarded directly (we consume their hook)
+```
+
+**Query path (session-start + on-demand):**
+
+```
+AI client calls MCP tool (continuum_search, continuum_get_state, etc.)
    ↓
-MCP server routes to Core
+MCP server routes to Worker over HTTP (or in-process for stdio mode)
    ↓
-Core queries SQLite + Chroma
+Worker queries SQLite (FTS5) + Chroma (vector) — see §4 for fusion
    ↓
-Digest Generator composes response (with LLM optionally)
+Optional: Digest Generator composes narrative (LLM-assisted if configured)
    ↓
-Returns structured result to AI client
+Returns structured result to AI client (Progressive Disclosure — see §5)
 ```
 
 ---
@@ -164,84 +207,337 @@ Digest         { id, window_start, window_end, narrative,
 - `StateSnapshots` are append-only (you can query history — "what was true on May 14?").
 - `Todos` reference `Observations` (provenance — "where did this commitment come from?").
 - `Digests` are regeneratable from sources (not the source-of-truth themselves — sources are).
+- **Hybrid index: every Observation is written to BOTH SQLite-FTS5 AND Chroma.** Never just one.
+- **Privacy invariant** (`<private>` enforcement) is enforced at the Aggregator BEFORE indexing — see §8.
 
 ---
 
-## 5. MCP Interface (tools exposed to AI clients)
+### 4a. Hybrid Search: SQLite-FTS5 + Chroma (verified pattern from claude-mem)
+
+The Indexer is **simultaneously dual-write** — every accepted Observation lands
+in both stores. The two stores serve complementary failure modes of pure
+keyword vs pure semantic search.
 
 ```
-get_state(at?: timestamp) → StateSnapshot
-  "What was active/dormant/broken at timestamp T?" (default: now)
-
-get_digest(window: '24h'|'7d'|'session') → Digest
-  "Summarize what happened in window W."
-
-search_docs(query: string, limit?: int) → Observation[]
-  "Find relevant /docs chunks for query." (RAG)
-
-search_memory(query: string, limit?: int) → Observation[]
-  "Find relevant past observations." (claude-mem-style)
-
-get_todos(status?: 'open'|'blocked'|'done', refs?: string[]) → Todo[]
-  "List todos filtered by status or reference."
-
-create_todo({title, refs?, verify_command?}) → Todo
-update_todo({id, status?, verify_command?}) → Todo
-
-record_checkpoint(reason: string) → StateSnapshot
-  "Manually snapshot current state with reason."
+                            ┌───────────────────────────────┐
+                            │  Aggregator (privacy-scrubbed) │
+                            └───────────────┬───────────────┘
+                                            │
+                              ┌─────────────┴─────────────┐
+                              ▼                           ▼
+                  ┌───────────────────────┐   ┌───────────────────────┐
+                  │   SQLite + FTS5       │   │  Chroma (vector DB)   │
+                  │                       │   │                       │
+                  │  Tables: observations,│   │  Embeddings: per-      │
+                  │   sources, todos,     │   │   observation chunk    │
+                  │   snapshots, digests  │   │                       │
+                  │                       │   │  Distance: cosine     │
+                  │  FTS5 virtual table   │   │                       │
+                  │   on observation.text │   │  Indexer: HNSW        │
+                  │   for exact /         │   │                       │
+                  │   keyword / code-     │   │  Use case: fuzzy      │
+                  │   snippet matching    │   │   semantic intent     │
+                  │   (high precision)    │   │   (high recall)       │
+                  └──────────┬────────────┘   └──────────┬────────────┘
+                             │                           │
+                             └─────────────┬─────────────┘
+                                           ▼
+                            ┌───────────────────────────┐
+                            │  Rank Fusion              │
+                            │  (Reciprocal Rank Fusion) │
+                            │  on continuum_search()    │
+                            └───────────────────────────┘
 ```
 
-**Resources (MCP):**
+**Read path:**
+
+`continuum_search(query)` runs **both** stores in parallel, merges results via
+RRF (Reciprocal Rank Fusion), and returns the unified compact index. Callers
+fetch full content selectively via `continuum_get_observations(ids[])` — see §5.
+
+**Why both, not one:**
+
+- **FTS5 alone** misses paraphrase ("error handling" should find "exception").
+- **Chroma alone** misses precise code snippets, hashes, file paths, error codes.
+- **Together** = recall + precision. Mirrors claude-mem's verified approach.
+
+---
+
+## 5. MCP Interface — Progressive Disclosure (3-layer pattern)
+
+Naive flat retrieval (`search_docs(...) → Observation[]` with full text) blows
+the context window. claude-mem's verified solution is a **3-layer workflow**
+that filters by IDs before fetching content, yielding ~10x token savings.
+Continuum adopts the same pattern across all 5 aggregated sources.
+
+### Layer 1 — Search (compact index, ~50–100 tokens/result)
+
+```
+continuum_search({
+  query: string,
+  source?: 'docs'|'mem'|'sona'|'git'|'export'|undefined,  // omit = all
+  type?: string,                                          // e.g. 'commit', 'file_edit', 'pain_signal'
+  before?: timestamp,
+  after?: timestamp,
+  limit?: int = 20
+})
+→ SearchHit[]
+  where SearchHit = {
+    id: string,           // canonical Observation id
+    source: string,       // which adapter produced it
+    type: string,
+    timestamp: ISO8601,
+    title: string,        // 1-line summary (~60 chars)
+    score: number,        // RRF score from FTS5 + Chroma fusion
+    has_more: boolean     // true if get_observations would return >2KB
+  }
+```
+
+### Layer 2 — Timeline (chronological context around interesting hits)
+
+```
+continuum_timeline({
+  anchor: string | { query: string },   // ID or fresh query
+  window: '1h'|'24h'|'7d'|'session' = '24h',
+  source?: string,
+  limit?: int = 50
+})
+→ TimelineEntry[]
+  where TimelineEntry = SearchHit & { context_before: string[], context_after: string[] }
+```
+
+Lets the AI see "what was happening AROUND this observation" without fetching
+every full record. Useful for understanding causality
+("this commit broke X — what was the conversation right before?").
+
+### Layer 3 — Full fetch (only the IDs the AI explicitly requests)
+
+```
+continuum_get_observations({
+  ids: string[],          // BATCH multiple IDs — never call this one-at-a-time
+  format?: 'raw'|'rendered'|'with_refs' = 'rendered'
+})
+→ Observation[]
+  where Observation = {
+    id, source, type, timestamp, refs[],
+    content: string,      // FULL text — only fetched on demand
+    metadata: Record<string, unknown>
+  }
+```
+
+**Token cost discipline:**
+
+- Layer 1 search: ~1–2 KB per 20 results (just the index)
+- Layer 2 timeline: ~5–10 KB per 50 results (titles + neighbors)
+- Layer 3 fetch: ~500–2000 tokens per observation (full content)
+
+The AI is expected to filter aggressively before reaching Layer 3.
+Documentation + prompts (see below) reinforce this workflow.
+
+### Stateful tools (not observation-shaped — return directly)
+
+These remain compact by definition. No progressive disclosure needed.
+
+```
+continuum_get_state(at?: ISO8601)               → StateSnapshot
+continuum_get_digest(window?: '24h'|'7d'|...)   → Digest
+continuum_get_todos(status?, refs?)             → Todo[]            // already small
+continuum_create_todo({...})                    → Todo
+continuum_update_todo({id, ...})                → Todo
+continuum_record_checkpoint(reason: string)     → StateSnapshot
+```
+
+### Resources (MCP)
 
 - `continuum://state/current` — current StateSnapshot as markdown
 - `continuum://digest/latest` — latest digest
 - `continuum://todos/open` — open todos
+- `continuum://session/briefing` — pre-rendered "what's happening" for session start
 
-**Prompts (MCP):**
+### Prompts (MCP)
 
-- `continuum.session_start` — pre-built prompt that asks AI to read state+digest before responding
+- `continuum.session_start` — pre-built prompt: "Read `continuum://session/briefing` first, then use `continuum_search` (filter by IDs) before `continuum_get_observations` (fetch content)."
+- `continuum.cite` — given an Observation ID, return canonical citation block for inclusion in chat.
 
 ---
 
 ## 6. Deployment
 
+Continuum requires a **persistent background process** for asynchronous work
+(source polling, embedding generation, checkpoint scheduling, LLM-assisted
+digest composition). Following claude-mem's verified pattern, the Worker
+Service is a first-class V0 component — not optional, not deferred to V1.
+
 ```
-┌────────────────────────────────────────────────────────────────┐
-│  V0 (tonight): Local CLI — `npx continuum init/start`          │
-│     • SQLite + Chroma stored at ~/.continuum/                  │
-│     • MCP stdio server invoked by Claude Code per-project      │
-│     • Source adapters poll on a configurable cadence           │
-│                                                                │
-│  V1 (week 2): Docker self-host                                 │
-│     • Single container, exposes MCP over HTTP + WebSocket      │
-│     • Persistent volumes for SQLite + Chroma                   │
-│                                                                │
-│  V2 (month 2): Hosted SaaS                                     │
-│     • Multi-tenant, OAuth, billing                             │
-│     • Team workspaces                                          │
-│     • Cross-device sync                                        │
-└────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  V0 (this week): Local CLI + Background Worker                     │
+│                                                                    │
+│     ┌──────────────────────────────┐                               │
+│     │  AI client (Claude Code,     │                               │
+│     │  Desktop, Cursor)            │                               │
+│     └──────────┬───────────────────┘                               │
+│                │ stdio (MCP transport)                             │
+│                ▼                                                   │
+│     ┌──────────────────────────────┐                               │
+│     │  MCP stdio adapter           │  thin — routes calls to       │
+│     │  (`continuum mcp` cmd)       │  the Worker over HTTP         │
+│     └──────────┬───────────────────┘                               │
+│                │ HTTP                                              │
+│                ▼                                                   │
+│     ┌──────────────────────────────┐                               │
+│     │  Worker Service              │  ← managed by Bun (preferred) │
+│     │  on http://localhost:37778   │     or Node fallback          │
+│     │                              │                               │
+│     │  • Source polling loop       │                               │
+│     │  • Indexer (FTS5 + Chroma)   │                               │
+│     │  • Checkpoint scheduler      │                               │
+│     │  • Digest generator (LLM)    │                               │
+│     │  • Todo state machine        │                               │
+│     │  • Static web viewer UI      │                               │
+│     │  • 10+ HTTP search endpoints │                               │
+│     └──────────┬───────────────────┘                               │
+│                │                                                   │
+│                ▼                                                   │
+│     SQLite + Chroma + /checkpoints  (under ~/.continuum/{project}) │
+│                                                                    │
+│  Port: 37778 (deliberate +1 offset from claude-mem's 37777 to      │
+│              avoid collision when both run side-by-side)           │
+│                                                                    │
+│  CLI:                                                              │
+│     `continuum init`         → scaffold ~/.continuum/{project}/    │
+│     `continuum start`        → boot Worker (background daemon)     │
+│     `continuum stop`         → stop Worker                         │
+│     `continuum status`       → health + counts                     │
+│     `continuum mcp`          → start MCP stdio adapter             │
+│                                  (invoked by AI client config)     │
+│     `continuum checkpoint    → manual snapshot trigger             │
+│        <reason>`                                                   │
+└────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────┐
+│  V1 (week 2-3): Docker self-host                                   │
+│     • Single container — Worker exposed over HTTP + WebSocket      │
+│     • Persistent volumes for SQLite + Chroma                       │
+│     • MCP stdio adapter still client-side (connects to remote      │
+│       worker)                                                      │
+└────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────┐
+│  V2 (month 2): Hosted SaaS                                         │
+│     • Multi-tenant Worker fleet                                    │
+│     • OAuth, billing, team workspaces                              │
+│     • Cross-device sync (workspace_id-scoped)                      │
+└────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────┐
+│  V1.5 (parallel to Docker): OpenClaw Gateway distribution          │
+│                                                                    │
+│     Single-command installer (mirrors claude-mem's pattern):       │
+│                                                                    │
+│       curl -fsSL https://install.continuum.dev/openclaw.sh | bash  │
+│                                                                    │
+│     Installs Worker + MCP adapter as a persistent plugin on        │
+│     OpenClaw AI gateways alongside any other tools (claude-mem,    │
+│     custom MCP servers, etc.).                                     │
+│                                                                    │
+│     This accelerates adoption among AI-assisted developers who     │
+│     already run gateway infrastructure — Continuum becomes the     │
+│     "persistent state" plugin alongside claude-mem's "persistent   │
+│     memory" plugin (complementary, not competing — see D7).        │
+└────────────────────────────────────────────────────────────────────┘
 ```
+
+**Why Worker + thin MCP adapter (not pure stdio MCP):**
+
+1. **Async work survives session boundaries.** Embedding a 3000-doc /docs
+   tree can take 5+ minutes. We can't block the AI client's stdio.
+2. **Multiple clients can share the same Worker.** Claude Desktop + Claude
+   Code + Cursor on the same machine all see the same state.
+3. **Web viewer UI** for human inspection (status, manual checkpoint, recent
+   observations) lives alongside the API without a second process.
+4. **Matches claude-mem's verified runtime model** — proven to handle this
+   load profile.
 
 ---
 
 ## 7. Extension Points
 
-- **Source adapter SDK** — `interface SourceAdapter { sync(), search(), listen() }`. Anyone can add Slack, Linear, Jira, Notion, Figma, etc.
-- **Sink adapter SDK** — `interface Sink { onCheckpoint(), onDigest(), onTodoChange() }`. Notify Slack, email digest, etc.
-- **LLM provider abstraction** — digest generation pluggable (OpenAI, Anthropic, local Ollama).
-- **Embedding provider abstraction** — Chroma's default vs. OpenAI vs. local.
+### Source adapter SDK
+
+`interface SourceAdapter { sync(), search(), listen() }`. Anyone can add Slack, Linear, Jira, Notion, Figma, etc. New adapters require zero changes to Core — they bind to the same hook bus from §3.
+
+### Sink adapter SDK
+
+`interface Sink { onCheckpoint(), onDigest(), onTodoChange() }`. Notify Slack, email digest, post to discord, push to GitHub Issues, etc.
+
+### LLM provider abstraction
+
+Digest generation pluggable: OpenAI, Anthropic, local Ollama, or template-only fallback (no LLM required for V0).
+
+### Embedding provider abstraction
+
+Chroma's default vs. OpenAI vs. local. Default in V0: Chroma's built-in.
+
+### Open Claude Code execution synergy — Todo Pipeline ↔ Built-in Tools
+
+Continuum **flags state**. Open Claude Code **resolves it** with its 25+ built-in tools. The two systems compose:
+
+| Continuum surfaces… | Open Claude Code resolves with… |
+|---|---|
+| Open todo with `verify_command` | `Bash` — runs the verify command |
+| Open todo "edit X to Y" | `Edit` / `MultiEdit` — applies the change |
+| Open todo "build/refactor feature" | `Task` (sub-agent) — delegates with full Continuum context |
+| Open todo "review branch X" | `EnterWorktree` — isolated review env |
+| Drift between STATE.md and code | `Read` + `Grep` — verify the entry's `verify_command` |
+| New observation from `PostToolUse` | `TodoWrite` — Open Claude Code captures the next step in its own queue |
+
+This is **not** Continuum spawning Claude Code. It's Continuum providing the **CONTEXT** Open Claude Code needs to use its tools effectively. The boundary is clean: Continuum knows what's true; Open Claude Code knows what to do.
 
 ---
 
 ## 8. Security / Privacy
 
-- **Local-first by default.** Nothing leaves your machine unless you explicitly enable a sync sink.
-- **Encryption at rest:** SQLite + Chroma optionally encrypted (libSQL with encryption).
-- **`<private>` tag honored** (claude-mem convention): observations marked private never indexed.
-- **Tenant isolation:** SaaS deployment uses Postgres row-level security per workspace.
+### Privacy is a core invariant, not a convention
+
+The `<private>...</private>` tag (and configurable additional patterns) is a
+**Continuum invariant enforced at the Aggregator**, BEFORE content reaches
+the Indexer. This is elevated from claude-mem's "convention" status because
+Continuum aggregates 5 sources — any one of which could contain secrets,
+PII, or sensitive ops data. A single leak point is unacceptable.
+
+**Enforcement rule:**
+
+```
+Every Observation accepted by the Aggregator passes through PrivacyFilter
+BEFORE any indexing or storage occurs.
+
+PrivacyFilter.scan(content):
+  1. Strip any <private>...</private> block content (keep markers as
+     [PRIVATE_REDACTED] for audit).
+  2. Apply configured regex patterns (e.g. /sk-[a-zA-Z0-9]{20,}/,
+     /API_KEY\s*=/, /BEGIN PRIVATE KEY/).
+  3. If >50% of an Observation's content is private (heuristic),
+     DROP the entire Observation rather than store partial.
+  4. Emit a redaction Audit entry: {observation_id_would_be, source,
+     reason, byte_count_redacted, timestamp}.
+```
+
+This applies to **all 5 sources** — including:
+
+- `/docs` markdown (someone might paste a key into a doc)
+- `claude-mem` observations (forwarded — we honor the tag)
+- `sona_events` rows (corrected feedback may contain customer PII)
+- **git commit messages** (people accidentally commit secrets to messages too)
+- **session transcripts** (Claude conversations may include credentials)
+
+### Other privacy + security guarantees
+
+- **Local-first by default.** Nothing leaves your machine unless you explicitly enable a sync sink (V1+).
+- **Encryption at rest:** SQLite + Chroma optionally encrypted (libSQL with encryption support).
+- **Tenant isolation (V2+ SaaS):** Postgres row-level security per `workspace_id`, enforced at every table.
 - **No telemetry by default** — opt-in for usage analytics.
+- **Configurable redaction rules** (`~/.continuum/privacy.json`) — operators add their own patterns (e.g. internal customer ID formats).
+- **Audit log for redactions** queryable via `continuum_search({type: 'audit'})` — operators can see WHAT was dropped and WHY, without seeing the redacted content itself.
 
 ---
 
@@ -343,13 +639,13 @@ Locked tonight or before code begins.
 |---|---|---|---|---|
 | **D0** | Repo strategy | Standalone / inside VC / inside engine | **Standalone** | ✅ Locked 2026-05-14 |
 | **D1** | Working name | Continuum / Anchor / Recall / Through / Memex / other | Continuum | pending |
-| **D2** | Embedding store | Chroma / sqlite-vss / pgvector | Chroma (matches claude-mem) | pending |
-| **D3** | Monorepo tool | pnpm workspaces / turborepo / nx | pnpm (smallest) | pending |
+| **D2** | Embedding store | Chroma / sqlite-vss / pgvector | Chroma (matches claude-mem) | ✅ Locked 2026-05-14 (per §4a — hybrid FTS5 + Chroma verified pattern) |
+| **D3** | Monorepo tool | pnpm workspaces / turborepo / nx | pnpm (smallest) | ⚠️ Decided: **npm workspaces** for V0 (pnpm not installed; migration trivial). Locked 2026-05-14 |
 | **D4** | LLM for digest generation | optional from V0 / required from V1 | optional V0 (template fallback) | pending |
-| **D5** | License | MIT / Apache-2.0 / dual | Apache-2.0 (matches claude-mem) | pending |
-| **D6** | GitHub org | own org / under VoiceCosmos / personal | own org for OSS clarity | pending |
-| **D7** | claude-mem relationship | adapter (we consume) / fork / competitor | adapter — orchestrate, don't reinvent | pending |
-| **D8** | First checkpoint trigger | git commit / session end / both | both | pending |
+| **D5** | License | MIT / Apache-2.0 / dual | Apache-2.0 (matches claude-mem) | ✅ Locked 2026-05-14 — Apache-2.0. Easy to embed in MCP servers, agent harnesses, enterprise stacks. Matches claude-mem. |
+| **D6** | GitHub org | own org / under VoiceCosmos / personal | own org for OSS clarity | ✅ Locked 2026-05-14 — `number7even` (matches existing VC-Hospitality, VC-Spa, VC-Restaurants, number7evencrm). Repo: github.com/number7even/CONTINUUM |
+| **D7** | claude-mem relationship | adapter (we consume) / fork / competitor | adapter — orchestrate, don't reinvent | ✅ Locked 2026-05-14 (verified install at `~/.claude/plugins/marketplaces/thedotmack/` — proven runtime model adopted in §3, §4a, §5, §6, §8) |
+| **D8** | First checkpoint trigger | git commit / session end / both | both | ✅ Locked 2026-05-14 — **both**. SessionEnd hook (§3) writes auto-checkpoints; `git post-commit` hook writes mid-session checkpoints. Manual `continuum_record_checkpoint` always available. |
 
 ---
 
