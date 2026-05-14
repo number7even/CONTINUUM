@@ -1,12 +1,20 @@
 # Continuum — Architecture Map
 
-> **Status:** v0.1 draft — claude-mem reverse-engineering integrated
+> **Status:** v0.2 draft — claude-mem reverse-engineering + ruv-FANN neural capability layer
 > **Date:** 2026-05-14
 > **Authors:** Riaan Kleynhans + Claude
 > **Working name:** Continuum (open — see D1)
 > **Repo:** [github.com/number7even/CONTINUUM](https://github.com/number7even/CONTINUUM) (Option A: standalone, locked 2026-05-14)
 >
-> **v0.1 changelog (this revision):**
+> **v0.2 changelog (this revision):**
+> Added **§10a Neural Capability Layer** — ruv-FANN / ruv-swarm / Neuro-Divergent / midstream integration phased across V0.5 → V2.
+> Updated **§5** with future `continuum_spawn_swarm` MCP tool (V1.5).
+> Updated **§6** with ruv-FANN WASM-native local digest path (V0.5).
+> Updated **§15 Roadmap** with neural-layer phasing.
+> Updated **§16 Related Documents** with ruv-FANN, ruv-swarm, midstream, open-claude-code.
+> Locked **D4** (digest engine) — phased: template fallback V0 → ruv-FANN local V0.5 → external LLM optional override.
+>
+> **v0.1 changelog (previous revision):**
 > Reverse-engineered 5 verified patterns from `thedotmack/claude-mem` v13.2.0
 > (installed at `~/.claude/plugins/marketplaces/thedotmack/`):
 > §3 — 5 lifecycle hook listeners replace generic source-change trigger.
@@ -564,6 +572,160 @@ V2 (hosted):     workspace_id at every table level, RLS enforced
 
 ---
 
+## 10a. Neural Capability Layer (ruv-FANN integration)
+
+Continuum's V0 ships as a passive memory + state aggregator. Beginning V0.5, the
+[**ruv-FANN**](https://github.com/ruvnet/ruv-FANN) neural framework (WASM-native, CPU-only, MCP-first) is embedded into the Worker
+as a **Neural Capability Layer**. This transforms Continuum from passive state-tracker
+into an active, autonomous problem-solving engine — without any change to the
+MCP contract or the 5-source aggregation model.
+
+**Why ruv-FANN, not external LLMs:**
+
+- **WASM-native** — embeds directly into Continuum's Node/TypeScript Worker, no separate process.
+- **CPU-only** — no GPU required, runs on any developer machine.
+- **<100ms decisions** — fast enough for synchronous MCP tool responses.
+- **Zero API cost** — no OpenAI/Anthropic round-trip per digest or todo evaluation.
+- **MCP-first** — Continuum exposes ruv-FANN capabilities as MCP tools to the AI client.
+
+### Phased integration
+
+```
+V0    (current)  → no neural layer; template-based digest fallback only
+V0.5  (week 2-3) → ruv-FANN embedded for local digest generation
+V1    (month 1)  → ruv-swarm for ephemeral per-adapter source aggregation
+V1.5  (month 2)  → continuum_spawn_swarm MCP tool (autonomous todo execution)
+V2    (month 3)  → Neuro-Divergent forecasting models for predictive snapshots
+```
+
+### V0.5 — Local digest generation (replaces optional LLM call)
+
+The Digest Generator currently has an "optional LLM provider abstraction" (§7).
+V0.5 makes ruv-FANN the **primary local path**, with external LLMs as opt-in override:
+
+```
+Digest Generator
+   ├─ Template fallback (V0, no LLM)             — always available
+   ├─ ruv-FANN local (V0.5+)                     — default, zero-cost, <100ms
+   └─ External LLM (optional override)           — OpenAI/Anthropic when richer narrative needed
+```
+
+### V1 — Swarm-based source aggregation
+
+Continuum's Aggregator (§2, §3) currently runs source adapters in the Worker
+process. V1 introduces **ephemeral ruv-swarm agents** — one per adapter — that
+ingest and normalize concurrently, resolve conflicts via swarm consensus, and
+dissolve once their batch is committed to SQLite/Chroma.
+
+```
+                            ┌─────────────────────────┐
+                            │   Continuum Aggregator   │
+                            └──────────┬──────────────┘
+                                       │ spawn ephemeral swarm
+                ┌──────────┬───────────┼───────────┬──────────┐
+                ▼          ▼           ▼           ▼          ▼
+            docs       mem agent     sona       git agent   export
+            agent      (mesh)        agent      (ring)      agent
+            (mesh)                   (ring)                 (hierarchical)
+                │          │           │           │          │
+                └──────────┴───────────┴───────────┴──────────┘
+                                       │ swarm-consensus normalize
+                                       ▼
+                            ┌─────────────────────────┐
+                            │  Single Observation     │
+                            │  stream (canonical)     │
+                            └──────────┬──────────────┘
+                                       ▼
+                                  Indexer (FTS5 + Chroma)
+                                       │
+                                       ▼
+                                 Swarm dissolves
+```
+
+**Topology per adapter** (cognitive pattern fit):
+
+- **docs** (mesh) — peer chunks coordinate around shared concept clusters
+- **mem** (mesh) — peer observations cross-reference
+- **sona** (ring) — temporal feedback signals require chronological coherence
+- **git** (ring) — commits inherently chronological
+- **export** (hierarchical) — session transcripts have nested turn structure
+
+### V1.5 — `continuum_spawn_swarm` MCP tool
+
+A new MCP tool exposes ephemeral swarm spawning to the AI client (Open Claude Code, etc.):
+
+```
+continuum_spawn_swarm({
+  task: string,                                 // natural language description
+  topology?: 'mesh'|'ring'|'hierarchical'|'star',
+  max_agents?: int = 5,
+  cognitive_pattern?: 'convergent'|'divergent'|'lateral',
+  verify_command?: string,                      // if provided, swarm must satisfy before declaring done
+  lifecycle: 'ephemeral'                        // always — dissolves after success or timeout
+})
+→ SwarmResult = {
+    swarm_id: string,
+    status: 'succeeded' | 'failed' | 'timed_out',
+    artifacts: Observation[],                    // anything the swarm produced (commits, files, tests)
+    verify_passed: boolean,
+    runtime_ms: number,
+    agents_spawned: int
+  }
+```
+
+**Use case:** an open Todo with `verify_command` set. Open Claude Code invokes
+`continuum_spawn_swarm` with the todo as task and its verify_command — the
+ephemeral swarm attempts the work, the verify_command is run, and the swarm
+dissolves regardless of outcome (artifacts persist as Observations either way).
+
+This is the **autonomous Todo resolution path** — distinct from human/AI manual
+resolution. Operator/Riaan retains HITL approval over swarm-produced commits.
+
+### V2 — Neuro-Divergent predictive snapshots
+
+[**Neuro-Divergent**](https://github.com/ruvnet/ruv-FANN/tree/main/neuro-divergent) (subproject of ruv-FANN) provides 27+ neural forecasting models. Continuum's
+StateSnapshot model gains a `forecast` field:
+
+```
+StateSnapshot {
+  // ... existing fields ...
+  forecast?: {
+    timeline_slip_probability: number,       // 0..1 — likelihood of missing next milestone
+    components_likely_to_break: string[],    // by file/module
+    todos_likely_to_unblock: string[],       // by todo id
+    confidence: number,                       // 0..1
+    model: string,                            // which Neuro-Divergent model produced this
+    generated_at: ISO8601
+  }
+}
+```
+
+**Input signals:** git commit velocity, todo completion rate, observation
+type distribution over time, claude-mem session frequency, SONA feedback
+sentiment trends. Architectural symmetry with VoiceCosmos's ARIA approach
+to predictive guest engagement (same forecast primitives, different domain).
+
+### V1+ — midstream for streaming transport
+
+[**midstream**](https://github.com/ruvnet/midstream) (sibling project) provides real-time streaming primitives that
+fit Continuum's V1+ HTTP/SSE/WebSocket transport (§6). When the worker handles
+multi-client subscriptions (Claude Desktop + Code + Cursor all watching the
+same workspace), midstream's pub/sub layer brokers state-change broadcasts
+without each client polling.
+
+### Hard separations
+
+To avoid scope creep into V0:
+
+- **No ruv-FANN dependency in V0 packages.** Worker stays pure-TS until V0.5.
+- **All neural-layer code lives behind feature flags.** Operators can disable
+  the entire layer with `CONTINUUM_NEURAL=disabled` and Continuum runs the
+  V0 path indefinitely.
+- **Verify-then-dissolve discipline** for every swarm spawn — no long-lived
+  agents in V1.5 by design.
+
+---
+
 ## 11. Repo Structure (standalone — locked: Option A)
 
 ```
@@ -641,7 +803,7 @@ Locked tonight or before code begins.
 | **D1** | Working name | Continuum / Anchor / Recall / Through / Memex / other | Continuum | pending |
 | **D2** | Embedding store | Chroma / sqlite-vss / pgvector | Chroma (matches claude-mem) | ✅ Locked 2026-05-14 (per §4a — hybrid FTS5 + Chroma verified pattern) |
 | **D3** | Monorepo tool | pnpm workspaces / turborepo / nx | pnpm (smallest) | ⚠️ Decided: **npm workspaces** for V0 (pnpm not installed; migration trivial). Locked 2026-05-14 |
-| **D4** | LLM for digest generation | optional from V0 / required from V1 | optional V0 (template fallback) | pending |
+| **D4** | Digest generation engine | external LLM only / ruv-FANN local-first / template-only | phased — see §10a | ✅ Locked 2026-05-14 — **Phased: V0 template fallback → V0.5+ ruv-FANN local (CPU-native, zero-cost) → external LLM as optional override**. No external API dependency in default config. |
 | **D5** | License | MIT / Apache-2.0 / dual | Apache-2.0 (matches claude-mem) | ✅ Locked 2026-05-14 — Apache-2.0. Easy to embed in MCP servers, agent harnesses, enterprise stacks. Matches claude-mem. |
 | **D6** | GitHub org | own org / under VoiceCosmos / personal | own org for OSS clarity | ✅ Locked 2026-05-14 — `number7even` (matches existing VC-Hospitality, VC-Spa, VC-Restaurants, number7evencrm). Repo: github.com/number7even/CONTINUUM |
 | **D7** | claude-mem relationship | adapter (we consume) / fork / competitor | adapter — orchestrate, don't reinvent | ✅ Locked 2026-05-14 (verified install at `~/.claude/plugins/marketplaces/thedotmack/` — proven runtime model adopted in §3, §4a, §5, §6, §8) |
@@ -651,21 +813,33 @@ Locked tonight or before code begins.
 
 ## 15. Roadmap (post-V0)
 
-- **V0** (this week): dogfood-ready, 4 MCP tools, 3 source adapters, local-only
-- **V0.5** (week 2): claude-mem + sona adapters, todo manager, LLM digest
-- **V1** (month 1): Docker self-host, MCP over HTTP, MIT/Apache OSS release on GitHub
-- **V1.5** (month 2): web UI (status dashboard, manual checkpoint controls)
-- **V2** (month 3): hosted SaaS — multi-tenant, OAuth, billing, team workspaces
+- **V0** (this week): dogfood-ready, 4 MCP tools, 3 source adapters (docs/git/export), local-only, **no neural layer**
+- **V0.5** (week 2-3): claude-mem + sona adapters, todo manager, **ruv-FANN WASM embedded for local digest generation** (§10a)
+- **V1** (month 1): Docker self-host, MCP over HTTP/SSE, Apache-2.0 OSS release, **ruv-swarm for per-adapter ephemeral source aggregation** (§10a)
+- **V1.5** (month 2): web UI (status dashboard, manual checkpoint controls), **`continuum_spawn_swarm` MCP tool** (§10a), **OpenClaw Gateway distribution** (§6)
+- **V2** (month 3): hosted SaaS — multi-tenant, OAuth, billing, team workspaces, **Neuro-Divergent predictive snapshots** (§10a), **midstream streaming transport** (§10a)
 - **V3** (quarter 2): ARIA hotel integration — same engine, tenant-scoped, embedded in Voice OS
 
 ---
 
 ## 16. Related Documents
 
-- `STATE.md` (this repo root) — canonical activation state for VC-Hospitality (what Continuum will source from + replace as the primary mechanism)
-- `STATE_DOCS_INDEX.md` (this repo root) — canonical /docs map (what docs adapter ingests)
+### Continuum's own state files (in dogfood repo)
+
+- `STATE.md` (VC-Hospitality root) — canonical activation state, source for Continuum's first checkpoint snapshot
+- `STATE_DOCS_INDEX.md` (VC-Hospitality root) — canonical /docs map (what `adapters/docs` ingests on first sync)
 - `MEMORY.md` (Claude's project memory) — insights store (complementary to Continuum, not replaced)
-- `~/.claude-mem/` — claude-mem v13.2.0 installed 2026-05-14 (memory adapter source)
+
+### Memory + AI client primitives
+
+- [**claude-mem**](https://github.com/thedotmack/claude-mem) v13.2.0 — installed 2026-05-14 at `~/.claude/plugins/marketplaces/thedotmack/`. Continuum consumes via `adapters/claude-mem` per D7.
+- [**open-claude-code**](https://github.com/ruvnet/open-claude-code) — primary AI client target (§1). Native MCP support across 4 transports.
+
+### Neural capability layer (V0.5+ — see §10a)
+
+- [**ruv-FANN**](https://github.com/ruvnet/ruv-FANN) — WASM-native neural framework. Powers local digest generation (V0.5), source-adapter swarms (V1), `continuum_spawn_swarm` (V1.5).
+- [**ruv-FANN / Neuro-Divergent**](https://github.com/ruvnet/ruv-FANN/tree/main/neuro-divergent) — 27+ forecasting models. Powers V2 predictive snapshots.
+- [**midstream**](https://github.com/ruvnet/midstream) — real-time streaming primitives. Powers V1+ multi-client subscription transport.
 
 ---
 
