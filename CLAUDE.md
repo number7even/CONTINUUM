@@ -31,29 +31,63 @@
 - **License:** Apache-2.0
 - **Workspace tool:** npm workspaces (D3 locked — pnpm migration trivial later)
 - **Storage engine V0:** SQLite + FTS5 via `better-sqlite3`. RuVector swap
-  comes V0.5+ via storage adapter pattern (D2 locked).
+  comes V0.5+ via storage adapter pattern (D2 locked **and now materialised
+  in code** — see below).
+- **Storage Adapter pattern (D2) materialised in code** (commit `e725ae7`,
+  2026-05-15): `StorageBackend` interface in `packages/core/src/storage.ts`,
+  `SQLiteStorageBackend` impl in `packages/core/src/storage-sqlite.ts`,
+  factory `openStorage(projectId)`. All consumers (`mcp-server`,
+  `adapter-export`) go through the abstraction. V0.5 RuVector swap is a
+  single-line change at the factory.
 - **V0 packages compiled clean:**
-  - `packages/core/` — types, db, checkpoint engine
-  - `packages/mcp-server/` — 4 MCP tools (`continuum_record_checkpoint`,
-    `continuum_get_state`, `continuum_get_digest`, `continuum_search_docs`)
-- **First real `product_state[]` checkpoint exists** for `vc-hospitality`
-  project at `~/.continuum/vc-hospitality/continuum.db`.
+  - `packages/core/` — types, db, checkpoint engine, todo CRUD, storage
+    abstraction
+  - `packages/mcp-server/` — **7 MCP tools** + **1 Resource**:
+    - `continuum_record_checkpoint`, `continuum_get_state`,
+      `continuum_get_digest`, `continuum_search_docs` (V0 baseline)
+    - `continuum_get_todos`, `continuum_create_todo`,
+      `continuum_update_todo` (added 2026-05-15, commit `c9def2c`)
+    - Resource `continuum://todos/open` (added 2026-05-15, commit `c9def2c`)
+  - `packages/adapters/export/` — Claude session JSONL → Observation
+    adapter (commit `0dd867b`, shipped pre-2026-05-15).
+- **Verify-then-dissolve discipline proven end-to-end** (2026-05-15): row
+  `81223c05-4465-480c-a56d-14f665ffb581` in the `vc-hospitality` DB —
+  hospitality-aria deploy verified via SHA-grep of bundle `buildId`
+  (commit `2aa4f96a5`), row closed only after fresh `verifyCommand`
+  exited 0. Re-runnable witness encoded in the DB row itself.
+- **`product_state[]` checkpoints in DB** (3 rows in `vc-hospitality`):
+  - `aa102d94` — "Continuum V0 born" (2026-05-14)
+  - `028d1cd3` — Grok failover stack live (2026-05-14)
+  - `e22985e0` — V0 polish milestone (2026-05-15; reproducible via
+    `scripts/checkpoints/v0-polish-2026-05-15.mjs`)
 
 ## What's NOT done yet (do not claim otherwise)
 
-- ❌ MCP Resources (`continuum://state/current`, `continuum://digest/latest`,
-  `continuum://todos/open`, `continuum://session/briefing`) — V0 polish gap.
+- ⏳ MCP Resources — 1 of 4 shipped: ✅ `continuum://todos/open` (2026-05-15).
+  Still missing: ❌ `continuum://state/current`, `continuum://digest/latest`,
+  `continuum://session/briefing` — V0 polish gap.
 - ❌ MCP Prompts (`continuum.session_start`, `continuum.cite`) — V0 polish gap.
-- ❌ `packages/adapters/{docs,git,export}` — V0 polish.
+- ❌ `packages/adapters/{docs,git}` — V0 polish (`export` shipped at `0dd867b`).
 - ❌ STATE.md → first-checkpoint parser — V0 polish.
 - ❌ CLI (`npx continuum init / start / status`) — V0 polish.
 - ❌ `claude-mem` + `sona` adapters — V0.5.
-- ❌ RuVector storage backend — V0.5 (behind verification gate).
+- ❌ RuVector storage backend — V0.5 (drop-in point now wired at
+  `openStorage()` factory — V0.5 work is the implementation, not the seam).
 - ❌ ruv-FANN / ruvllm digest generation — V0.5.
 - ❌ ruv-swarm ingestion — V1.
 - ❌ Web UI — V1.5.
-- ❌ HTTP/SSE/WebSocket transports — V1.
-- ❌ Hosted SaaS multi-tenant — V2.
+- ❌ HTTP/SSE/WebSocket transports — V1. **Backlog encoded as todos**
+  V1.1→V1.4 in the `vc-hospitality` pipeline (2026-05-15).
+- ❌ Hosted SaaS multi-tenant — V2. **Backlog encoded as todos** V2.1
+  (WebSocket) + V2.2 (Postgres RLS + OAuth — see architectural flag below)
+  in the `vc-hospitality` pipeline (2026-05-15).
+
+**Open architectural flag (2026-05-15):** V2.2 todo title says "Postgres
+RLS" but D2 locks RuVector as the V0.5+ unified persistence engine. Two
+coherent reconciliations: (a) RuVector holds data, Postgres wraps it as the
+auth/tenancy directory (common SaaS pattern, no D2 revision needed); or
+(b) V2 reverts to Postgres which would require a D2 lock-revision conversation
+in ARCHITECTURE.md §14. Decide before V2.2 work begins.
 
 ---
 
@@ -121,7 +155,7 @@ The architecture is identical across all three. Only configuration changes.
 
 ---
 
-_Last updated: 2026-05-14._
+_Last updated: 2026-05-15._
 _Update this file whenever V0 polish lands, V0.5 begins, or any partner
 agreement clause is revised._
 
