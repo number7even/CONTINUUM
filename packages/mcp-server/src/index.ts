@@ -2,12 +2,19 @@
 /**
  * Continuum MCP stdio server (V0).
  *
- * Exposes 4 tools to MCP-aware AI clients (Claude Code, Cursor, etc.):
+ * Exposes 7 tools + 1 resource to MCP-aware AI clients (Claude Code, Cursor,
+ * Hermes Agent, etc.):
  *
  *   1. continuum_record_checkpoint  — write immutable state snapshot
  *   2. continuum_get_state           — fetch state at timestamp (or now)
  *   3. continuum_get_digest          — fetch composed narrative for window
  *   4. continuum_search_docs         — FTS5 keyword search over observations
+ *   5. continuum_get_todos           — list todos, optional status filter
+ *   6. continuum_create_todo         — create a new todo in the pipeline
+ *   7. continuum_update_todo         — mutate status/title/etc. on a todo
+ *
+ * Resources:
+ *   continuum://todos/open — JSON list of all open + in_progress todos.
  *
  * Progressive Disclosure scaffolding (ARCHITECTURE.md §5) is in place — V0
  * ships layer-1 (search returning compact hits) only. Layer-2 timeline +
@@ -34,14 +41,22 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   openDb,
   recordCheckpoint,
   getStateAt,
   listSnapshots,
+  createTodo,
+  listTodos,
+  updateTodo,
   type CheckpointInput,
   type StateEntry,
+  type CreateTodoInput,
+  type UpdateTodoInput,
+  type Todo,
 } from '@continuum/core';
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
@@ -57,6 +72,7 @@ const server = new Server(
   {
     capabilities: {
       tools: {},
+      resources: {},
     },
   },
 );
@@ -163,6 +179,87 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
         },
         required: ['query'],
+      },
+    },
+    {
+      name: 'continuum_get_todos',
+      description:
+        'List todos in the live pipeline. Pass status="open" (or "in_progress" / "blocked" / "done") ' +
+        'to filter, or omit to return all. Newest first. The continuum://todos/open resource is ' +
+        'the cheap polling surface; this tool is for filtered lookups.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['open', 'in_progress', 'blocked', 'done'],
+            description: 'Filter by status. Omit for all statuses.',
+          },
+          limit: {
+            type: 'number',
+            description: 'Max results. Default 100.',
+          },
+        },
+      },
+    },
+    {
+      name: 'continuum_create_todo',
+      description:
+        'Create a new todo in the pipeline. Use this when a discussion produces a commitment that ' +
+        'should be tracked through to verification. refs[] links to observation IDs that motivated ' +
+        'the todo; verifyCommand is a shell command that proves the todo is satisfied when it returns 0. ' +
+        'IMPORTANT: for deployment, release, migration, or "ship" todos, you MUST populate verifyCommand — ' +
+        'it is the gate that proves the change actually landed (e.g. health-check curl, smoke test, ' +
+        'grep for the deployed artifact). Todos without verifyCommand cannot be auto-resolved by ' +
+        'scheduled clients (e.g. cron-driven Hermes) and must be closed manually.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          refs: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Observation IDs that motivated this todo.',
+          },
+          verifyCommand: {
+            type: 'string',
+            description:
+              'Shell command that exits 0 when satisfied. REQUIRED for any deploy/release/migration ' +
+              'todo so the verify-then-dissolve loop can close it without human approval.',
+          },
+          blockedBy: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Other Todo IDs that must complete first.',
+          },
+          status: {
+            type: 'string',
+            enum: ['open', 'in_progress', 'blocked', 'done'],
+            description: 'Initial status. Default "open".',
+          },
+        },
+        required: ['title'],
+      },
+    },
+    {
+      name: 'continuum_update_todo',
+      description:
+        'Update mutable fields on a todo — status transitions, title edits, verifyCommand changes, ' +
+        'blockedBy dependencies. Transitioning to status="done" stamps completedAt automatically.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          status: {
+            type: 'string',
+            enum: ['open', 'in_progress', 'blocked', 'done'],
+          },
+          title: { type: 'string' },
+          verifyCommand: { type: ['string', 'null'] },
+          blockedBy: { type: 'array', items: { type: 'string' } },
+          refs: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['id'],
       },
     },
   ],
@@ -272,6 +369,38 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         };
       }
 
+      case 'continuum_get_todos': {
+        const { status, limit } = (args ?? {}) as { status?: Todo['status']; limit?: number };
+        const todos = listTodos(db, { status, limit });
+        return {
+          content: [
+            { type: 'text', text: JSON.stringify({ count: todos.length, todos }, null, 2) },
+          ],
+        };
+      }
+
+      case 'continuum_create_todo': {
+        const input = args as unknown as CreateTodoInput;
+        if (!input?.title?.trim()) {
+          throw new Error('title is required');
+        }
+        const todo = createTodo(db, input);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(todo, null, 2) }],
+        };
+      }
+
+      case 'continuum_update_todo': {
+        const input = args as unknown as UpdateTodoInput;
+        if (!input?.id) {
+          throw new Error('id is required');
+        }
+        const todo = updateTodo(db, input);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(todo, null, 2) }],
+        };
+      }
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -282,6 +411,54 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
       isError: true,
     };
   }
+});
+
+// ── Resource registry ────────────────────────────────────────────────────────
+//
+// V0 ships one Resource — continuum://todos/open — the live open-pipeline view.
+// V0 polish will add continuum://state/current, continuum://digest/latest,
+// continuum://session/briefing once Aggregator + Digest writers land.
+
+const OPEN_TODOS_URI = 'continuum://todos/open';
+
+server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+  resources: [
+    {
+      uri: OPEN_TODOS_URI,
+      name: 'Open Todos',
+      description:
+        'Live list of todos with status="open" or "in_progress". Cheap polling surface ' +
+        'for scheduled clients (e.g. cron-driven Hermes runs) to check what work is queued.',
+      mimeType: 'application/json',
+    },
+  ],
+}));
+
+server.setRequestHandler(ReadResourceRequestSchema, async request => {
+  const { uri } = request.params;
+  if (uri !== OPEN_TODOS_URI) {
+    throw new Error(`Unknown resource: ${uri}`);
+  }
+  const open = listTodos(db, { status: 'open' });
+  const inProgress = listTodos(db, { status: 'in_progress' });
+  const todos = [...open, ...inProgress];
+  return {
+    contents: [
+      {
+        uri,
+        mimeType: 'application/json',
+        text: JSON.stringify(
+          {
+            generatedAt: new Date().toISOString(),
+            count: todos.length,
+            todos,
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
 });
 
 // ── Template digest (V0 — replaced by ruvllm/ruv-FANN in V0.5) ────────────────

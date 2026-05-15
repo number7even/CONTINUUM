@@ -40,3 +40,13 @@ export {
   privacyFilter,
   type PrivacyResult,
 } from './observation.js';
+
+export {
+  createTodo,
+  listTodos,
+  getTodo,
+  updateTodo,
+  type CreateTodoInput,
+  type ListTodosOptions,
+  type UpdateTodoInput,
+} from './todo.js';
