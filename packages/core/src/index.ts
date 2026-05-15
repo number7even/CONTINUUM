@@ -2,13 +2,20 @@
  * @continuum/core — public API surface.
  *
  * V0 ships:
- *   - Types (Observation, StateSnapshot, Todo, Digest, SearchHit)
- *   - SQLite storage (better-sqlite3 + FTS5)
- *   - Checkpoint engine (record_checkpoint, getStateAt, listSnapshots)
+ *   - Types (Observation, StateSnapshot, Todo, Digest, SearchHit, …)
+ *   - StorageBackend interface — domain-level persistence abstraction
+ *   - SQLiteStorageBackend — V0 implementation (better-sqlite3 + FTS5)
+ *   - openStorage(projectId) factory — single swap point for V0.5 RuVector
+ *   - Pure helpers (privacyFilter)
  *
- * V0.5+ adds: RuVector storage backend behind the same surface, plus
- * GNN-reinforced search, RVF cognitive containers, Delta Behavior CRDTs.
+ * Consumers of @continuum/core SHOULD NOT touch better-sqlite3 directly —
+ * always go through openStorage()/StorageBackend so the V0.5 RuVector swap
+ * is a single-line change at the factory.
+ *
+ * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
+
+// — Domain types
 export type {
   Source,
   SourceType,
@@ -20,33 +27,20 @@ export type {
   SearchHit,
 } from './types.js';
 
-export {
-  openDb,
-  dbPathForProject,
-  continuumDataRoot,
-} from './db.js';
+// — Storage abstraction (the V0 → V0.5 stable interface)
+export type {
+  StorageBackend,
+  CheckpointInput,
+  CreateTodoInput,
+  ListTodosOptions,
+  UpdateTodoInput,
+  InsertObservationsResult,
+} from './storage.js';
 
-export {
-  recordCheckpoint,
-  getStateAt,
-  listSnapshots,
-  type CheckpointInput,
-} from './checkpoint.js';
+export { openStorage, SQLiteStorageBackend } from './storage-sqlite.js';
 
-export {
-  upsertSource,
-  insertObservation,
-  insertObservationsBulk,
-  privacyFilter,
-  type PrivacyResult,
-} from './observation.js';
+// — Filesystem layout helpers (used by adapters/CLI for diagnostics)
+export { dbPathForProject, continuumDataRoot } from './db.js';
 
-export {
-  createTodo,
-  listTodos,
-  getTodo,
-  updateTodo,
-  type CreateTodoInput,
-  type ListTodosOptions,
-  type UpdateTodoInput,
-} from './todo.js';
+// — Pure helpers (storage-agnostic)
+export { privacyFilter, type PrivacyResult } from './observation.js';

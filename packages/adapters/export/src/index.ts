@@ -33,9 +33,8 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import chokidar from 'chokidar';
 import {
-  openDb,
-  upsertSource,
-  insertObservationsBulk,
+  openStorage,
+  type StorageBackend,
   type Observation,
 } from '@continuum/core';
 import { parseJsonlLine, turnToObservation } from './parser.js';
@@ -93,7 +92,7 @@ function findClaudeSessionDir(claudeRoot: string, projectName: string): string |
 const offsets = new Map<string, number>();
 
 function processFile(
-  db: ReturnType<typeof openDb>,
+  storage: StorageBackend,
   filePath: string,
   sourceId: string,
   verbose: boolean,
@@ -150,7 +149,7 @@ function processFile(
   let added = 0;
   let dropped = 0;
   if (observations.length > 0) {
-    const result = insertObservationsBulk(db, observations);
+    const result = storage.insertObservationsBulk(observations);
     added = result.inserted;
     dropped = result.dropped;
   }
@@ -169,9 +168,9 @@ function processFile(
 
 async function main() {
   const args = parseArgs(process.argv);
-  const db = openDb(args.project);
+  const storage = openStorage(args.project);
   const sourceId = `export:${args.project}`;
-  upsertSource(db, sourceId, 'export', { adapter: '@continuum/adapter-export', version: '0.0.1' });
+  storage.upsertSource(sourceId, 'export', { adapter: '@continuum/adapter-export', version: '0.0.1' });
 
   const sessionDir = findClaudeSessionDir(args.claudeDir, args.project);
   if (!sessionDir) {
@@ -183,7 +182,7 @@ async function main() {
 
   console.log(`[export] project=${args.project}`);
   console.log(`[export] session dir=${sessionDir}`);
-  console.log(`[export] db=${(db as any).name ?? '~/.continuum/' + args.project + '/continuum.db'}`);
+  console.log(`[export] storage=${storage.dataLocation()}`);
   console.log(`[export] mode=${args.mode}`);
 
   // Initial backfill pass — read every existing .jsonl file from offset 0.
@@ -192,14 +191,14 @@ async function main() {
   let totalDropped = 0;
   for (const f of initialFiles) {
     const full = join(sessionDir, f);
-    const { added, dropped } = processFile(db, full, sourceId, args.verbose);
+    const { added, dropped } = processFile(storage, full, sourceId, args.verbose);
     totalAdded += added;
     totalDropped += dropped;
   }
   console.log(`[export] backfill complete: ${totalAdded} observation${totalAdded === 1 ? '' : 's'} added from ${initialFiles.length} file${initialFiles.length === 1 ? '' : 's'}${totalDropped > 0 ? ` (${totalDropped} dropped by privacy filter)` : ''}`);
 
   if (args.mode === 'once') {
-    db.close();
+    storage.close();
     return;
   }
 
@@ -211,7 +210,7 @@ async function main() {
   });
 
   const handle = (path: string) => {
-    processFile(db, path, sourceId, args.verbose);
+    processFile(storage, path, sourceId, args.verbose);
   };
 
   watcher.on('add', handle);
@@ -222,7 +221,7 @@ async function main() {
   const shutdown = () => {
     console.log('\n[export] shutting down...');
     watcher.close().then(() => {
-      db.close();
+      storage.close();
       process.exit(0);
     });
   };

@@ -45,13 +45,8 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
-  openDb,
-  recordCheckpoint,
-  getStateAt,
-  listSnapshots,
-  createTodo,
-  listTodos,
-  updateTodo,
+  openStorage,
+  type StorageBackend,
   type CheckpointInput,
   type StateEntry,
   type CreateTodoInput,
@@ -62,7 +57,7 @@ import {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 const projectId = process.env.CONTINUUM_PROJECT_ID ?? 'default';
-const db = openDb(projectId);
+const storage: StorageBackend = openStorage(projectId);
 
 const server = new Server(
   {
@@ -277,7 +272,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         if (!input?.reason || !Array.isArray(input?.active)) {
           throw new Error('reason and active[] are required');
         }
-        const snapshot = recordCheckpoint(db, input);
+        const snapshot = storage.recordCheckpoint(input);
         return {
           content: [
             { type: 'text', text: JSON.stringify(snapshot, null, 2) },
@@ -287,7 +282,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
       case 'continuum_get_state': {
         const at = (args as { at?: string })?.at;
-        const snapshot = getStateAt(db, at);
+        const snapshot = storage.getStateAt(at);
         if (!snapshot) {
           return {
             content: [
@@ -309,7 +304,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
       case 'continuum_get_digest': {
         const window = (args as { window?: string })?.window ?? '24h';
-        const snapshots = listSnapshots(db, 10);
+        const snapshots = storage.listSnapshots(10);
         const hoursWindow = window === '7d' ? 168 : window === 'session' ? 8 : 24;
         const cutoff = new Date(Date.now() - hoursWindow * 3600 * 1000).toISOString();
         const recent = snapshots.filter(s => s.timestamp >= cutoff);
@@ -334,34 +329,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
       case 'continuum_search_docs': {
         const { query, limit } = args as { query: string; limit?: number };
         if (!query?.trim()) throw new Error('query is required');
-
-        const rows = db.prepare(`
-          SELECT o.id, o.source_id, o.type, o.content, o.timestamp,
-                 bm25(observations_fts) AS rank
-          FROM observations_fts
-          JOIN observations o ON o.rowid = observations_fts.rowid
-          WHERE observations_fts MATCH ?
-          ORDER BY rank
-          LIMIT ?
-        `).all(query, limit ?? 20) as Array<{
-          id: string;
-          source_id: string;
-          type: string;
-          content: string;
-          timestamp: string;
-          rank: number;
-        }>;
-
-        const hits = rows.map(r => ({
-          id: r.id,
-          source: r.source_id.split(':')[0],
-          type: r.type,
-          timestamp: r.timestamp,
-          title: r.content.slice(0, 80).replace(/\s+/g, ' '),
-          score: -r.rank, // bm25 returns negative — flip for "higher = better"
-          hasMore: r.content.length > 2000,
-        }));
-
+        const hits = storage.searchObservations(query, limit);
         return {
           content: [
             { type: 'text', text: JSON.stringify({ query, count: hits.length, hits }, null, 2) },
@@ -371,7 +339,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
       case 'continuum_get_todos': {
         const { status, limit } = (args ?? {}) as { status?: Todo['status']; limit?: number };
-        const todos = listTodos(db, { status, limit });
+        const todos = storage.listTodos({ status, limit });
         return {
           content: [
             { type: 'text', text: JSON.stringify({ count: todos.length, todos }, null, 2) },
@@ -384,7 +352,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         if (!input?.title?.trim()) {
           throw new Error('title is required');
         }
-        const todo = createTodo(db, input);
+        const todo = storage.createTodo(input);
         return {
           content: [{ type: 'text', text: JSON.stringify(todo, null, 2) }],
         };
@@ -395,7 +363,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         if (!input?.id) {
           throw new Error('id is required');
         }
-        const todo = updateTodo(db, input);
+        const todo = storage.updateTodo(input);
         return {
           content: [{ type: 'text', text: JSON.stringify(todo, null, 2) }],
         };
@@ -439,8 +407,8 @@ server.setRequestHandler(ReadResourceRequestSchema, async request => {
   if (uri !== OPEN_TODOS_URI) {
     throw new Error(`Unknown resource: ${uri}`);
   }
-  const open = listTodos(db, { status: 'open' });
-  const inProgress = listTodos(db, { status: 'in_progress' });
+  const open = storage.listTodos({ status: 'open' });
+  const inProgress = storage.listTodos({ status: 'in_progress' });
   const todos = [...open, ...inProgress];
   return {
     contents: [
@@ -491,4 +459,4 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 
 // Suppress stdout — MCP communicates over stdio, console.log would corrupt protocol
-process.stderr.write(`[continuum-mcp] project=${projectId} db=ready\n`);
+process.stderr.write(`[continuum-mcp] project=${projectId} storage=${storage.dataLocation()}\n`);
