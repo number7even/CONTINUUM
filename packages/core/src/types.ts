@@ -128,6 +128,34 @@ export interface Digest {
 }
 
 /**
+ * Agent handoff metadata schema — V0-compatible RecursiveMAS intent capture.
+ *
+ * Stored in `Observation.metadata` when `Observation.type === 'agent_handoff'`.
+ * Full RecursiveMAS latent-space recursion is parked at V1.5+ (Issue #3) and
+ * requires local inference (`ruvllm`). This interface is the V0 primitive that
+ * captures handoff intent across agent boundaries using the existing
+ * privacy-filtered Observation pipeline.
+ *
+ * Use `createAgentHandoffObservation()` to construct one — that helper writes
+ * a human-readable summary into `Observation.content` (so FTS5 search finds
+ * it) and the full structured handoff into `metadata`.
+ */
+export interface AgentHandoffMetadata {
+  /** Agent role/identity emitting the handoff (e.g. "researcher", "coder"). */
+  fromAgent: string;
+  /** Agent role/identity expected to consume the handoff. */
+  toAgent: string;
+  /** What the emitting agent was trying to achieve, in one sentence. */
+  intent: string;
+  /** Hard constraints the receiver must respect. Each entry a short string. */
+  constraints: string[];
+  /** Optional partial state the receiver should resume from. JSON-serializable. */
+  partialState?: unknown;
+  /** Optional shell command that proves the next step's success. */
+  verifierRef?: string;
+}
+
+/**
  * A search result hit. Progressive Disclosure Layer 1 (ARCHITECTURE.md §5).
  * Compact — ~50-100 tokens per hit.
  */

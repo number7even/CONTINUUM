@@ -1,24 +1,33 @@
 #!/usr/bin/env node
 /**
- * Continuum MCP stdio server (V0).
+ * Continuum MCP stdio server (V0 + V0 polish).
  *
- * Exposes 7 tools + 1 resource to MCP-aware AI clients (Claude Code, Cursor,
- * Hermes Agent, etc.):
+ * Exposes 7 tools + 4 Resources + 2 Prompts to MCP-aware AI clients
+ * (Claude Code, Cursor, Hermes Agent, etc.).
  *
- *   1. continuum_record_checkpoint  — write immutable state snapshot
- *   2. continuum_get_state           — fetch state at timestamp (or now)
- *   3. continuum_get_digest          — fetch composed narrative for window
- *   4. continuum_search_docs         — FTS5 keyword search over observations
- *   5. continuum_get_todos           — list todos, optional status filter
- *   6. continuum_create_todo         — create a new todo in the pipeline
- *   7. continuum_update_todo         — mutate status/title/etc. on a todo
+ * Tools:
+ *   1. continuum_record_checkpoint   — write immutable state snapshot
+ *   2. continuum_get_state            — fetch state at timestamp (or now)
+ *   3. continuum_get_digest           — fetch composed narrative for window
+ *   4. continuum_search_docs          — FTS5 keyword search (Layer-1)
+ *   5. continuum_get_todos            — list todos, optional status filter
+ *   6. continuum_create_todo          — create a new todo in the pipeline
+ *   7. continuum_update_todo          — mutate status/title/etc. on a todo
  *
  * Resources:
- *   continuum://todos/open — JSON list of all open + in_progress todos.
+ *   continuum://todos/open            — live open + in_progress todos
+ *   continuum://state/current         — most recent StateSnapshot
+ *   continuum://digest/latest         — composed narrative for last 24h
+ *   continuum://session/briefing      — Layer-0 pre-rendered session brief
  *
- * Progressive Disclosure scaffolding (ARCHITECTURE.md §5) is in place — V0
- * ships layer-1 (search returning compact hits) only. Layer-2 timeline +
- * Layer-3 batch get_observations land in V0.5.
+ * Prompts:
+ *   continuum.session_start           — Layer-0 → Layer-1 → Layer-3 workflow
+ *   continuum.cite                    — Observation-ID citation discipline
+ *
+ * Progressive Disclosure (ARCHITECTURE.md §5) — V0 polish ships:
+ *   • Layer-0 (briefing resource — eliminates round-trips for warm-up)
+ *   • Layer-1 (continuum_search_docs — compact hits)
+ *   Layer-2 timeline + Layer-3 batch get_observations land in V0.5.
  *
  * Transport: stdio (V0). HTTP/SSE/WebSocket land in V1 per §6.
  *
@@ -43,6 +52,8 @@ import {
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   openStorage,
@@ -68,6 +79,7 @@ const server = new Server(
     capabilities: {
       tools: {},
       resources: {},
+      prompts: {},
     },
   },
 );
@@ -383,51 +395,339 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
 // ── Resource registry ────────────────────────────────────────────────────────
 //
-// V0 ships one Resource — continuum://todos/open — the live open-pipeline view.
-// V0 polish will add continuum://state/current, continuum://digest/latest,
-// continuum://session/briefing once Aggregator + Digest writers land.
+// V0 polish ships 4 Resources:
+//
+//   continuum://todos/open         — live open + in_progress todos
+//   continuum://state/current      — most recent state snapshot
+//   continuum://digest/latest      — composed narrative for last 24h
+//   continuum://session/briefing   — Layer-0 Progressive Disclosure brief
+//                                    (combines state + open todos + recent
+//                                    activity in one cheap read so the AI
+//                                    can warm-start without tool calls)
 
-const OPEN_TODOS_URI = 'continuum://todos/open';
+const RESOURCE_URIS = {
+  openTodos: 'continuum://todos/open',
+  stateCurrent: 'continuum://state/current',
+  digestLatest: 'continuum://digest/latest',
+  sessionBriefing: 'continuum://session/briefing',
+} as const;
 
 server.setRequestHandler(ListResourcesRequestSchema, async () => ({
   resources: [
     {
-      uri: OPEN_TODOS_URI,
+      uri: RESOURCE_URIS.openTodos,
       name: 'Open Todos',
       description:
         'Live list of todos with status="open" or "in_progress". Cheap polling surface ' +
         'for scheduled clients (e.g. cron-driven Hermes runs) to check what work is queued.',
       mimeType: 'application/json',
     },
+    {
+      uri: RESOURCE_URIS.stateCurrent,
+      name: 'Current State',
+      description:
+        'Most recent StateSnapshot — what is active in production, what is dormant, and ' +
+        'what is known broken right now. For historical state queries, use the ' +
+        'continuum_get_state tool with an ISO timestamp.',
+      mimeType: 'application/json',
+    },
+    {
+      uri: RESOURCE_URIS.digestLatest,
+      name: 'Latest Digest',
+      description:
+        'Composed narrative for the last 24 hours. V0 returns a template-based summary ' +
+        'of recent checkpoints; V0.5+ adds ruvllm/ruv-FANN local-AI narratives.',
+      mimeType: 'application/json',
+    },
+    {
+      uri: RESOURCE_URIS.sessionBriefing,
+      name: 'Session Briefing',
+      description:
+        'Layer-0 Progressive Disclosure — a pre-rendered markdown document combining ' +
+        'current state, open todos, and recent activity. AI clients should read this ' +
+        'FIRST at the start of every session: it is a single cheap read (~2–5 KB) that ' +
+        'often answers a session\'s opening questions without any further tool calls. ' +
+        'Pair with the continuum.session_start Prompt.',
+      mimeType: 'text/markdown',
+    },
   ],
 }));
 
 server.setRequestHandler(ReadResourceRequestSchema, async request => {
   const { uri } = request.params;
-  if (uri !== OPEN_TODOS_URI) {
-    throw new Error(`Unknown resource: ${uri}`);
-  }
-  const open = storage.listTodos({ status: 'open' });
-  const inProgress = storage.listTodos({ status: 'in_progress' });
-  const todos = [...open, ...inProgress];
-  return {
-    contents: [
-      {
-        uri,
-        mimeType: 'application/json',
-        text: JSON.stringify(
+  switch (uri) {
+    case RESOURCE_URIS.openTodos: {
+      const open = storage.listTodos({ status: 'open' });
+      const inProgress = storage.listTodos({ status: 'in_progress' });
+      const todos = [...open, ...inProgress];
+      return {
+        contents: [
           {
-            generatedAt: new Date().toISOString(),
-            count: todos.length,
-            todos,
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(
+              { generatedAt: new Date().toISOString(), count: todos.length, todos },
+              null,
+              2,
+            ),
           },
-          null,
-          2,
-        ),
+        ],
+      };
+    }
+
+    case RESOURCE_URIS.stateCurrent: {
+      const snapshot = storage.getStateAt();
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(
+              snapshot ?? {
+                message:
+                  'No checkpoints recorded yet. Use continuum_record_checkpoint to capture the first state.',
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    case RESOURCE_URIS.digestLatest: {
+      const snapshots = storage.listSnapshots(10);
+      const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const recent = snapshots.filter(s => s.timestamp >= cutoff);
+      const narrative = templateDigest(recent, '24h');
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(
+              {
+                generatedAt: new Date().toISOString(),
+                window: '24h',
+                windowStart: cutoff,
+                windowEnd: new Date().toISOString(),
+                narrative,
+                snapshotsInWindow: recent.length,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    case RESOURCE_URIS.sessionBriefing: {
+      const text = composeBriefing(storage, projectId);
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'text/markdown',
+            text,
+          },
+        ],
+      };
+    }
+
+    default:
+      throw new Error(`Unknown resource: ${uri}`);
+  }
+});
+
+// ── Prompt registry ──────────────────────────────────────────────────────────
+//
+// V0 polish ships 2 Prompts that encode the Progressive Disclosure + citation
+// disciplines the architecture depends on:
+//
+//   continuum.session_start  — Layer-0 → Layer-1 → Layer-3 warm-up workflow
+//   continuum.cite           — Observation-ID citation discipline
+
+const PROMPTS = [
+  {
+    name: 'continuum.session_start',
+    description:
+      'Canonical session warm-up. Instructs the AI to read continuum://session/briefing ' +
+      'first (Layer-0), then use continuum_search_docs to filter by IDs (Layer-1) before ' +
+      'fetching full content (Layer-3). Enforces the ~10x token-savings retrieval pattern.',
+    text:
+      'You are starting a session in a Continuum-enabled project. Before any other ' +
+      'action, follow this protocol:\n\n' +
+      '1. Read the resource `continuum://session/briefing` FIRST. It is a single cheap ' +
+      'read (~2–5 KB) that combines current state, open todos, and recent activity. ' +
+      'Most sessions can answer their opening question from this alone.\n\n' +
+      '2. If the briefing answers the user\'s question, proceed. Otherwise use ' +
+      '`continuum_search_docs` with specific keywords — that returns Layer-1 hits ' +
+      '(compact IDs + titles, ~50–100 tokens each). Do NOT fetch full content yet.\n\n' +
+      '3. Narrow the result set to the specific Observation IDs you actually need. For ' +
+      'historical state queries use `continuum_get_state` with an ISO timestamp.\n\n' +
+      '4. Only after narrowing should you fetch full content (Layer-3) — and only for ' +
+      'the specific IDs you identified.\n\n' +
+      '5. When asserting any fact about this project, cite the Observation ID(s) that ' +
+      'prove it. See the `continuum.cite` Prompt for the format.\n\n' +
+      '6. When you produce a commitment the user wants tracked, call ' +
+      '`continuum_create_todo` with a concrete `verifyCommand` — a shell command that ' +
+      'exits 0 when the commitment is satisfied. Todos without `verifyCommand` cannot ' +
+      'be auto-resolved.\n\n' +
+      'You may now proceed with the user\'s request.',
+  },
+  {
+    name: 'continuum.cite',
+    description:
+      'Citation discipline. When asserting any fact about the project, cite the ' +
+      'Observation ID(s) that prove it. If no citation is possible, say so explicitly ' +
+      'rather than asserting unverified claims.',
+    text:
+      'When asserting any fact about this project, cite the Observation ID that proves ' +
+      'it.\n\n' +
+      'Format:\n\n' +
+      '  > The voice cutoff bug was fixed in commit 2aa4f96a5 ' +
+      '[obs:81223c05-4465-480c-a56d-14f665ffb581].\n\n' +
+      '  > The StorageBackend abstraction was materialised on 2026-05-15 in commit ' +
+      'e725ae7 [obs:<id>].\n\n' +
+      'If you cannot cite an Observation ID for a claim, say so explicitly:\n\n' +
+      '  > I don\'t have a Continuum observation that proves this — recommend recording ' +
+      'one via `continuum_record_checkpoint`, or surface the question to the operator.\n\n' +
+      'Never claim a fact about project state without either an Observation cite or an ' +
+      'explicit "uncited" admission. The verify-then-dissolve discipline depends on ' +
+      'provenance — facts without it cannot be re-verified later.',
+  },
+] as const;
+
+server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+  prompts: PROMPTS.map(p => ({ name: p.name, description: p.description })),
+}));
+
+server.setRequestHandler(GetPromptRequestSchema, async request => {
+  const { name } = request.params;
+  const found = PROMPTS.find(p => p.name === name);
+  if (!found) {
+    throw new Error(`Unknown prompt: ${name}`);
+  }
+  return {
+    description: found.description,
+    messages: [
+      {
+        role: 'user',
+        content: { type: 'text', text: found.text },
       },
     ],
   };
 });
+
+// ── Briefing composer (Layer-0 Progressive Disclosure) ──────────────────────
+//
+// Composes current state + open todos + recent activity into a single markdown
+// document the AI reads at session start. Token cost: ~2–5 KB depending on
+// project size; replaces 3–5 tool calls the AI would otherwise make to warm up.
+
+function composeBriefing(storage: StorageBackend, projectId: string): string {
+  const now = new Date().toISOString();
+  const snapshot = storage.getStateAt();
+  const openTodos = storage.listTodos({ status: 'open' });
+  const inProgressTodos = storage.listTodos({ status: 'in_progress' });
+  const allSnapshots = storage.listSnapshots(10);
+  const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const recent = allSnapshots.filter(s => s.timestamp >= cutoff);
+
+  const lines: string[] = [
+    '# Continuum Session Briefing',
+    '',
+    `_Generated: ${now}_  `,
+    `_Project: ${projectId}_`,
+    '',
+    '## Current State',
+    '',
+  ];
+
+  if (snapshot) {
+    lines.push(
+      `**Snapshot:** \`${snapshot.id.slice(0, 8)}\`  `,
+      `**Captured:** ${snapshot.timestamp}  `,
+      `**Reason:** ${snapshot.reason}`,
+      '',
+      `### Active in production (${snapshot.active.length})`,
+      '',
+    );
+    if (snapshot.active.length === 0) {
+      lines.push('_(none recorded)_', '');
+    } else {
+      for (const e of snapshot.active) {
+        lines.push(`- **${e.name}** — \`${e.where}\` — verifies via \`${e.verifyCommand}\``);
+      }
+      lines.push('');
+    }
+
+    lines.push(`### Known broken (${snapshot.broken.length})`, '');
+    if (snapshot.broken.length === 0) {
+      lines.push('_(none)_', '');
+    } else {
+      for (const e of snapshot.broken) {
+        lines.push(`- **${e.name}** — \`${e.where}\` — ${e.description ?? 'no description'}`);
+      }
+      lines.push('');
+    }
+  } else {
+    lines.push(
+      '_No checkpoints recorded yet. Use `continuum_record_checkpoint` to capture the first state._',
+      '',
+    );
+  }
+
+  lines.push(
+    '## Open Todos',
+    '',
+    `_${openTodos.length} open · ${inProgressTodos.length} in progress_`,
+    '',
+  );
+  const allOpen = [...openTodos, ...inProgressTodos];
+  if (allOpen.length === 0) {
+    lines.push('_(pipeline empty)_', '');
+  } else {
+    for (const t of allOpen.slice(0, 20)) {
+      const verify = t.verifyCommand ? ` — verifies: \`${t.verifyCommand}\`` : '';
+      lines.push(`- [${t.status}] \`${t.id.slice(0, 8)}\` ${t.title}${verify}`);
+    }
+    if (allOpen.length > 20) {
+      lines.push(`- _… ${allOpen.length - 20} more (use \`continuum_get_todos\`)_`);
+    }
+    lines.push('');
+  }
+
+  lines.push(
+    '## Recent Activity (last 24h)',
+    '',
+    `_${recent.length} checkpoint${recent.length === 1 ? '' : 's'} in window_`,
+    '',
+  );
+  if (recent.length === 0) {
+    lines.push('_(no recent checkpoints)_', '');
+  } else {
+    for (const s of recent.slice(0, 10)) {
+      lines.push(`- \`${s.timestamp.slice(0, 19)}Z\` — ${s.reason}`);
+    }
+    lines.push('');
+  }
+
+  lines.push(
+    '## How to use this briefing',
+    '',
+    '1. If the answer is here, proceed directly — no further tool calls needed.',
+    '2. Otherwise `continuum_search_docs` for Layer-1 hits (compact IDs + titles).',
+    '3. Use `continuum_get_state` for historical state queries (ISO timestamp).',
+    '4. Only fetch full content for narrowed-down IDs (Layer-3 — not yet shipped; coming V0.5).',
+    '5. New commitments → `continuum_create_todo` with a concrete `verifyCommand`.',
+    '6. Asserting facts → cite Observation IDs (see `continuum.cite` Prompt).',
+    '',
+  );
+
+  return lines.join('\n');
+}
 
 // ── Template digest (V0 — replaced by ruvllm/ruv-FANN in V0.5) ────────────────
 

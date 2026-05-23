@@ -25,6 +25,7 @@ export type {
   Todo,
   Digest,
   SearchHit,
+  AgentHandoffMetadata,
 } from './types.js';
 
 // — Storage abstraction (the V0 → V0.5 stable interface)
@@ -44,3 +45,6 @@ export { dbPathForProject, continuumDataRoot } from './db.js';
 
 // — Pure helpers (storage-agnostic)
 export { privacyFilter, type PrivacyResult } from './observation.js';
+
+// — Agent handoff primitive (V0-compatible RecursiveMAS intent capture, Issue #3)
+export { createAgentHandoffObservation } from './observation.js';

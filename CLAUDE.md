@@ -17,10 +17,15 @@
    (Open Decisions) to know what's locked vs pending. **8 of 9 decisions
    are locked as of 2026-05-14.**
 4. **`docs/INDEX.md`** — documentation map.
-5. **GitHub Issues #1 + #2** — preserved integration proposals (DSPy.ts +
-   Ruflo) for v0.4+. **Do NOT** propose adding these to v0.3 architecture.
-   They are tracked. The partner agreement was: no integration #5+ before
-   V0 ships.
+5. **GitHub Issues #1, #2, #3** — preserved integration proposals (DSPy.ts,
+   Ruflo, RecursiveMAS) for v0.4+ / v1.5+. **Do NOT** propose adding these
+   to v0.3 architecture. They are tracked. The partner agreement was: no
+   integration #5+ before V0 ships.
+   - **#3 (RecursiveMAS, parked 2026-05-20)** explicitly requires V0.5+
+     local inference (`ruvllm`) before any code lands — cloud API models
+     do not expose hidden states, so RecursiveLink is incoherent against
+     Anthropic/OpenAI/Google APIs. See Issue #3 §"Hard problems Q1–Q4"
+     and `docs/CTO_ANALYSIS_2026-05-20.md`.
 
 ---
 

@@ -7,7 +7,7 @@
  */
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
-import type { Observation } from './types.js';
+import type { AgentHandoffMetadata, Observation } from './types.js';
 
 /**
  * Privacy patterns dropped at Aggregator (ARCHITECTURE.md §8 invariant).
@@ -112,6 +112,50 @@ export function insertObservation(
     refs: obs.refs ?? [],
     metadata: obs.metadata,
   };
+}
+
+/**
+ * Create an `agent_handoff` observation — V0-compatible RecursiveMAS intent
+ * primitive (see Issue #3 and ARCHITECTURE.md §15b Step 3).
+ *
+ * Captures `fromAgent → toAgent` intent + constraints + optional partial
+ * state across agent boundaries using the existing privacy-filtered
+ * observation pipeline. A human-readable summary goes into `content` so FTS5
+ * search surfaces it; the full structured handoff lives in `metadata`.
+ *
+ * The caller is responsible for ensuring the parent Source row exists
+ * (use `upsertSource` first).
+ */
+export function createAgentHandoffObservation(
+  db: Database.Database,
+  args: {
+    sourceId: string;
+    handoff: AgentHandoffMetadata;
+    refs?: string[];
+    timestamp?: string;
+  },
+): Observation | null {
+  const { handoff } = args;
+  const constraintsLine =
+    handoff.constraints.length > 0 ? `Constraints: ${handoff.constraints.join('; ')}` : '';
+  const verifierLine = handoff.verifierRef ? `Verifier: ${handoff.verifierRef}` : '';
+  const summary = [
+    `[handoff ${handoff.fromAgent} → ${handoff.toAgent}]`,
+    handoff.intent,
+    constraintsLine,
+    verifierLine,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return insertObservation(db, {
+    sourceId: args.sourceId,
+    type: 'agent_handoff',
+    content: summary,
+    timestamp: args.timestamp ?? new Date().toISOString(),
+    refs: args.refs ?? [],
+    metadata: handoff as unknown as Record<string, unknown>,
+  });
 }
 
 /**

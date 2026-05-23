@@ -976,14 +976,43 @@ Locked tonight or before code begins.
 
 ---
 
-## 15. Roadmap (post-V0)
+## 15. Roadmap & Phased Execution Plan (post-V0)
 
-- **V0** (this week): dogfood-ready, 4 MCP tools, 3 source adapters (docs/git/export), local-only, **SQLite + Chroma + FTS5 storage**, no neural layer
-- **V0.5** (week 2-3): claude-mem + sona adapters, todo manager, **ruv-FANN OR ruvllm for local digest** (§10a + §10b), **RuVector migration** if gates pass (§10b)
-- **V1** (month 1): Docker self-host, MCP over HTTP/SSE, Apache-2.0 OSS release, **ruv-swarm for per-adapter ephemeral source aggregation** (§10a), **RVF COW snapshots replace JSON checkpoints** (§10b)
-- **V1.5** (month 2): web UI (status dashboard, manual checkpoint controls), **`continuum_spawn_swarm` MCP tool** (§10a), **OpenClaw Gateway distribution** (§6), **GNN-reinforced search** matures (§10b)
-- **V2** (month 3): hosted SaaS — **RuVector native multi-tenant collections** (no DB rewrite — §10b), OAuth, billing, team workspaces, **Neuro-Divergent predictive snapshots** (§10a), **midstream streaming transport** (§10a)
-- **V3** (quarter 2): ARIA hotel integration — same RuVector engine, tenant-scoped, embedded in Voice OS
+### 15a. Version roadmap
+
+- **V0** (shipped 2026-05-14): dogfood-ready, **7 MCP tools + 1 Resource**, 1 source adapter (`export`), local-only, **SQLite + FTS5 storage** (Chroma deferred to V0.5 — V0 ships keyword-only), no neural layer. **StorageBackend abstraction shipped** (commit `e725ae7`) — V0.5 RuVector is a single-line factory swap.
+- **V0 polish** (in progress 2026-05-20+): 3 additional Resources (`continuum://state/current`, `continuum://digest/latest`, `continuum://session/briefing`), 2 Prompts (`continuum.session_start`, `continuum.cite`), `agent_handoff` observation kind (V0-compatible intent capture, see Issue #3), `docs` + `git` adapters, STATE.md → first-checkpoint parser, CLI (`npx continuum init/start/status`).
+- **V0.5** (week 2–3): `claude-mem` + `sona` adapters, **ruv-FANN OR ruvllm for local digest** (§10a + §10b), **RuVector migration** if gates pass (§10b), Chroma backfill or skip-and-go-direct-to-RuVector decision.
+- **V1** (month 1): Docker self-host, **MCP over HTTP/SSE**, Apache-2.0 OSS release, **ruv-swarm for per-adapter ephemeral source aggregation** (§10a), **RVF COW snapshots replace JSON checkpoints** (§10b), DSPy.ts integration begins ([Issue #1](https://github.com/number7even/CONTINUUM/issues/1)).
+- **V1.5** (month 2): web UI (status dashboard, manual checkpoint controls), **`continuum_spawn_swarm` MCP tool** (§10a), **OpenClaw Gateway distribution** (§6), **GNN-reinforced search** matures (§10b), Ruflo orchestration ([Issue #2](https://github.com/number7even/CONTINUUM/issues/2)), RecursiveMAS latent-space recursion ([Issue #3](https://github.com/number7even/CONTINUUM/issues/3) — gated by local inference engine `ruvllm` shipping in V0.5), Agentic-Jujutsu for concurrent swarm commits ([Issue #6](https://github.com/number7even/CONTINUUM/issues/6)).
+- **V1.x** (interleaved with V1/V1.5): MidStream + Prime-Radiant real-time hallucination gating ([Issue #5](https://github.com/number7even/CONTINUUM/issues/5)).
+- **V2** (month 3): hosted SaaS — **RuVector native multi-tenant collections** + Postgres control plane for tenancy/OAuth (resolves D-V2.2 flag), billing, team workspaces, **Neuro-Divergent predictive snapshots** (§10a), **midstream streaming transport** (§10a), Mike legal addon ([Issue #4](https://github.com/number7even/CONTINUUM/issues/4)), TaskmasterAI PRD-ingestion adapter ([Issue #7](https://github.com/number7even/CONTINUUM/issues/7) — may land earlier in V0.5+).
+- **V3** (quarter 2): ARIA hotel integration — same RuVector engine, tenant-scoped, embedded in Voice OS.
+
+### 15b. Phased execution plan (the four canonical steps)
+
+The version timeline above ladders into four discrete execution steps. Each step has hard preconditions; jumping ahead is what partner-agreement clause #3 was written to prevent.
+
+| Step | Phase | Goal | Hard precondition | Key deliverables | Parked integrations to activate |
+|---|---|---|---|---|---|
+| **1** | V0 polish | Establish the baseline — close the gap between the README narrative and shipped code. | V0 already shipped (done). | 3 Resources, 2 Prompts, `agent_handoff` schema, `docs`/`git` adapters, CLI, STATE.md parser, **CTO-doc privacy-row correction** (privacy filter is actually shipped — §8 invariant lives inside `observation.ts:insertObservation`, not in a dedicated Aggregator module). | None. |
+| **2** | V0.5 RuVector | Unified persistence — swap storage engine without touching consumers. | Step 1 complete. RuVector v1.0+ maturity verified. Benchmark beats V0 SQLite-FTS5 baseline on representative workload. | RuVector backend (`packages/core/src/storage-ruvector.ts`), feature-flag at `openStorage()`, RVF native snapshots, GNN-reinforced search active. | Issue #1 (DSPy.ts AgentDB-vs-RuVector decision must close before V1). |
+| **3** | V1 → V1.5 Swarm | Activate concurrent swarms; ground RecursiveMAS *only if* local inference is real. | Step 2 complete. `ruvllm` local inference engine shipping in V0.5 confirmed. RecursiveMAS Q1–Q4 hard problems (Issue #3) answered: local-model topology, latent-bridge implementation, falsification benchmark vs text-loop baseline. | `continuum_spawn_swarm` MCP tool, RecursiveMAS RecursiveLink in-swarm comms, Agentic-Jujutsu opt-in worktrees, MidStream coherence gate on final emission. | Issues #2, #3, #5, #6. |
+| **4** | V2 Multi-Tenant + Addons | Enterprise scale — multi-tenant boundary + first vertical addon. | Step 3 complete. D-V2.2 tenancy reconciliation locked (RuVector data plane + Postgres control plane). Mike license verified. Legal counsel sign-off on court-admissibility claim. | RuVector multi-tenant collections, Postgres RLS, OAuth, billing, Mike SPA/NDA review presets, court-admissible audit chain. | Issue #4 (Mike). Issue #7 (TaskmasterAI) likely activated earlier — V0.5–V1. |
+
+### 15c. The seven parked integrations (durable record)
+
+The partner agreement requires that no integration #5+ lands ahead of V0 ship. The integrations below are tracked as GitHub Issues; this section is the canonical cross-reference.
+
+| # | Integration | Target phase | Status |
+|---|---|---|---|
+| [#1](https://github.com/number7even/CONTINUUM/issues/1) | DSPy.ts — self-optimising digest, experience replay, ReActReflexion, AgentDB-vs-RuVector decision | V0.4 / V1 | Parked |
+| [#2](https://github.com/number7even/CONTINUUM/issues/2) | Ruflo — GOAP A* todo execution, 12 workers, mTLS federation, Web UI, SONA-HNSW | V1.5 | Parked |
+| [#3](https://github.com/number7even/CONTINUUM/issues/3) | RecursiveMAS — latent-space agent recursion, RecursiveLink modules, ReasoningBank | V1.5+ (gated by local inference) | Parked |
+| [#4](https://github.com/number7even/CONTINUUM/issues/4) | Mike — tabular review legal addon, parallel diligence, court-admissible citations | V2 | Parked |
+| [#5](https://github.com/number7even/CONTINUUM/issues/5) | MidStream + Prime-Radiant — real-time hallucination gating via sheaf Laplacian coherence | V1.x | Parked |
+| [#6](https://github.com/number7even/CONTINUUM/issues/6) | Agentic-Jujutsu — lock-free concurrent commits for AI swarms | V1+ | Parked |
+| [#7](https://github.com/number7even/CONTINUUM/issues/7) | TaskmasterAI — PRD → Live Todo Pipeline ingestion | V0.4 | Parked |
 
 ---
 
