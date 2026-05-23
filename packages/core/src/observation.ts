@@ -159,6 +159,61 @@ export function createAgentHandoffObservation(
 }
 
 /**
+ * Upsert an Observation with a caller-supplied stable ID.
+ *
+ * Used by adapters that want idempotent re-syncs (e.g. the `docs` adapter
+ * derives `id` from `sha256(relativePath)` so that re-ingesting an edited
+ * markdown file refreshes content in place rather than creating a duplicate).
+ *
+ * Privacy filter still runs. Returns null if the observation was dropped
+ * (entire content was private). The caller is responsible for ensuring the
+ * parent Source row exists (use `upsertSource` first).
+ *
+ * On conflict, ALL mutable fields update — source_id, type, content,
+ * timestamp, refs, metadata. The FTS5 AFTER UPDATE trigger keeps the
+ * search index consistent.
+ */
+export function upsertObservation(
+  db: Database.Database,
+  obs: Omit<Observation, 'id'> & { id: string },
+): Observation | null {
+  const privacy = privacyFilter(obs.content);
+  if (privacy.shouldDrop) {
+    return null;
+  }
+
+  db.prepare(`
+    INSERT INTO observations (id, source_id, type, content, timestamp, refs, metadata)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      source_id = excluded.source_id,
+      type = excluded.type,
+      content = excluded.content,
+      timestamp = excluded.timestamp,
+      refs = excluded.refs,
+      metadata = excluded.metadata
+  `).run(
+    obs.id,
+    obs.sourceId,
+    obs.type,
+    privacy.scrubbed,
+    obs.timestamp,
+    JSON.stringify(obs.refs ?? []),
+    obs.metadata ? JSON.stringify(obs.metadata) : null,
+  );
+
+  return {
+    id: obs.id,
+    sourceId: obs.sourceId,
+    type: obs.type,
+    content: privacy.scrubbed,
+    timestamp: obs.timestamp,
+    refs: obs.refs ?? [],
+    metadata: obs.metadata,
+  };
+}
+
+/**
  * Bulk insert in a single transaction — used by adapters during initial backfill.
  */
 export function insertObservationsBulk(

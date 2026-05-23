@@ -78,6 +78,14 @@ export interface StorageBackend {
   // — Observations — privacy-filtered event log
   upsertSource(id: string, type: SourceType, config?: Record<string, unknown>): void;
   insertObservation(obs: Omit<Observation, 'id'> & { id?: string }): Observation | null;
+  /**
+   * Upsert an Observation with a caller-supplied stable ID. Used by adapters
+   * (`docs`, `git`, …) that want re-running their sync to be idempotent —
+   * derive a deterministic ID from the source artifact (e.g. file path) and
+   * call this. Privacy filter still runs; returns null if the observation was
+   * dropped (entire content was private).
+   */
+  upsertObservation(obs: Omit<Observation, 'id'> & { id: string }): Observation | null;
   insertObservationsBulk(observations: Array<Omit<Observation, 'id'>>): InsertObservationsResult;
 
   // — Search — Progressive Disclosure Layer-1

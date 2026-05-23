@@ -22,6 +22,7 @@ import {
 import {
   upsertSource as _upsertSource,
   insertObservation as _insertObservation,
+  upsertObservation as _upsertObservation,
   insertObservationsBulk as _insertObservationsBulk,
 } from './observation.js';
 import {
@@ -95,6 +96,10 @@ export class SQLiteStorageBackend implements StorageBackend {
 
   insertObservation(obs: Omit<Observation, 'id'> & { id?: string }): Observation | null {
     return _insertObservation(this.db, obs);
+  }
+
+  upsertObservation(obs: Omit<Observation, 'id'> & { id: string }): Observation | null {
+    return _upsertObservation(this.db, obs);
   }
 
   insertObservationsBulk(observations: Array<Omit<Observation, 'id'>>): InsertObservationsResult {

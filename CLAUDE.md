@@ -87,7 +87,15 @@
 - ✅ MCP Prompts (`continuum.session_start`, `continuum.cite`) — **shipped**
   2026-05-23 (commit `31fe885`).
 - ✅ CLI (`continuum init / start / status`) — **shipped** 2026-05-23.
-- ❌ `packages/adapters/{docs,git}` — V0 polish (`export` shipped at `0dd867b`).
+- ✅ `packages/adapters/docs` — **shipped** 2026-05-23. Idempotent
+  markdown ingester (`.md` / `.mdx`), stable per-file IDs from
+  `sha256(relativePath)` formatted as UUID-shape. Smoke-test: ingested
+  this repo's own `docs/` into the `continuum` project (3 files, 3
+  upserts, idempotent on re-run, FTS5 verified). Privacy filter
+  enforced via `storage.upsertObservation()`. Backed by new
+  `StorageBackend.upsertObservation()` method (same commit).
+- ❌ `packages/adapters/git` — V0 polish (`export` shipped at `0dd867b`,
+  `docs` shipped 2026-05-23).
 - ❌ STATE.md → first-checkpoint parser — V0 polish.
 - ❌ Privacy filter extensions (JWT shapes, GCP service-account JSON,
   entropy detector, operator-extensible patterns config) — V0 polish per
