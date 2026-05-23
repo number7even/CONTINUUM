@@ -46,13 +46,26 @@
   single-line change at the factory.
 - **V0 packages compiled clean:**
   - `packages/core/` — types, db, checkpoint engine, todo CRUD, storage
-    abstraction
-  - `packages/mcp-server/` — **7 MCP tools** + **1 Resource**:
-    - `continuum_record_checkpoint`, `continuum_get_state`,
-      `continuum_get_digest`, `continuum_search_docs` (V0 baseline)
-    - `continuum_get_todos`, `continuum_create_todo`,
+    abstraction, **`AgentHandoffMetadata` type + `createAgentHandoffObservation()`
+    helper** (V0-compatible RecursiveMAS intent capture per Issue #3, commit
+    `31fe885`, 2026-05-23)
+  - `packages/mcp-server/` — **7 MCP tools** + **4 Resources** + **2 Prompts**:
+    - Tools: `continuum_record_checkpoint`, `continuum_get_state`,
+      `continuum_get_digest`, `continuum_search_docs` (V0 baseline);
+      `continuum_get_todos`, `continuum_create_todo`,
       `continuum_update_todo` (added 2026-05-15, commit `c9def2c`)
-    - Resource `continuum://todos/open` (added 2026-05-15, commit `c9def2c`)
+    - Resources: `continuum://todos/open` (2026-05-15, `c9def2c`);
+      `continuum://state/current`, `continuum://digest/latest`,
+      `continuum://session/briefing` — Layer-0 markdown brief composing
+      state + open todos + recent activity in one cheap read
+      (2026-05-23, commit `31fe885`)
+    - Prompts: `continuum.session_start` (Layer-0→1→3 retrieval protocol),
+      `continuum.cite` (Observation-ID citation discipline)
+      (2026-05-23, commit `31fe885`)
+  - `packages/cli/` — **`continuum init / start / status`** CLI
+    (2026-05-23). Single bin, hand-rolled argv. `init` creates DB +
+    prints MCP registration snippet; `start` execs the MCP stdio server;
+    `status` shows latest snapshot + todo counts + data path.
   - `packages/adapters/export/` — Claude session JSONL → Observation
     adapter (commit `0dd867b`, shipped pre-2026-05-15).
 - **Verify-then-dissolve discipline proven end-to-end** (2026-05-15): row
@@ -68,13 +81,18 @@
 
 ## What's NOT done yet (do not claim otherwise)
 
-- ⏳ MCP Resources — 1 of 4 shipped: ✅ `continuum://todos/open` (2026-05-15).
-  Still missing: ❌ `continuum://state/current`, `continuum://digest/latest`,
-  `continuum://session/briefing` — V0 polish gap.
-- ❌ MCP Prompts (`continuum.session_start`, `continuum.cite`) — V0 polish gap.
+- ✅ MCP Resources — **4 of 4 shipped** as of 2026-05-23 (commit `31fe885`):
+  `continuum://todos/open`, `continuum://state/current`,
+  `continuum://digest/latest`, `continuum://session/briefing`.
+- ✅ MCP Prompts (`continuum.session_start`, `continuum.cite`) — **shipped**
+  2026-05-23 (commit `31fe885`).
+- ✅ CLI (`continuum init / start / status`) — **shipped** 2026-05-23.
 - ❌ `packages/adapters/{docs,git}` — V0 polish (`export` shipped at `0dd867b`).
 - ❌ STATE.md → first-checkpoint parser — V0 polish.
-- ❌ CLI (`npx continuum init / start / status`) — V0 polish.
+- ❌ Privacy filter extensions (JWT shapes, GCP service-account JSON,
+  entropy detector, operator-extensible patterns config) — V0 polish per
+  CTO doc §A3. Base filter (`<private>` tags + sk-/xai-/AKIA/PEM patterns)
+  **is already shipped** in `packages/core/src/observation.ts:42`.
 - ❌ `claude-mem` + `sona` adapters — V0.5.
 - ❌ RuVector storage backend — V0.5 (drop-in point now wired at
   `openStorage()` factory — V0.5 work is the implementation, not the seam).
