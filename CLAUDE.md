@@ -92,10 +92,17 @@
   `sha256(relativePath)` formatted as UUID-shape. Smoke-test: ingested
   this repo's own `docs/` into the `continuum` project (3 files, 3
   upserts, idempotent on re-run, FTS5 verified). Privacy filter
-  enforced via `storage.upsertObservation()`. Backed by new
-  `StorageBackend.upsertObservation()` method (same commit).
-- ❌ `packages/adapters/git` — V0 polish (`export` shipped at `0dd867b`,
-  `docs` shipped 2026-05-23).
+  enforced via `storage.upsertObservation()`. Backed by
+  `StorageBackend.upsertObservation()` method.
+- ✅ `packages/adapters/git` — **shipped** 2026-05-23. One Observation
+  per commit with `type='commit'`, raw 40-char SHA as the stable ID
+  (slice(0,8) = git short-hash). `git log -z --pretty=format` with
+  `\x1f` field separators for safe multi-line parsing. Content is
+  subject + body (diffs intentionally excluded — token bloat + privacy
+  risk; `git show <sha>` recovers them). Smoke-test: ingested 15-of-15
+  commits from this repo, idempotent on re-run, cross-source FTS5
+  search for "StorageBackend" returns hits across both git commits
+  and docs.
 - ❌ STATE.md → first-checkpoint parser — V0 polish.
 - ❌ Privacy filter extensions (JWT shapes, GCP service-account JSON,
   entropy detector, operator-extensible patterns config) — V0 polish per

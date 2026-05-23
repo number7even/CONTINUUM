@@ -1,0 +1,26 @@
+{
+  "name": "@continuum/adapter-git",
+  "version": "0.0.1",
+  "description": "Continuum git adapter — ingests git log commits into the Continuum observation index. Idempotent stable IDs (raw SHA).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "continuum-adapter-git": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@continuum/core": "0.0.1"
+  },
+  "license": "Apache-2.0",
+  "author": "Riaan Kleynhans <riaan@number7even.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/number7even/CONTINUUM.git",
+    "directory": "packages/adapters/git"
+  }
+}
