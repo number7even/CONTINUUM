@@ -48,3 +48,11 @@ export { privacyFilter, type PrivacyResult } from './observation.js';
 
 // — Agent handoff primitive (V0-compatible RecursiveMAS intent capture, Issue #3)
 export { createAgentHandoffObservation } from './observation.js';
+
+// — STATE.md parser (V0 polish — feeds `continuum init` first-checkpoint)
+export {
+  parseStateMd,
+  parseStateMdToCheckpoint,
+  type ParseStateMdResult,
+  type ParseStateMdToCheckpointResult,
+} from './state-md.js';

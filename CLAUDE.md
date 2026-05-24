@@ -103,7 +103,15 @@
   commits from this repo, idempotent on re-run, cross-source FTS5
   search for "StorageBackend" returns hits across both git commits
   and docs.
-- ❌ STATE.md → first-checkpoint parser — V0 polish.
+- ✅ STATE.md → first-checkpoint parser — **shipped** 2026-05-24.
+  Pure parser in `packages/core/src/state-md.ts` (string → CheckpointInput,
+  no I/O). Wired into `continuum init` (auto-imports if STATE.md present
+  AND no checkpoints exist yet — avoids noise on re-running init) and
+  exposed as `continuum import-state` for forced re-imports. Smoke-tested
+  on the real VC-Hospitality STATE.md: 11 active + 3 dormant + 0 broken,
+  4 legitimate warnings (entries missing Verify correctly dropped).
+  First-word category classification (not regex on full heading) — caught
+  the "DORMANT (built but not the **active** path)" trap.
 - ❌ Privacy filter extensions (JWT shapes, GCP service-account JSON,
   entropy detector, operator-extensible patterns config) — V0 polish per
   CTO doc §A3. Base filter (`<private>` tags + sk-/xai-/AKIA/PEM patterns)

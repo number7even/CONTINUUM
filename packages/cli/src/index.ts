@@ -17,14 +17,20 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
-import { basename } from 'node:path';
-import { openStorage } from '@continuum/core';
+import { basename, resolve as resolvePath } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import {
+  openStorage,
+  parseStateMdToCheckpoint,
+  type StorageBackend,
+} from '@continuum/core';
 
 // ── Argv parsing ──────────────────────────────────────────────────────────────
 
 interface ParsedArgs {
   command: string | undefined;
   projectId: string | undefined;
+  stateMd: string | undefined;
   help: boolean;
 }
 
@@ -32,6 +38,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   let command: string | undefined;
   let projectId: string | undefined;
+  let stateMd: string | undefined;
   let help = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -40,12 +47,16 @@ function parseArgs(argv: string[]): ParsedArgs {
       help = true;
     } else if (a === '--project-id' || a === '-p') {
       projectId = args[++i];
+    } else if (a === '--state-md') {
+      stateMd = args[++i];
+    } else if (a !== undefined && a.startsWith('--state-md=')) {
+      stateMd = a.split('=').slice(1).join('=');
     } else if (a !== undefined && !a.startsWith('-') && command === undefined) {
       command = a;
     }
   }
 
-  return { command, projectId, help };
+  return { command, projectId, stateMd, help };
 }
 
 function resolveProjectId(flagValue?: string): string {
@@ -65,17 +76,24 @@ USAGE
   continuum <command> [options]
 
 COMMANDS
-  init        Create the project DB and print MCP registration snippet.
-  start       Run the MCP stdio server for this project.
-  status      Print current state, todo counts, and data location.
+  init           Create the project DB and print MCP registration snippet.
+                 Auto-imports ./STATE.md as the first checkpoint if found
+                 and no checkpoints exist yet.
+  start          Run the MCP stdio server for this project.
+  status         Print current state, todo counts, and data location.
+  import-state   Parse a STATE.md and record it as a new checkpoint. Always
+                 creates a checkpoint (use this to re-snapshot after edits).
 
 OPTIONS
   --project-id, -p <id>   Project ID (default: $CONTINUUM_PROJECT_ID or cwd basename).
+  --state-md <path>       Path to STATE.md (default: ./STATE.md). Used by
+                          init (auto-import) and import-state (manual).
   --help, -h              Show this help.
 
 EXAMPLES
   continuum init --project-id my-project
   continuum status
+  continuum import-state --state-md=./STATE.md
   CONTINUUM_PROJECT_ID=vc-hospitality continuum start
 
 LEARN MORE
@@ -86,11 +104,96 @@ function printUsage(): void {
   process.stdout.write(USAGE);
 }
 
+// ── STATE.md helpers ─────────────────────────────────────────────────────────
+
+function resolveStateMdPath(override?: string): string {
+  return override ? resolvePath(override) : resolvePath(process.cwd(), 'STATE.md');
+}
+
+interface StateMdImportSummary {
+  imported: boolean;
+  reason?: string;
+  snapshotId?: string;
+  totals?: { active: number; dormant: number; broken: number };
+  warnings?: string[];
+  skipReason?: string;
+}
+
+function importStateMdInto(
+  storage: StorageBackend,
+  stateMdPath: string,
+  triggerLabel: string,
+): StateMdImportSummary {
+  if (!existsSync(stateMdPath)) {
+    return { imported: false, skipReason: `no STATE.md found at ${stateMdPath}` };
+  }
+  let text: string;
+  try {
+    text = readFileSync(stateMdPath, 'utf-8');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { imported: false, skipReason: `could not read ${stateMdPath}: ${msg}` };
+  }
+  const reason = `STATE.md import (${triggerLabel}) — ${stateMdPath}`;
+  const { input, warnings, totals } = parseStateMdToCheckpoint(text, reason);
+  if (totals.active + totals.dormant + totals.broken === 0) {
+    return {
+      imported: false,
+      skipReason: `STATE.md parsed but produced zero entries (warnings: ${warnings.length})`,
+      warnings,
+    };
+  }
+  const snapshot = storage.recordCheckpoint(input);
+  return {
+    imported: true,
+    reason,
+    snapshotId: snapshot.id,
+    totals,
+    warnings,
+  };
+}
+
+function printStateMdSummary(summary: StateMdImportSummary, stateMdPath: string): void {
+  if (summary.imported) {
+    process.stdout.write(
+      [
+        `✓ Imported ${stateMdPath} → checkpoint ${summary.snapshotId!.slice(0, 8)}`,
+        `    active: ${summary.totals!.active}  dormant: ${summary.totals!.dormant}  broken: ${summary.totals!.broken}`,
+      ].join('\n') + '\n',
+    );
+    if (summary.warnings && summary.warnings.length > 0) {
+      for (const w of summary.warnings) {
+        process.stderr.write(`  warning: ${w}\n`);
+      }
+    }
+  } else if (summary.skipReason) {
+    process.stderr.write(`  STATE.md: ${summary.skipReason}\n`);
+  }
+}
+
 // ── continuum init ────────────────────────────────────────────────────────────
 
-function commandInit(projectId: string): void {
+function commandInit(projectId: string, stateMdOverride: string | undefined): void {
   const storage = openStorage(projectId);
   const dataPath = storage.dataLocation();
+
+  // Auto-import STATE.md as the first checkpoint — only if one is present
+  // AND no checkpoints exist yet (avoid noise on re-running init).
+  const stateMdPath = resolveStateMdPath(stateMdOverride);
+  const existingSnapshots = storage.listSnapshots(1);
+  let stateMdNote = '';
+  if (existsSync(stateMdPath) && existingSnapshots.length === 0) {
+    const summary = importStateMdInto(storage, stateMdPath, 'continuum init');
+    printStateMdSummary(summary, stateMdPath);
+    if (summary.imported) {
+      stateMdNote =
+        `\n  Auto-imported STATE.md as first checkpoint (${summary.snapshotId!.slice(0, 8)}).`;
+    }
+  } else if (existsSync(stateMdPath) && existingSnapshots.length > 0) {
+    stateMdNote =
+      `\n  STATE.md detected but checkpoints already exist — skipping auto-import.\n  Use 'continuum import-state' to force a fresh checkpoint from STATE.md.`;
+  }
+
   storage.close();
 
   // Find the MCP server binary so the registration snippet is copy-paste ready.
@@ -122,7 +225,7 @@ function commandInit(projectId: string): void {
       `✓ Continuum initialised`,
       ``,
       `  Project ID:  ${projectId}`,
-      `  Data path:   ${dataPath}`,
+      `  Data path:   ${dataPath}${stateMdNote}`,
       ``,
       `MCP registration — add to ~/.claude.json or .mcp.json:`,
       ``,
@@ -132,12 +235,34 @@ function commandInit(projectId: string): void {
       `  1. Add the snippet above to your AI client's MCP config.`,
       `  2. Restart the client so it picks up the new server.`,
       `  3. Run \`continuum status\` here to confirm the DB is reachable.`,
-      `  4. (Optional) Capture the first checkpoint with the`,
-      `     continuum_record_checkpoint tool inside your AI client,`,
-      `     or wait for the V0-polish STATE.md parser (next ship).`,
+      `  4. (Optional) If STATE.md was not auto-imported, run`,
+      `     'continuum import-state --state-md=./STATE.md' to capture`,
+      `     a fresh checkpoint, or use continuum_record_checkpoint from`,
+      `     inside your AI client.`,
       ``,
     ].join('\n'),
   );
+}
+
+// ── continuum import-state ───────────────────────────────────────────────────
+
+function commandImportState(projectId: string, stateMdOverride: string | undefined): void {
+  const stateMdPath = resolveStateMdPath(stateMdOverride);
+  if (!existsSync(stateMdPath)) {
+    process.stderr.write(
+      `continuum: STATE.md not found at ${stateMdPath}\n` +
+      `           pass --state-md=/abs/path to point at a different file.\n`,
+    );
+    process.exit(2);
+  }
+  const storage = openStorage(projectId);
+  try {
+    const summary = importStateMdInto(storage, stateMdPath, 'continuum import-state');
+    printStateMdSummary(summary, stateMdPath);
+    if (!summary.imported) process.exit(1);
+  } finally {
+    storage.close();
+  }
 }
 
 // ── continuum status ──────────────────────────────────────────────────────────
@@ -203,7 +328,7 @@ async function commandStart(projectId: string): Promise<void> {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const { command, projectId: projectIdFlag, help } = parseArgs(process.argv);
+  const { command, projectId: projectIdFlag, stateMd, help } = parseArgs(process.argv);
 
   if (help || !command) {
     printUsage();
@@ -214,7 +339,7 @@ async function main(): Promise<void> {
 
   switch (command) {
     case 'init':
-      commandInit(projectId);
+      commandInit(projectId, stateMd);
       return;
 
     case 'status':
@@ -223,6 +348,10 @@ async function main(): Promise<void> {
 
     case 'start':
       await commandStart(projectId);
+      return;
+
+    case 'import-state':
+      commandImportState(projectId, stateMd);
       return;
 
     default:
