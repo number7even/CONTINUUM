@@ -164,6 +164,61 @@ export interface PrivacyResult {
   shouldDrop: boolean;
 }
 
+// ── Metadata deep-scrubbing (Issue #8 fix) ───────────────────────────────────
+//
+// The original V0 implementation stored Observation.metadata raw — only
+// content went through privacyFilter. Adapters writing arbitrary metadata
+// (docs paths, git commit authors, future TaskmasterAI section refs,
+// operator-supplied tool calls) silently bypassed the §8 invariant.
+//
+// scrubMetadataDeep walks every string value in the metadata tree (objects,
+// arrays, nested) through privacyFilter. Matched-pattern labels carry a
+// `metadata:` prefix in the audit sink so leaks in metadata are
+// distinguishable from leaks in content.
+//
+// Mandatory gate before V1 HTTP/SSE exposure (an HTTP endpoint accepting
+// metadata payloads from remote agents would otherwise be an exfiltration
+// channel for any operator-set tool's metadata fields).
+
+export interface MetadataScrubResult {
+  scrubbed: Record<string, unknown> | undefined;
+  matchedPatterns: string[];
+}
+
+export function scrubMetadataDeep(
+  metadata: Record<string, unknown> | undefined,
+): MetadataScrubResult {
+  if (!metadata) return { scrubbed: metadata, matchedPatterns: [] };
+  const matched: string[] = [];
+
+  function walk(v: unknown): unknown {
+    if (v === null || v === undefined) return v;
+    if (typeof v === 'string') {
+      const r = privacyFilter(v);
+      for (const label of r.matchedPatterns) matched.push(`metadata:${label}`);
+      return r.scrubbed;
+    }
+    if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint') {
+      return v;
+    }
+    if (Array.isArray(v)) {
+      return v.map(walk);
+    }
+    if (typeof v === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+        out[k] = walk(val);
+      }
+      return out;
+    }
+    // Functions, symbols — drop. Shouldn't be JSON-serialisable anyway.
+    return null;
+  }
+
+  const scrubbed = walk(metadata) as Record<string, unknown>;
+  return { scrubbed, matchedPatterns: matched };
+}
+
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -244,6 +299,8 @@ export function insertObservation(
     // Still write a redaction audit entry — operator can see WHAT was dropped + WHY
     return null;
   }
+  // Issue #8 — deep-scrub metadata strings through the same privacy patterns.
+  const metaScrub = scrubMetadataDeep(obs.metadata);
 
   const id = obs.id ?? randomUUID();
   db.prepare(`
@@ -256,7 +313,7 @@ export function insertObservation(
     privacy.scrubbed,
     obs.timestamp,
     JSON.stringify(obs.refs ?? []),
-    obs.metadata ? JSON.stringify(obs.metadata) : null,
+    metaScrub.scrubbed ? JSON.stringify(metaScrub.scrubbed) : null,
   );
 
   return {
@@ -266,7 +323,7 @@ export function insertObservation(
     content: privacy.scrubbed,
     timestamp: obs.timestamp,
     refs: obs.refs ?? [],
-    metadata: obs.metadata,
+    metadata: metaScrub.scrubbed,
   };
 }
 
@@ -337,6 +394,8 @@ export function upsertObservation(
   if (privacy.shouldDrop) {
     return null;
   }
+  // Issue #8 — deep-scrub metadata strings.
+  const metaScrub = scrubMetadataDeep(obs.metadata);
 
   db.prepare(`
     INSERT INTO observations (id, source_id, type, content, timestamp, refs, metadata)
@@ -355,7 +414,7 @@ export function upsertObservation(
     privacy.scrubbed,
     obs.timestamp,
     JSON.stringify(obs.refs ?? []),
-    obs.metadata ? JSON.stringify(obs.metadata) : null,
+    metaScrub.scrubbed ? JSON.stringify(metaScrub.scrubbed) : null,
   );
 
   return {
@@ -365,7 +424,7 @@ export function upsertObservation(
     content: privacy.scrubbed,
     timestamp: obs.timestamp,
     refs: obs.refs ?? [],
-    metadata: obs.metadata,
+    metadata: metaScrub.scrubbed,
   };
 }
 
@@ -391,6 +450,8 @@ export function insertObservationsBulk(
         dropped++;
         continue;
       }
+      // Issue #8 — deep-scrub metadata strings on the bulk path too.
+      const metaScrub = scrubMetadataDeep(obs.metadata);
       const id = randomUUID();
       insert.run(
         id,
@@ -399,7 +460,7 @@ export function insertObservationsBulk(
         privacy.scrubbed,
         obs.timestamp,
         JSON.stringify(obs.refs ?? []),
-        obs.metadata ? JSON.stringify(obs.metadata) : null,
+        metaScrub.scrubbed ? JSON.stringify(metaScrub.scrubbed) : null,
       );
       inserted++;
     }

@@ -22,6 +22,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   privacyFilter,
+  scrubMetadataDeep,
   _resetOperatorPatternsCacheForTests,
 } from '../packages/core/dist/observation.js';
 
@@ -143,6 +144,36 @@ console.log('Bad operator config does not crash:');
     delete process.env.CONTINUUM_PRIVACY_CONFIG;
     _resetOperatorPatternsCacheForTests();
   }
+}
+
+console.log('');
+console.log('Issue #8 — metadata deep-scrub (4 cases):');
+{
+  // (a) top-level string field with API key → scrubbed
+  const a = scrubMetadataDeep({ author: 'sk-abcdefghijklmnopqrstuv1234567890 in code' });
+  check('metadata top-level string scrubbed',
+    !JSON.stringify(a.scrubbed).includes('sk-abcdefghijklmnopqrstuv1234567890')
+    && a.matchedPatterns.some(l => l === 'metadata:openai-key'),
+    `matched=${a.matchedPatterns.join(',')}`);
+
+  // (b) nested object string → scrubbed
+  const b = scrubMetadataDeep({ env: { aws: 'AKIAIOSFODNN7EXAMPLE' } });
+  check('metadata nested object scrubbed',
+    !JSON.stringify(b.scrubbed).includes('AKIAIOSFODNN7EXAMPLE')
+    && b.matchedPatterns.some(l => l === 'metadata:aws-access-key-id'));
+
+  // (c) array of strings → scrubbed
+  const c = scrubMetadataDeep({ tokens: ['safe', 'ghp_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789'] });
+  check('metadata array element scrubbed',
+    !JSON.stringify(c.scrubbed).includes('ghp_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789')
+    && c.matchedPatterns.some(l => l === 'metadata:github-token'));
+
+  // (d) numeric/boolean metadata → passed through unchanged
+  const d = scrubMetadataDeep({ count: 42, active: true, retention_days: 7 });
+  check('metadata numeric/boolean preserved',
+    d.scrubbed.count === 42 && d.scrubbed.active === true && d.scrubbed.retention_days === 7
+    && d.matchedPatterns.length === 0,
+    JSON.stringify(d.scrubbed));
 }
 
 console.log('');

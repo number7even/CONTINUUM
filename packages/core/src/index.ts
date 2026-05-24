@@ -50,7 +50,7 @@ export { embed, embeddingDimensions } from './embedder.js';
 export { dbPathForProject, continuumDataRoot } from './db.js';
 
 // — Pure helpers (storage-agnostic)
-export { privacyFilter, type PrivacyResult } from './observation.js';
+export { privacyFilter, scrubMetadataDeep, type PrivacyResult, type MetadataScrubResult } from './observation.js';
 
 // — Agent handoff primitive (V0-compatible RecursiveMAS intent capture, Issue #3)
 export { createAgentHandoffObservation } from './observation.js';

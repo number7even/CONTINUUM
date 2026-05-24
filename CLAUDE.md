@@ -79,12 +79,16 @@
     - `028d1cd3` — Grok failover stack live (2026-05-14)
     - `e22985e0` — V0 polish milestone (2026-05-15; reproducible via
       `scripts/checkpoints/v0-polish-2026-05-15.mjs`)
-  - `continuum` project (V0.5 stub on top of V0-polish-complete):
-    - **(latest)** `<stamped at commit time>` — **V0.5 hybrid-stub COMPLETE**
-      (2026-05-24; reproducible via
-      `scripts/checkpoints/v0.5-hybrid-stub-2026-05-24.mjs`). 8 active
-      (V0-polish carried forward) + 4 dormant (V0.5 stub: hybrid backend,
-      embedder, factory toggle, smoke test — opt-in via
+  - `continuum` project (V1 HTTP stub on top of V0.5 on top of V0-polish):
+    - **(latest)** `b0f54355` — **V1 HTTP/SSE stub COMPLETE** (2026-05-24;
+      reproducible via `scripts/checkpoints/v1-http-stub-2026-05-24.mjs`).
+      8 active (V0-polish + Issue #8 metadata fix + refactor reflected in
+      updated verify_commands) + 7 dormant (4 V0.5 + 3 V1 — all opt-in
+      behind env vars). All 15 entries verify-green at stamp time; hash
+      `16bbe4835a322a60…`.
+    - `2e21bcaa` — V0.5 hybrid-stub COMPLETE (2026-05-24; reproducible
+      via `scripts/checkpoints/v0.5-hybrid-stub-2026-05-24.mjs`). 8
+      active + 4 dormant (V0.5 stub — opt-in via
       `CONTINUUM_STORAGE_BACKEND=hybrid`).
     - `208c56b2` — V0 polish COMPLETE (2026-05-24; reproducible via
       `scripts/checkpoints/v0-polish-complete-2026-05-24.mjs`).
@@ -143,9 +147,16 @@
   SQLite (relational) + RuVector @0.2.25 native (HNSW vector index) +
   `@xenova/transformers` MiniLM-L6-v2 (384-dim embeddings). Opt-in via
   `CONTINUUM_STORAGE_BACKEND=hybrid`; sqlite remains the default. Smoke
-  test `scripts/ruvector-smoke.mjs` passes all 9 checks (factory routing,
-  sync StorageBackend parity, background vector indexing, semantic
-  search top-match assertion).
+  test `scripts/ruvector-smoke.mjs` passes all 9 checks. **Issue #8 closed
+  2026-05-24** — privacy filter now deep-scrubs `Observation.metadata`
+  strings (mandatory gate before V1 HTTP exposure). **V1 HTTP/SSE
+  transport stub SHIPPED 2026-05-24**: Express + `SSEServerTransport` +
+  Bearer auth + project routing in `packages/mcp-server/src/http.ts`;
+  `continuum serve` CLI command wraps it. mcp-server refactored into
+  thin `index.ts` (42 lines, stdio) + factory `server.ts` (783 lines,
+  buildServer) + `http.ts` (163 lines, HTTP/SSE) — partial address of
+  Issue #12. 7-check end-to-end smoke `scripts/http-smoke.mjs` round-
+  trips a real SDK `SSEClientTransport` against the live server.
 - ✅ Privacy filter §A3 extensions — **shipped** 2026-05-24. Eleven named
   patterns total (4 baseline + 7 new: JWT / GCP service account / GitHub
   tokens / Slack / Google API / Stripe live secret + publishable). Patterns

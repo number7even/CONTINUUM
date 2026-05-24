@@ -80,6 +80,8 @@ COMMANDS
                  Auto-imports ./STATE.md as the first checkpoint if found
                  and no checkpoints exist yet.
   start          Run the MCP stdio server for this project.
+  serve          Run the MCP HTTP/SSE server (V1 — remote / hosted clients).
+                 Requires $CONTINUUM_HTTP_TOKEN (Bearer shared secret).
   status         Print current state, todo counts, and data location.
   import-state   Parse a STATE.md and record it as a new checkpoint. Always
                  creates a checkpoint (use this to re-snapshot after edits).
@@ -95,6 +97,7 @@ EXAMPLES
   continuum status
   continuum import-state --state-md=./STATE.md
   CONTINUUM_PROJECT_ID=vc-hospitality continuum start
+  CONTINUUM_HTTP_TOKEN=$(openssl rand -hex 32) continuum serve
 
 LEARN MORE
   https://github.com/number7even/CONTINUUM
@@ -325,6 +328,22 @@ async function commandStart(projectId: string): Promise<void> {
   await import('@continuum/mcp-server');
 }
 
+// ── continuum serve (V1 HTTP/SSE) ────────────────────────────────────────────
+
+async function commandServe(projectId: string): Promise<void> {
+  if (!process.env.CONTINUUM_HTTP_TOKEN || !process.env.CONTINUUM_HTTP_TOKEN.trim()) {
+    process.stderr.write(
+      'continuum serve: $CONTINUUM_HTTP_TOKEN required. Generate one with `openssl rand -hex 32` ' +
+        'and re-launch, e.g.\n  CONTINUUM_HTTP_TOKEN=$(openssl rand -hex 32) continuum serve\n',
+    );
+    process.exit(1);
+  }
+  process.env.CONTINUUM_PROJECT_ID = projectId;
+  // The http.ts module is the bin entry — importing it boots Express +
+  // SSEServerTransport and listens on $CONTINUUM_HTTP_PORT (default 7878).
+  await import('@continuum/mcp-server/dist/http.js');
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -348,6 +367,10 @@ async function main(): Promise<void> {
 
     case 'start':
       await commandStart(projectId);
+      return;
+
+    case 'serve':
+      await commandServe(projectId);
       return;
 
     case 'import-state':
