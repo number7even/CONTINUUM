@@ -122,6 +122,15 @@
   4 legitimate warnings (entries missing Verify correctly dropped).
   First-word category classification (not regex on full heading) — caught
   the "DORMANT (built but not the **active** path)" trap.
+- ⚠️ **Post-V0-polish review backlog** — [Issues #8–#18](https://github.com/number7even/CONTINUUM/issues?q=is%3Aissue+is%3Aopen+sort%3Acreated-desc)
+  captured 2026-05-24 immediately after V0-polish-complete. **Tier A
+  defects to fix before V0.5 starts:** #8 (privacy filter doesn't scrub
+  Observation.metadata), #9 (CLI project-id case-sensitivity foot-gun),
+  #10 (`deleteObservation` for incident response). Tier B (sustainability
+  / refactor): #11 (`node --test` framework), #12 (mcp-server split before
+  it hits 1000 lines), #13 (`continuum verify` CLI command). Tier C+D:
+  briefing freshness header (#14), configurable window (#15), adapter
+  watch mode (#16), Issue #1–#7 triage (#17), FTS5 canary fixture (#18).
 - ✅ Privacy filter §A3 extensions — **shipped** 2026-05-24. Eleven named
   patterns total (4 baseline + 7 new: JWT / GCP service account / GitHub
   tokens / Slack / Google API / Stripe live secret + publishable). Patterns
