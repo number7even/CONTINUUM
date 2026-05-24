@@ -112,10 +112,17 @@
   4 legitimate warnings (entries missing Verify correctly dropped).
   First-word category classification (not regex on full heading) — caught
   the "DORMANT (built but not the **active** path)" trap.
-- ❌ Privacy filter extensions (JWT shapes, GCP service-account JSON,
-  entropy detector, operator-extensible patterns config) — V0 polish per
-  CTO doc §A3. Base filter (`<private>` tags + sk-/xai-/AKIA/PEM patterns)
-  **is already shipped** in `packages/core/src/observation.ts:42`.
+- ✅ Privacy filter §A3 extensions — **shipped** 2026-05-24. Eleven named
+  patterns total (4 baseline + 7 new: JWT / GCP service account / GitHub
+  tokens / Slack / Google API / Stripe live secret + publishable). Patterns
+  now **actually scrub** (replace with `[REDACTED:<label>]`) instead of
+  just detecting. Operator-extensible via JSON file at
+  `$CONTINUUM_PRIVACY_CONFIG` (default `~/.continuum/privacy.json`).
+  Optional Shannon-entropy detector gated by env var
+  `CONTINUUM_PRIVACY_ENTROPY_DETECTOR=1` (4.5 bits/char threshold —
+  above hex commit SHAs at ~4.0). 13-check smoke test in
+  `scripts/privacy-smoke.mjs` exercises every pattern + edge cases (commit
+  SHA not redacted, operator config loaded, bad config gracefully ignored).
 - ❌ `claude-mem` + `sona` adapters — V0.5.
 - ❌ RuVector storage backend — V0.5 (drop-in point now wired at
   `openStorage()` factory — V0.5 work is the implementation, not the seam).

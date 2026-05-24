@@ -7,55 +7,211 @@
  */
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type { AgentHandoffMetadata, Observation } from './types.js';
 
 /**
- * Privacy patterns dropped at Aggregator (ARCHITECTURE.md §8 invariant).
- * Operators may extend via ~/.continuum/privacy.json in V0.5.
+ * Privacy patterns enforced at the Aggregator (ARCHITECTURE.md §8 invariant).
+ *
+ * The filter runs in three passes (CTO doc §A3):
+ *   1. `<private>...</private>` block redaction — the explicit nuke. If a
+ *      majority of content is wrapped in tags, the observation is dropped
+ *      entirely (shouldDrop=true).
+ *   2. Named-pattern scrubbing — known-shape secrets (OpenAI keys, JWTs,
+ *      AWS credentials, etc.) are REPLACED in-place with
+ *      `[REDACTED:<label>]` so the surrounding content stays useful but
+ *      the secret never reaches the index. Each match is logged to
+ *      matchedPatterns[] for the operator audit trail.
+ *   3. Optional Shannon-entropy detector — gated by env var
+ *      CONTINUUM_PRIVACY_ENTROPY_DETECTOR=1. Scans for runs of
+ *      base64-shaped chars >=40 long; redacts ones above 4.5 bits/char
+ *      entropy (commit SHAs sit at ~4.0 so they pass through unscrubbed).
+ *
+ * Operator extensibility (CTO doc §A3): patterns can be added via JSON file
+ * at $CONTINUUM_PRIVACY_CONFIG (default ~/.continuum/privacy.json), shape:
+ *   { "patterns": [{ "label": "company-token", "rx": "[A-Z0-9]{32}", "flags": "g" }] }
+ * Invalid regexes are skipped silently — never crash the ingest pipeline
+ * because a hand-edited config file is broken.
  */
+
+interface NamedPattern {
+  label: string;
+  rx: RegExp;
+}
+
 const PRIVATE_TAG_RX = /<private>[\s\S]*?<\/private>/gi;
-const DEFAULT_PRIVATE_PATTERNS: RegExp[] = [
-  /<private>[\s\S]*?<\/private>/i,
-  /sk-[a-zA-Z0-9_\-]{20,}/,          // OpenAI/Anthropic-style API keys
-  /xai-[a-zA-Z0-9_\-]{20,}/,         // xAI keys
-  /AKIA[0-9A-Z]{16}/,                // AWS access key IDs
-  /BEGIN[\s_]+PRIVATE[\s_]+KEY/i,    // PEM private keys
+
+const DEFAULT_PRIVATE_PATTERNS: NamedPattern[] = [
+  // V0 baseline (shipped pre-§A3) — now also scrub, not just detect.
+  { label: 'openai-key', rx: /sk-[a-zA-Z0-9_-]{20,}/g },
+  { label: 'xai-key', rx: /xai-[a-zA-Z0-9_-]{20,}/g },
+  { label: 'aws-access-key-id', rx: /\bAKIA[0-9A-Z]{16}\b/g },
+  {
+    label: 'pem-private-key',
+    rx: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+  },
+  // §A3 additions (2026-05-24): closes the V0 polish privacy backlog.
+  {
+    label: 'jwt',
+    rx: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+  },
+  { label: 'gcp-service-account', rx: /"type"\s*:\s*"service_account"/gi },
+  { label: 'github-token', rx: /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g },
+  { label: 'slack-token', rx: /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g },
+  { label: 'google-api-key', rx: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+  { label: 'stripe-live-secret', rx: /\bsk_live_[0-9a-zA-Z]{24,}\b/g },
+  { label: 'stripe-live-publishable', rx: /\bpk_live_[0-9a-zA-Z]{24,}\b/g },
 ];
+
+// Operator patterns are loaded once per process and cached. Reloading on
+// every observation would re-read the JSON file on each insert — wasteful.
+let _cachedOperatorPatterns: NamedPattern[] | null = null;
+
+function operatorPrivacyConfigPath(): string | null {
+  const override = process.env.CONTINUUM_PRIVACY_CONFIG;
+  if (override && override.trim()) return override.trim();
+  const home = homedir();
+  return home ? join(home, '.continuum', 'privacy.json') : null;
+}
+
+function loadOperatorPatterns(): NamedPattern[] {
+  const path = operatorPrivacyConfigPath();
+  if (!path) return [];
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf-8');
+  } catch {
+    return []; // file absent → no extra patterns. Not an error.
+  }
+  let parsed: { patterns?: Array<{ label?: string; rx?: string; flags?: string }> };
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`[continuum:privacy] could not parse ${path}: ${msg}\n`);
+    return [];
+  }
+  if (!Array.isArray(parsed?.patterns)) return [];
+  const out: NamedPattern[] = [];
+  for (const entry of parsed.patterns) {
+    if (!entry || typeof entry.label !== 'string' || typeof entry.rx !== 'string') continue;
+    const flags = typeof entry.flags === 'string' ? entry.flags : 'g';
+    try {
+      out.push({ label: entry.label, rx: new RegExp(entry.rx, flags) });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`[continuum:privacy] skipping bad regex "${entry.label}": ${msg}\n`);
+    }
+  }
+  return out;
+}
+
+function getOperatorPatterns(): NamedPattern[] {
+  if (_cachedOperatorPatterns === null) {
+    _cachedOperatorPatterns = loadOperatorPatterns();
+  }
+  return _cachedOperatorPatterns;
+}
+
+/** Test-only: clear the cached operator patterns so tests can re-load fresh. */
+export function _resetOperatorPatternsCacheForTests(): void {
+  _cachedOperatorPatterns = null;
+}
+
+// ── Optional Shannon-entropy detector ────────────────────────────────────────
+
+const HIGH_ENTROPY_CANDIDATE_RX = /[A-Za-z0-9+/_=-]{40,}/g;
+const HIGH_ENTROPY_THRESHOLD = 4.5; // bits/char — above hex commit SHAs (~4.0)
+
+function shannonEntropy(s: string): number {
+  if (s.length === 0) return 0;
+  const freq = new Map<string, number>();
+  for (const c of s) freq.set(c, (freq.get(c) ?? 0) + 1);
+  let h = 0;
+  for (const f of freq.values()) {
+    const p = f / s.length;
+    h -= p * Math.log2(p);
+  }
+  return h;
+}
+
+function scrubHighEntropy(input: string): { scrubbed: string; matched: boolean } {
+  HIGH_ENTROPY_CANDIDATE_RX.lastIndex = 0;
+  let matched = false;
+  const out = input.replace(HIGH_ENTROPY_CANDIDATE_RX, m => {
+    if (shannonEntropy(m) >= HIGH_ENTROPY_THRESHOLD) {
+      matched = true;
+      return '[REDACTED:high-entropy]';
+    }
+    return m;
+  });
+  return { scrubbed: out, matched };
+}
+
+// ── Result type ──────────────────────────────────────────────────────────────
 
 /** Privacy filter result. */
 export interface PrivacyResult {
-  /** Content after `<private>` blocks stripped. May be empty if entire content was private. */
+  /** Content after all redactions. May be empty if entire content was private. */
   scrubbed: string;
-  /** True if any pattern matched and content was modified or dropped. */
+  /** True if any pattern matched and content was modified. */
   redacted: boolean;
-  /** Patterns that matched (for audit log). */
+  /** Pattern labels that matched (for audit log). */
   matchedPatterns: string[];
-  /** True if >50% of original content was private and the whole observation should be dropped. */
+  /** True if >50% of original content was inside `<private>` tags. */
   shouldDrop: boolean;
 }
 
+// ── Main entry point ─────────────────────────────────────────────────────────
+
 /**
  * Run the privacy filter on a candidate Observation's content.
- * Removes `<private>` blocks. Detects high-entropy secret patterns.
- * If too much content is private, signals shouldDrop=true.
+ *
+ * Three passes: `<private>` block redaction (with shouldDrop signal),
+ * named-pattern scrubbing (in-place replacement with [REDACTED:label]),
+ * optional Shannon-entropy scan (opt-in via env var).
+ *
+ * @param content       Raw observation content.
+ * @param extraPatterns Caller-supplied regexes; each gets auto-label `extra-<i>`.
  */
 export function privacyFilter(content: string, extraPatterns: RegExp[] = []): PrivacyResult {
-  const patterns = [...DEFAULT_PRIVATE_PATTERNS, ...extraPatterns];
-  let scrubbed = content.replace(PRIVATE_TAG_RX, '[PRIVATE_REDACTED]');
   const matched: string[] = [];
 
-  for (const pat of patterns) {
-    if (pat.test(content)) {
-      matched.push(pat.toString());
-    }
+  // Pass 1 — <private>...</private> block redaction.
+  PRIVATE_TAG_RX.lastIndex = 0;
+  let scrubbed = content.replace(PRIVATE_TAG_RX, '[PRIVATE_REDACTED]');
+  const tagBytesRemoved = content.length - scrubbed.length;
+  if (tagBytesRemoved > 0) matched.push('private-tag');
+
+  // Pass 2 — named-pattern scrubbing (defaults + operator + caller extras).
+  const patterns: NamedPattern[] = [
+    ...DEFAULT_PRIVATE_PATTERNS,
+    ...getOperatorPatterns(),
+    ...extraPatterns.map((rx, i) => ({ label: `extra-${i}`, rx })),
+  ];
+  for (const p of patterns) {
+    p.rx.lastIndex = 0;
+    const before = scrubbed;
+    scrubbed = scrubbed.replace(p.rx, `[REDACTED:${p.label}]`);
+    if (scrubbed !== before) matched.push(p.label);
   }
 
-  const removedBytes = content.length - scrubbed.length;
-  const shouldDrop = removedBytes > content.length * 0.5;
+  // Pass 3 — optional Shannon-entropy detector (opt-in).
+  if (process.env.CONTINUUM_PRIVACY_ENTROPY_DETECTOR === '1') {
+    const r = scrubHighEntropy(scrubbed);
+    scrubbed = r.scrubbed;
+    if (r.matched) matched.push('high-entropy');
+  }
+
+  // shouldDrop fires only on heavy <private> tag use — pattern scrubs are
+  // localised, not a "drop the whole observation" signal.
+  const shouldDrop = tagBytesRemoved > content.length * 0.5;
 
   return {
     scrubbed,
-    redacted: matched.length > 0 || removedBytes > 0,
+    redacted: matched.length > 0 || tagBytesRemoved > 0,
     matchedPatterns: matched,
     shouldDrop,
   };
