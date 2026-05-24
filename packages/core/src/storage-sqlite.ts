@@ -151,13 +151,7 @@ export class SQLiteStorageBackend implements StorageBackend {
   }
 }
 
-/**
- * Factory — open the configured storage backend for a project.
- *
- * V0 always returns SQLiteStorageBackend. V0.5+ adds a feature flag /
- * env var to return RuVectorStorageBackend instead — same interface,
- * different engine.
- */
-export function openStorage(projectId: string): StorageBackend {
-  return new SQLiteStorageBackend(projectId);
-}
+// openStorage() factory moved to ./factory.ts as of V0.5 so the hybrid
+// backend (which has heavy ruvector + @xenova/transformers deps) can
+// be selected via env var without forcing those deps to load when
+// sqlite-only operators import @continuum/core.

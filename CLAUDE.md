@@ -79,15 +79,20 @@
     - `028d1cd3` — Grok failover stack live (2026-05-14)
     - `e22985e0` — V0 polish milestone (2026-05-15; reproducible via
       `scripts/checkpoints/v0-polish-2026-05-15.mjs`)
-  - `continuum` project (1 clean row + 2 iteration drafts):
-    - `208c56b2` — **V0 polish COMPLETE** (2026-05-24; reproducible via
+  - `continuum` project (V0.5 stub on top of V0-polish-complete):
+    - **(latest)** `<stamped at commit time>` — **V0.5 hybrid-stub COMPLETE**
+      (2026-05-24; reproducible via
+      `scripts/checkpoints/v0.5-hybrid-stub-2026-05-24.mjs`). 8 active
+      (V0-polish carried forward) + 4 dormant (V0.5 stub: hybrid backend,
+      embedder, factory toggle, smoke test — opt-in via
+      `CONTINUUM_STORAGE_BACKEND=hybrid`).
+    - `208c56b2` — V0 polish COMPLETE (2026-05-24; reproducible via
       `scripts/checkpoints/v0-polish-complete-2026-05-24.mjs`).
       Real canonical hash `2b18a91527851b7e…`. All 9 entries verified
       green at stamp time (8 active + 1 dormant).
-    - `a63eb576`, `c6291935` — earlier drafts of the same checkpoint
-      with broken verify_commands (storage-upsert + cross-source-fts5)
-      and broken pre-fix hashes. Kept in DB per append-only invariant
-      as the iteration log; `getStateAt()` returns `208c56b2`.
+    - `a63eb576`, `c6291935` — earlier drafts of the V0-polish-complete
+      checkpoint with broken verify_commands and broken pre-fix hashes.
+      Kept in DB per append-only invariant as the iteration log.
 
 ## What's NOT done yet (do not claim otherwise)
 
@@ -133,11 +138,14 @@
   watch mode (#16), Issue #1–#7 triage (#17), FTS5 canary fixture (#18),
   **RVM source checkout** (#19 — added 2026-05-24 under explicit override
   of partner-clause #3; source at `~/Development/rvm`, `cargo check` clean,
-  no integration code yet). **V0.5 RuVector architecture gap (#20)** —
-  npm package `ruvector@0.2.25` is vector-first not row-oriented; §10b
-  "drop-in storage swap" assumption needs revision before any
-  `storage-ruvector.ts` lands. Three paths in the issue body
-  (hybrid two-store / RVF direct / defer to v1.0).
+  no integration code yet). **V0.5 RuVector architecture gap (#20) — Path A
+  chosen and SHIPPED as stub 2026-05-24**: `HybridStorageBackend` composes
+  SQLite (relational) + RuVector @0.2.25 native (HNSW vector index) +
+  `@xenova/transformers` MiniLM-L6-v2 (384-dim embeddings). Opt-in via
+  `CONTINUUM_STORAGE_BACKEND=hybrid`; sqlite remains the default. Smoke
+  test `scripts/ruvector-smoke.mjs` passes all 9 checks (factory routing,
+  sync StorageBackend parity, background vector indexing, semantic
+  search top-match assertion).
 - ✅ Privacy filter §A3 extensions — **shipped** 2026-05-24. Eleven named
   patterns total (4 baseline + 7 new: JWT / GCP service account / GitHub
   tokens / Slack / Google API / Stripe live secret + publishable). Patterns

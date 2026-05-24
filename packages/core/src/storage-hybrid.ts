@@ -1,0 +1,292 @@
+/**
+ * HybridStorageBackend — V0.5 transitional backend (Path A from Issue #20).
+ *
+ * Composes SQLiteStorageBackend (relational: snapshots, todos, sources,
+ * observation rows + FTS5 keyword search) with a RuVector vector index
+ * (HNSW vector search over observation content via @xenova/transformers
+ * MiniLM-L6-v2 embeddings).
+ *
+ * Observation writes are dual-written:
+ *   1. SQLite — full row, synchronous, returns immediately.
+ *   2. RuVector — embedded + indexed in the background. Fire-and-forget;
+ *      embedding/index errors log to stderr but don't fail the SQLite
+ *      insert (observations must always land in the relational store).
+ *
+ * StorageBackend's existing sync interface stays unchanged so consumers
+ * (mcp-server, cli, adapter-docs, adapter-git, etc.) need NO modification.
+ * Vector search is exposed as NEW async methods on this class — not on
+ * the StorageBackend interface — so V0.5 doesn't reshape the contract:
+ *
+ *   vectorSearch(query, k)    semantic search over embedded observations
+ *   flushVectorWrites()       wait for in-flight embeddings to settle
+ *   vectorCount()             diagnostic
+ *
+ * Activation: set CONTINUUM_STORAGE_BACKEND=hybrid (default: sqlite).
+ * On hybrid, the openStorage() factory returns this class.
+ *
+ * V0.5 acceptance criteria:
+ *   (a) V0-polish-complete checkpoint's verify_commands still pass
+ *       against this backend (sync StorageBackend parity).
+ *   (b) vectorSearch recovers a semantically-related observation that
+ *       FTS5 keyword search would not (proves the embedding pipeline
+ *       is online and the vector index is consulted).
+ *
+ * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
+ */
+import { join } from 'node:path';
+
+import { SQLiteStorageBackend } from './storage-sqlite.js';
+import { embed, embeddingDimensions } from './embedder.js';
+import { continuumDataRoot } from './db.js';
+import type {
+  Observation,
+  SearchHit,
+  SourceType,
+  StateSnapshot,
+  Todo,
+} from './types.js';
+import type {
+  CheckpointInput,
+  CreateTodoInput,
+  InsertObservationsResult,
+  ListTodosOptions,
+  StorageBackend,
+  UpdateTodoInput,
+} from './storage.js';
+
+// Narrow shape we actually need from the ruvector VectorDB class.
+// Keeping this local avoids importing ruvector's full type tree into core
+// at module-graph load time — the real import is deferred until first use.
+interface VectorDb {
+  insert(entry: {
+    id?: string;
+    vector: Float32Array | number[];
+    metadata?: Record<string, unknown>;
+  }): Promise<string>;
+  search(query: {
+    vector: Float32Array | number[];
+    k: number;
+    filter?: Record<string, unknown>;
+  }): Promise<
+    Array<{
+      id: string;
+      score: number;
+      metadata?: Record<string, unknown>;
+    }>
+  >;
+  delete(id: string): Promise<boolean>;
+  len(): Promise<number>;
+}
+
+interface VectorDbCtor {
+  new (opts: {
+    dimensions: number;
+    storagePath?: string;
+    metric?: string;
+    distanceMetric?: string;
+  }): VectorDb;
+}
+
+export class HybridStorageBackend implements StorageBackend {
+  private readonly sqlite: SQLiteStorageBackend;
+  private readonly vectorDbPath: string;
+  private _vectorDb: VectorDb | null = null;
+  private _vectorDbLoadPromise: Promise<VectorDb> | null = null;
+  // Append-only queue. flushVectorWrites() swaps it to drain. A new
+  // promise can land mid-flush; the next flush call picks it up.
+  private pendingEmbeds: Array<Promise<void>> = [];
+
+  constructor(projectId: string) {
+    // SQLiteStorageBackend's constructor mkdirs the project root for us
+    // (~/.continuum/<projectId>/), so we can place the ruvector file
+    // alongside the sqlite DB without an extra mkdir.
+    this.sqlite = new SQLiteStorageBackend(projectId);
+    this.vectorDbPath = join(continuumDataRoot(), projectId, 'ruvector.db');
+  }
+
+  private async getVectorDb(): Promise<VectorDb> {
+    if (this._vectorDb) return this._vectorDb;
+    if (this._vectorDbLoadPromise) return this._vectorDbLoadPromise;
+    this._vectorDbLoadPromise = (async () => {
+      const rv = (await import('ruvector')) as unknown as {
+        VectorDB?: VectorDbCtor;
+        VectorDb?: VectorDbCtor;
+        default?: VectorDbCtor;
+      };
+      const Ctor = rv.VectorDB ?? rv.VectorDb ?? rv.default;
+      if (!Ctor) {
+        throw new Error('ruvector: no VectorDB / VectorDb / default export found');
+      }
+      this._vectorDb = new Ctor({
+        dimensions: embeddingDimensions(),
+        storagePath: this.vectorDbPath,
+        metric: 'cosine',
+      });
+      return this._vectorDb;
+    })();
+    return this._vectorDbLoadPromise;
+  }
+
+  /**
+   * Queue an embedding + vector insert for an Observation that was just
+   * persisted to SQLite. Fire-and-forget — errors log to stderr but
+   * never throw back at the synchronous insert path.
+   */
+  private queueVectorIndex(obs: Observation): void {
+    const task = (async () => {
+      try {
+        const vector = await embed(obs.content);
+        const db = await this.getVectorDb();
+        await db.insert({
+          id: obs.id,
+          vector,
+          metadata: {
+            sourceId: obs.sourceId,
+            type: obs.type,
+            timestamp: obs.timestamp,
+          },
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(
+          `[continuum:hybrid] vector index failed for ${obs.id}: ${msg}\n`,
+        );
+      }
+    })();
+    this.pendingEmbeds.push(task);
+  }
+
+  // ── StorageBackend (sync) — pass-through to SQLite for relational data
+
+  recordCheckpoint(input: CheckpointInput): StateSnapshot {
+    return this.sqlite.recordCheckpoint(input);
+  }
+
+  getStateAt(at?: string): StateSnapshot | null {
+    return this.sqlite.getStateAt(at);
+  }
+
+  listSnapshots(limit?: number): StateSnapshot[] {
+    return this.sqlite.listSnapshots(limit);
+  }
+
+  createTodo(input: CreateTodoInput): Todo {
+    return this.sqlite.createTodo(input);
+  }
+
+  listTodos(opts: ListTodosOptions = {}): Todo[] {
+    return this.sqlite.listTodos(opts);
+  }
+
+  getTodo(id: string): Todo | null {
+    return this.sqlite.getTodo(id);
+  }
+
+  updateTodo(input: UpdateTodoInput): Todo {
+    return this.sqlite.updateTodo(input);
+  }
+
+  upsertSource(
+    id: string,
+    type: SourceType,
+    config?: Record<string, unknown>,
+  ): void {
+    this.sqlite.upsertSource(id, type, config);
+  }
+
+  // ── Observations — sync SQLite write + background vector indexing
+
+  insertObservation(
+    obs: Omit<Observation, 'id'> & { id?: string },
+  ): Observation | null {
+    const result = this.sqlite.insertObservation(obs);
+    if (result) this.queueVectorIndex(result);
+    return result;
+  }
+
+  upsertObservation(
+    obs: Omit<Observation, 'id'> & { id: string },
+  ): Observation | null {
+    const result = this.sqlite.upsertObservation(obs);
+    if (result) this.queueVectorIndex(result);
+    return result;
+  }
+
+  insertObservationsBulk(
+    observations: Array<Omit<Observation, 'id'>>,
+  ): InsertObservationsResult {
+    // V0.5 stub: bulk path stays SQLite-only because insertObservationsBulk
+    // doesn't return the inserted IDs we'd need to vector-index. Adapters
+    // that want their bulk-imported observations to be vector-searchable
+    // should call insertObservation/upsertObservation in a loop instead.
+    return this.sqlite.insertObservationsBulk(observations);
+  }
+
+  searchObservations(query: string, limit?: number): SearchHit[] {
+    // Sync keyword search via SQLite-FTS5 stays the default. Vector
+    // search is the explicit async vectorSearch() method below.
+    return this.sqlite.searchObservations(query, limit);
+  }
+
+  close(): void {
+    this.sqlite.close();
+    // RuVector handles its own cleanup; no explicit close method on the
+    // npm surface today.
+  }
+
+  dataLocation(): string {
+    return `${this.sqlite.dataLocation()} + ${this.vectorDbPath}`;
+  }
+
+  // ── NEW async methods — NOT on the StorageBackend interface ─────────────
+
+  /** Wait until every in-flight background vector-index write has settled. */
+  async flushVectorWrites(): Promise<void> {
+    // Loop in case more writes land while we're awaiting the current batch.
+    while (this.pendingEmbeds.length > 0) {
+      const inFlight = this.pendingEmbeds;
+      this.pendingEmbeds = [];
+      await Promise.allSettled(inFlight);
+    }
+  }
+
+  /**
+   * Semantic search via RuVector + the embedder.
+   * Returns SearchHit[] shaped like the sync FTS5 path so callers can
+   * fuse the two result sets (RRF) once the V0.5 hybrid-search layer
+   * lands. For now, the title field signals to the caller that the
+   * full content must be fetched via continuum_get_observations.
+   */
+  async vectorSearch(query: string, k: number = 10): Promise<SearchHit[]> {
+    const vector = await embed(query);
+    const db = await this.getVectorDb();
+    const results = await db.search({ vector, k });
+    return results.map(r => {
+      const meta = r.metadata ?? {};
+      const sourceId = typeof meta.sourceId === 'string' ? meta.sourceId : 'export';
+      const type = typeof meta.type === 'string' ? meta.type : 'unknown';
+      const timestamp =
+        typeof meta.timestamp === 'string' ? meta.timestamp : '1970-01-01T00:00:00Z';
+      return {
+        id: r.id,
+        source: (sourceId.split(':')[0] ?? 'export') as SourceType,
+        type,
+        timestamp,
+        title: '(vector hit — fetch full content via continuum_get_observations)',
+        score: r.score,
+        hasMore: true,
+      };
+    });
+  }
+
+  /** Diagnostic — how many vectors are currently in the RuVector index. */
+  async vectorCount(): Promise<number> {
+    const db = await this.getVectorDb();
+    return db.len();
+  }
+
+  /** Diagnostic — where the RuVector data files live on disk. */
+  vectorDataLocation(): string {
+    return this.vectorDbPath;
+  }
+}

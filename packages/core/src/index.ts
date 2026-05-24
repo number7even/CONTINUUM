@@ -38,7 +38,13 @@ export type {
   InsertObservationsResult,
 } from './storage.js';
 
-export { openStorage, SQLiteStorageBackend } from './storage-sqlite.js';
+export { SQLiteStorageBackend } from './storage-sqlite.js';
+export { HybridStorageBackend } from './storage-hybrid.js';
+export { openStorage } from './factory.js';
+
+// Embedder — exposed so adapters / scripts can pre-compute embeddings
+// outside the storage backend if they need to (V0.5 stub primitive).
+export { embed, embeddingDimensions } from './embedder.js';
 
 // — Filesystem layout helpers (used by adapters/CLI for diagnostics)
 export { dbPathForProject, continuumDataRoot } from './db.js';
