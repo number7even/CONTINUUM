@@ -73,11 +73,21 @@
   hospitality-aria deploy verified via SHA-grep of bundle `buildId`
   (commit `2aa4f96a5`), row closed only after fresh `verifyCommand`
   exited 0. Re-runnable witness encoded in the DB row itself.
-- **`product_state[]` checkpoints in DB** (3 rows in `vc-hospitality`):
-  - `aa102d94` — "Continuum V0 born" (2026-05-14)
-  - `028d1cd3` — Grok failover stack live (2026-05-14)
-  - `e22985e0` — V0 polish milestone (2026-05-15; reproducible via
-    `scripts/checkpoints/v0-polish-2026-05-15.mjs`)
+- **`product_state[]` checkpoints in DB:**
+  - `vc-hospitality` project (3 rows):
+    - `aa102d94` — "Continuum V0 born" (2026-05-14)
+    - `028d1cd3` — Grok failover stack live (2026-05-14)
+    - `e22985e0` — V0 polish milestone (2026-05-15; reproducible via
+      `scripts/checkpoints/v0-polish-2026-05-15.mjs`)
+  - `continuum` project (1 clean row + 2 iteration drafts):
+    - `208c56b2` — **V0 polish COMPLETE** (2026-05-24; reproducible via
+      `scripts/checkpoints/v0-polish-complete-2026-05-24.mjs`).
+      Real canonical hash `2b18a91527851b7e…`. All 9 entries verified
+      green at stamp time (8 active + 1 dormant).
+    - `a63eb576`, `c6291935` — earlier drafts of the same checkpoint
+      with broken verify_commands (storage-upsert + cross-source-fts5)
+      and broken pre-fix hashes. Kept in DB per append-only invariant
+      as the iteration log; `getStateAt()` returns `208c56b2`.
 
 ## What's NOT done yet (do not claim otherwise)
 
