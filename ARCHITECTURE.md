@@ -743,6 +743,17 @@ an additive layer; it **replaces** the SQLite + Chroma split, simplifying
 Continuum's storage from "two engines + custom diff logic" to "one engine with
 native semantics for everything we need."
 
+> **⚠️ 2026-05-24 reconnaissance update.** \`ruvector@0.2.25\` on npm is
+> **vector-first**, not the unified vector/graph/relational engine §10b
+> below assumes. The 'drop-in storage swap' framing is broken: relational
+> state (snapshots / todos / sources) has no obvious mapping in the npm
+> surface, and observations require pre-computed embedding vectors that
+> CONTINUUM does not currently produce. **Three coherent V0.5 paths
+> tracked in [Issue #20](https://github.com/number7even/CONTINUUM/issues/20)** —
+> hybrid two-store, RVF-direct, or defer to RuVector v1.0+. Section §10b
+> below describes the original v0.3 design; revise alongside the Path
+> A/B/C decision.
+
 ### Why migrate from SQLite + Chroma to RuVector at V0.5
 
 | Capability | V0 (SQLite + Chroma) | V0.5+ (RuVector) |

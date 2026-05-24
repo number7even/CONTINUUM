@@ -122,7 +122,7 @@
   4 legitimate warnings (entries missing Verify correctly dropped).
   First-word category classification (not regex on full heading) — caught
   the "DORMANT (built but not the **active** path)" trap.
-- ⚠️ **Post-V0-polish review backlog** — [Issues #8–#19](https://github.com/number7even/CONTINUUM/issues?q=is%3Aissue+is%3Aopen+sort%3Acreated-desc)
+- ⚠️ **Post-V0-polish review backlog** — [Issues #8–#20](https://github.com/number7even/CONTINUUM/issues?q=is%3Aissue+is%3Aopen+sort%3Acreated-desc)
   captured 2026-05-24 immediately after V0-polish-complete. **Tier A
   defects to fix before V0.5 starts:** #8 (privacy filter doesn't scrub
   Observation.metadata), #9 (CLI project-id case-sensitivity foot-gun),
@@ -133,7 +133,11 @@
   watch mode (#16), Issue #1–#7 triage (#17), FTS5 canary fixture (#18),
   **RVM source checkout** (#19 — added 2026-05-24 under explicit override
   of partner-clause #3; source at `~/Development/rvm`, `cargo check` clean,
-  no integration code yet).
+  no integration code yet). **V0.5 RuVector architecture gap (#20)** —
+  npm package `ruvector@0.2.25` is vector-first not row-oriented; §10b
+  "drop-in storage swap" assumption needs revision before any
+  `storage-ruvector.ts` lands. Three paths in the issue body
+  (hybrid two-store / RVF direct / defer to v1.0).
 - ✅ Privacy filter §A3 extensions — **shipped** 2026-05-24. Eleven named
   patterns total (4 baseline + 7 new: JWT / GCP service account / GitHub
   tokens / Slack / Google API / Stripe live secret + publishable). Patterns
