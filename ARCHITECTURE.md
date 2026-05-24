@@ -1020,6 +1020,7 @@ The partner agreement requires that no integration #5+ lands ahead of V0 ship. T
 | [#5](https://github.com/number7even/CONTINUUM/issues/5) | MidStream + Prime-Radiant — real-time hallucination gating via sheaf Laplacian coherence | V1.x | Parked |
 | [#6](https://github.com/number7even/CONTINUUM/issues/6) | Agentic-Jujutsu — lock-free concurrent commits for AI swarms | V1+ | Parked |
 | [#7](https://github.com/number7even/CONTINUUM/issues/7) | TaskmasterAI — PRD → Live Todo Pipeline ingestion | V0.4 | Parked |
+| [#19](https://github.com/number7even/CONTINUUM/issues/19) | RVM — Rust no_std agent hypervisor + shared RVF snapshot format | V0.5+ | **Source checkout 2026-05-24** (under override of partner-clause #3) at `~/Development/rvm` @ `af97d18`; `cargo check` clean in 46s. No code integrated — depends on RuVector landing + Rust↔Node bridge decision. |
 
 ---
 
@@ -1046,6 +1047,7 @@ The partner agreement requires that no integration #5+ lands ahead of V0 ship. T
 
 - [**RuVector**](https://github.com/ruvnet/RuVector) — unified vector/graph/relational engine with GNN-reinforced search, RVF cognitive containers (Git-like COW snapshots), tamper-evident witness chain, Delta Behavior CRDTs, native multi-tenant collections. Replaces V0's SQLite+Chroma split.
 - **ruvllm** (RuVector subsystem) — embedded GGUF model runtime supporting Metal / CUDA / WebGPU. Powers V0.5 local digest option (a).
+- [**RVM**](https://github.com/ruvnet/rvm) — Rust no_std bare-metal agent micro-hypervisor (sister project to RuVector, shares RVF format). Coherence-domain partitions, hash-chained witnesses, F1–F4 fault rollback, Seed profile for 64 KB MCUs. **Source checkout** at `~/Development/rvm` @ `af97d18` (smoke-built 2026-05-24, `cargo check` clean across 14 crates in 46s). Integration path tracked in [Issue #19](https://github.com/number7even/CONTINUUM/issues/19) — depends on RuVector landing first + a Rust↔Node bridge decision (N-API vs IPC vs WASM).
 
 ---
 
