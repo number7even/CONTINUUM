@@ -1,0 +1,25 @@
+{
+  "name": "@continuum/console",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Continuum Operator Console — Next.js frontend that talks to a CONTINUUM HTTP/SSE engine over the V1 transport. Deploys on Vercel.",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.6.0"
+  },
+  "license": "Apache-2.0",
+  "author": "Riaan Kleynhans <riaan@number7even.com>"
+}

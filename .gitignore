@@ -10,6 +10,9 @@ dist/
 build/
 *.tsbuildinfo
 .turbo/
+# Next.js (apps/console)
+.next/
+next-env.d.ts
 
 # Test coverage
 coverage/

@@ -62,10 +62,18 @@
     - Prompts: `continuum.session_start` (Layer-0→1→3 retrieval protocol),
       `continuum.cite` (Observation-ID citation discipline)
       (2026-05-23, commit `31fe885`)
-  - `packages/cli/` — **`continuum init / start / status`** CLI
-    (2026-05-23). Single bin, hand-rolled argv. `init` creates DB +
-    prints MCP registration snippet; `start` execs the MCP stdio server;
-    `status` shows latest snapshot + todo counts + data path.
+  - `packages/cli/` — **`continuum init / start / serve / status /
+    import-state`** CLI. Single bin. `init` creates DB + prints MCP
+    registration snippet; `start` execs stdio MCP server; `serve` execs
+    HTTP/SSE MCP server (V1, requires `$CONTINUUM_HTTP_TOKEN`);
+    `status` shows latest snapshot + todo counts + data path;
+    `import-state` parses STATE.md into a checkpoint.
+  - `apps/console/` — **Next.js 15 frontend** (added 2026-05-24).
+    Server-rendered page connects to a running CONTINUUM HTTP/SSE
+    engine via the MCP SDK `SSEClientTransport` and renders the live
+    tool/resource/prompt registry. **Deploys to Vercel** (set Root
+    Directory to `apps/console`; set `CONTINUUM_HTTP_URL` +
+    `CONTINUUM_HTTP_TOKEN` env vars). The AaaS frontend proof.
   - `packages/adapters/export/` — Claude session JSONL → Observation
     adapter (commit `0dd867b`, shipped pre-2026-05-15).
 - **Verify-then-dissolve discipline proven end-to-end** (2026-05-15): row

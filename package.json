@@ -35,7 +35,8 @@
   },
   "workspaces": [
     "packages/*",
-    "packages/adapters/*"
+    "packages/adapters/*",
+    "apps/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
