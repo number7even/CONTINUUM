@@ -43,6 +43,7 @@ import type {
   SearchHit,
   SourceType,
   StateSnapshot,
+  TimelineHit,
   Todo,
 } from './types.js';
 import type {
@@ -51,6 +52,7 @@ import type {
   InsertObservationsResult,
   ListTodosOptions,
   StorageBackend,
+  TimelineOptions,
   UpdateTodoInput,
 } from './storage.js';
 
@@ -226,6 +228,17 @@ export class HybridStorageBackend implements StorageBackend {
     // Sync keyword search via SQLite-FTS5 stays the default. Vector
     // search is the explicit async vectorSearch() method below.
     return this.sqlite.searchObservations(query, limit);
+  }
+
+  listObservationsAround(opts: TimelineOptions): TimelineHit[] {
+    // Layer-2 is a chronological-window query over the observations table.
+    // SQLite owns it; vector index doesn't add value for time-bounded reads.
+    return this.sqlite.listObservationsAround(opts);
+  }
+
+  getObservations(ids: string[]): Observation[] {
+    // Layer-3 batch fetch is a simple SELECT IN (...) — SQLite's job.
+    return this.sqlite.getObservations(ids);
   }
 
   close(): void {

@@ -36,12 +36,14 @@ import type {
   SearchHit,
   SourceType,
   StateSnapshot,
+  TimelineHit,
   Todo,
 } from './types.js';
 import type {
   CheckpointInput,
   CreateTodoInput,
   InsertObservationsResult,
+  TimelineOptions,
   ListTodosOptions,
   StorageBackend,
   UpdateTodoInput,
@@ -137,6 +139,92 @@ export class SQLiteStorageBackend implements StorageBackend {
       title: r.content.slice(0, 80).replace(/\s+/g, ' '),
       score: -r.rank, // bm25 returns negative — flip for "higher = better"
       hasMore: r.content.length > 2000,
+    }));
+  }
+
+  // ── Timeline (Progressive Disclosure Layer-2) ─────────────────────────────
+
+  listObservationsAround(opts: TimelineOptions): TimelineHit[] {
+    // 1. Resolve anchor → ISO timestamp.
+    let anchorIso: string;
+    if (opts.aroundId) {
+      const row = this.db
+        .prepare('SELECT timestamp FROM observations WHERE id = ?')
+        .get(opts.aroundId) as { timestamp: string } | undefined;
+      if (!row) throw new Error(`continuum_timeline: observation not found: ${opts.aroundId}`);
+      anchorIso = row.timestamp;
+    } else if (opts.at) {
+      anchorIso = opts.at;
+    } else {
+      anchorIso = new Date().toISOString();
+    }
+    const anchorMs = new Date(anchorIso).getTime();
+    if (Number.isNaN(anchorMs)) {
+      throw new Error(`continuum_timeline: invalid anchor timestamp: ${anchorIso}`);
+    }
+
+    const beforeHours = opts.beforeHours ?? 1;
+    const afterHours = opts.afterHours ?? 1;
+    const startIso = new Date(anchorMs - beforeHours * 3600 * 1000).toISOString();
+    const endIso = new Date(anchorMs + afterHours * 3600 * 1000).toISOString();
+    const limit = Math.min(opts.limit ?? 50, 200);
+
+    const rows = this.db.prepare(`
+      SELECT id, source_id, type, content, timestamp
+      FROM observations
+      WHERE timestamp >= ? AND timestamp <= ?
+      ORDER BY timestamp ASC
+      LIMIT ?
+    `).all(startIso, endIso, limit) as Array<{
+      id: string;
+      source_id: string;
+      type: string;
+      content: string;
+      timestamp: string;
+    }>;
+
+    return rows.map(r => ({
+      id: r.id,
+      source: (r.source_id.split(':')[0] ?? 'export') as SourceType,
+      type: r.type,
+      timestamp: r.timestamp,
+      title: r.content.slice(0, 80).replace(/\s+/g, ' '),
+      score: 0, // timeline is not relevance-ranked; ordering is chronological
+      hasMore: r.content.length > 2000,
+      offsetSec: Math.round((new Date(r.timestamp).getTime() - anchorMs) / 1000),
+    }));
+  }
+
+  // ── Batch get (Progressive Disclosure Layer-3) ────────────────────────────
+
+  getObservations(ids: string[]): Observation[] {
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+    // Cap to prevent token blow-up. Extras silently dropped; caller batches.
+    const capped = ids.slice(0, 50);
+    const placeholders = capped.map(() => '?').join(',');
+    const rows = this.db.prepare(`
+      SELECT id, source_id, type, content, timestamp, refs, metadata
+      FROM observations
+      WHERE id IN (${placeholders})
+    `).all(...capped) as Array<{
+      id: string;
+      source_id: string;
+      type: string;
+      content: string;
+      timestamp: string;
+      refs: string;
+      metadata: string | null;
+    }>;
+    return rows.map(r => ({
+      id: r.id,
+      sourceId: r.source_id,
+      type: r.type,
+      content: r.content,
+      timestamp: r.timestamp,
+      refs: JSON.parse(r.refs || '[]') as string[],
+      metadata: r.metadata
+        ? (JSON.parse(r.metadata) as Record<string, unknown>)
+        : undefined,
     }));
   }
 

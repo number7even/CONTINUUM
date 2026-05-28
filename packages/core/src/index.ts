@@ -25,6 +25,7 @@ export type {
   Todo,
   Digest,
   SearchHit,
+  TimelineHit,
   AgentHandoffMetadata,
 } from './types.js';
 
@@ -36,6 +37,7 @@ export type {
   ListTodosOptions,
   UpdateTodoInput,
   InsertObservationsResult,
+  TimelineOptions,
 } from './storage.js';
 
 export { SQLiteStorageBackend } from './storage-sqlite.js';

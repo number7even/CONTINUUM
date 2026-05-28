@@ -171,3 +171,13 @@ export interface SearchHit {
   /** True if full content is >2KB — caller should batch get_observations. */
   hasMore: boolean;
 }
+
+/**
+ * Layer-2 Progressive Disclosure hit (ARCHITECTURE.md §5).
+ * Extends SearchHit with the chronological-offset signal — agent sees
+ * "this happened N seconds before/after anchor" without computing it.
+ */
+export interface TimelineHit extends SearchHit {
+  /** Seconds from the timeline anchor. Negative = before, positive = after. */
+  offsetSec: number;
+}

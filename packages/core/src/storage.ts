@@ -22,6 +22,7 @@ import type {
   SearchHit,
   SourceType,
   StateSnapshot,
+  TimelineHit,
   Todo,
 } from './types.js';
 
@@ -61,6 +62,24 @@ export interface InsertObservationsResult {
   dropped: number;
 }
 
+/**
+ * Anchor + window for Layer-2 timeline retrieval. Either anchor by an
+ * observation ID (uses that observation's timestamp) or by an ISO
+ * timestamp directly; if neither is given, anchor = now.
+ */
+export interface TimelineOptions {
+  /** Anchor by observation ID. Mutually exclusive with `at`. */
+  aroundId?: string;
+  /** Anchor by ISO-8601 timestamp. Defaults to now if neither is set. */
+  at?: string;
+  /** Hours of context before the anchor. Default 1. */
+  beforeHours?: number;
+  /** Hours of context after the anchor. Default 1. */
+  afterHours?: number;
+  /** Max results. Default 50, max 200. */
+  limit?: number;
+}
+
 // ── The interface ───────────────────────────────────────────────────────────
 
 export interface StorageBackend {
@@ -90,6 +109,22 @@ export interface StorageBackend {
 
   // — Search — Progressive Disclosure Layer-1
   searchObservations(query: string, limit?: number): SearchHit[];
+
+  /**
+   * Layer-2 Progressive Disclosure — observations in chronological order
+   * around a reference point (observation ID OR ISO timestamp). Returns
+   * compact TimelineHit[] with `offsetSec` so the agent reads "what
+   * happened N seconds before/after X" without computing it.
+   */
+  listObservationsAround(opts: TimelineOptions): TimelineHit[];
+
+  /**
+   * Layer-3 Progressive Disclosure — batch full-text fetch for
+   * specifically-narrowed Observation IDs. The expensive step (~500-2000
+   * tokens per observation). Caps at 50 IDs per call; extras silently
+   * dropped — caller should batch.
+   */
+  getObservations(ids: string[]): Observation[];
 
   // — Lifecycle —
   close(): void;

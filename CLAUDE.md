@@ -49,11 +49,14 @@
     abstraction, **`AgentHandoffMetadata` type + `createAgentHandoffObservation()`
     helper** (V0-compatible RecursiveMAS intent capture per Issue #3, commit
     `31fe885`, 2026-05-23)
-  - `packages/mcp-server/` — **7 MCP tools** + **4 Resources** + **2 Prompts**:
+  - `packages/mcp-server/` — **9 MCP tools** + **4 Resources** + **2 Prompts**:
     - Tools: `continuum_record_checkpoint`, `continuum_get_state`,
-      `continuum_get_digest`, `continuum_search_docs` (V0 baseline);
+      `continuum_get_digest`, `continuum_search_docs` (Layer-1, V0 baseline);
       `continuum_get_todos`, `continuum_create_todo`,
-      `continuum_update_todo` (added 2026-05-15, commit `c9def2c`)
+      `continuum_update_todo` (added 2026-05-15, commit `c9def2c`);
+      `continuum_timeline` (Layer-2 chronological context),
+      `continuum_get_observations` (Layer-3 batch full-text fetch) —
+      completes the Progressive Disclosure 3-layer surface (added 2026-05-28).
     - Resources: `continuum://todos/open` (2026-05-15, `c9def2c`);
       `continuum://state/current`, `continuum://digest/latest`,
       `continuum://session/briefing` — Layer-0 markdown brief composing
