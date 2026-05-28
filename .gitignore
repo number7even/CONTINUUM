@@ -13,6 +13,8 @@ build/
 # Next.js (apps/console)
 .next/
 next-env.d.ts
+# CodeGraph — per-machine index DB + watcher daemon state
+.codegraph/
 
 # Test coverage
 coverage/
