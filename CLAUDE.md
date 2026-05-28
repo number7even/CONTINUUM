@@ -88,7 +88,22 @@
     - `e22985e0` — V0 polish milestone (2026-05-15; reproducible via
       `scripts/checkpoints/v0-polish-2026-05-15.mjs`)
   - `continuum` project (V1 HTTP stub on top of V0.5 on top of V0-polish):
-    - **(latest)** `b0f54355` — **V1 HTTP/SSE stub COMPLETE** (2026-05-24;
+    - **(latest)** `d0fa50a7` — **V1 AaaS LIVE** (2026-05-28; reproducible
+      via `scripts/checkpoints/v1-aaas-live-2026-05-28.mjs`).
+      14 active (production path: MCP surface + refactor promoted to
+      active + CLI + 2 adapters + state-md parser + privacy + storage
+      upsert + cross-source FTS5 **+ live Fly engine + Bearer auth
+      enforced publicly + Vercel frontend connected to Fly + public SSE
+      roundtrip verified + Dockerfile/fly.toml on disk**) + 5 dormant
+      (V0.5 hybrid backend + embedder + factory toggle + ruvector smoke
+      + apps/console local-dev path). **All 19 entries verify-green at
+      stamp time**, including the 4 entries that hit live public
+      infrastructure (Fly /healthz 184ms, /sse 401 192ms, Vercel page
+      852ms, MCP SDK SSE roundtrip 1055ms). Public URLs:
+      https://continuum-kohl.vercel.app + https://continuum-engine.fly.dev
+      (custom api.continuum.rest cert issued, DNS pending). Hash
+      `57e6d42202e61c9c…`.
+    - `b0f54355` — **V1 HTTP/SSE stub COMPLETE** (2026-05-24;
       reproducible via `scripts/checkpoints/v1-http-stub-2026-05-24.mjs`).
       8 active (V0-polish + Issue #8 metadata fix + refactor reflected in
       updated verify_commands) + 7 dormant (4 V0.5 + 3 V1 — all opt-in
