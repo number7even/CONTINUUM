@@ -1,0 +1,50 @@
+# Build artifacts (will be rebuilt inside the container)
+**/node_modules
+**/dist
+**/build
+**/*.tsbuildinfo
+**/.turbo
+
+# Next.js (apps/console) — not included in engine image
+**/.next
+**/next-env.d.ts
+
+# CodeGraph index (per-machine, not for the engine container)
+.codegraph
+
+# Continuum local DB (per-operator, NOT to ship in image)
+.continuum
+
+# Git + CI
+.git
+.github
+.gitignore
+
+# IDE / OS noise
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Docs (not needed in runtime image)
+docs
+README.md
+ARCHITECTURE.md
+CLAUDE.md
+AGENTS.md
+
+# Scripts (operator-side, not engine)
+scripts
+
+# Tests (none today, but future-proof)
+**/*.test.ts
+**/*.test.js
+coverage
+
+# Env files (secrets handled via fly secrets, never baked into image)
+.env
+.env.local
+.env.*.local
+
+# Logs
+**/*.log

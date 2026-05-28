@@ -1,0 +1,60 @@
+# Fly.io deployment config for the CONTINUUM HTTP/SSE engine.
+#
+# Generated 2026-05-28 to replace the cloudflared quick-tunnel hack with
+# a proper hosted backend. See docs/DEPLOY_FLY.md for the one-time launch
+# walkthrough.
+#
+# After `fly deploy`, the public URL is https://<app-name>.fly.dev.
+# Attach a custom domain (e.g. api.continuum.rest) via:
+#   fly certs add api.continuum.rest
+#   (then add DNS CNAME api.continuum.rest → <app-name>.fly.dev at your DNS)
+
+app = "continuum-engine"
+primary_region = "iad"  # US East. Change with `fly regions set <region>`.
+
+[build]
+  # Use the repo-root Dockerfile. No buildpack auto-detect.
+  dockerfile = "Dockerfile"
+
+# ── Always-on env ───────────────────────────────────────────────────────────
+[env]
+  CONTINUUM_HTTP_PORT  = "7878"
+  CONTINUUM_DATA_DIR   = "/data"
+  CONTINUUM_PROJECT_ID = "continuum"
+  NODE_ENV             = "production"
+
+# Secrets (NOT in env above — set via `fly secrets set ...` so they're encrypted):
+#   CONTINUUM_HTTP_TOKEN  — required Bearer token (use ~/.continuum/bridge.env or generate fresh)
+
+# ── Persistent disk ─────────────────────────────────────────────────────────
+# SQLite + ruvector files live at /data. Without this volume the engine still
+# runs but state is wiped on every restart.
+[mounts]
+  source      = "continuum_data"
+  destination = "/data"
+
+# ── Public HTTP service ────────────────────────────────────────────────────
+[http_service]
+  internal_port       = 7878
+  force_https         = true
+  auto_stop_machines  = "off"           # AaaS needs always-on (no cold-start delays)
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Health check — Fly polls this; if 200 the machine stays in the load balancer.
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval     = "15s"
+    method       = "GET"
+    path         = "/healthz"
+    protocol     = "http"
+    timeout      = "5s"
+
+# ── VM size ────────────────────────────────────────────────────────────────
+# 512MB handles V0 SQLite-only comfortably. Bump to 1024MB if you opt into
+# V0.5 hybrid backend (ruvector + @xenova/transformers MiniLM load there).
+[[vm]]
+  size       = "shared-cpu-1x"
+  memory_mb  = 512
+  cpu_kind   = "shared"
+  cpus       = 1
