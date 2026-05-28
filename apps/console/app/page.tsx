@@ -114,7 +114,10 @@ export default async function Home() {
       <header style={{ borderBottom: '1px solid #2a2f36', paddingBottom: '1rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.75rem' }}>Continuum Console</h1>
         <p style={{ margin: '0.5rem 0 0', color: '#8b939b' }}>
-          V1 HTTP/SSE transport — operator view
+          V1 HTTP/SSE transport — operator view ·{' '}
+          <a href="/chat" style={{ color: '#9ad2ff' }}>
+            open chat → watch Progressive Disclosure in action
+          </a>
         </p>
       </header>
 
