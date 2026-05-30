@@ -224,6 +224,32 @@ export class HybridStorageBackend implements StorageBackend {
     return this.sqlite.insertObservationsBulk(observations);
   }
 
+  // ── Hard delete (INCIDENT RESPONSE — Issue #10) ─────────────────────────
+  // Sync SQLite delete returns immediately; vector index removal is queued
+  // through the same fire-and-forget channel the inserts use. If the row
+  // didn't exist in SQLite we skip the vector queue too — nothing to remove.
+
+  deleteObservation(id: string): boolean {
+    const deleted = this.sqlite.deleteObservation(id);
+    if (deleted) this.queueVectorDelete(id);
+    return deleted;
+  }
+
+  private queueVectorDelete(id: string): void {
+    const task = (async () => {
+      try {
+        const db = await this.getVectorDb();
+        await db.delete(id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(
+          `[continuum:hybrid] vector delete failed for ${id}: ${msg}\n`,
+        );
+      }
+    })();
+    this.pendingEmbeds.push(task);
+  }
+
   searchObservations(query: string, limit?: number): SearchHit[] {
     // Sync keyword search via SQLite-FTS5 stays the default. Vector
     // search is the explicit async vectorSearch() method below.

@@ -107,6 +107,27 @@ export interface StorageBackend {
   upsertObservation(obs: Omit<Observation, 'id'> & { id: string }): Observation | null;
   insertObservationsBulk(observations: Array<Omit<Observation, 'id'>>): InsertObservationsResult;
 
+  /**
+   * INCIDENT RESPONSE ONLY — permanently delete an Observation by ID.
+   *
+   * Hard-delete. Removes the row from `observations` (the FTS5 index entry
+   * is cleaned automatically via the AFTER DELETE trigger). In hybrid
+   * backends, also queues removal from the vector index. Returns true if
+   * a row matched and was deleted, false if no row existed for that ID.
+   *
+   * Intended for: secrets that leaked past the privacy filter, PII landed
+   * via metadata, external operator requests for data removal, accidental
+   * ingest of confidential markdown. Pairs with the write-time privacy
+   * filter to close the privacy loop — write-time scrub catches known
+   * patterns; this catches the rest.
+   *
+   * This is NOT a soft-delete and does NOT cascade through derived state
+   * (digests, briefings) — those regenerate on next read and reflect the
+   * post-delete reality. Snapshots that referenced the deleted ID via
+   * refs[] keep the dangling reference; treat as historical artifact.
+   */
+  deleteObservation(id: string): boolean;
+
   // — Search — Progressive Disclosure Layer-1
   searchObservations(query: string, limit?: number): SearchHit[];
 

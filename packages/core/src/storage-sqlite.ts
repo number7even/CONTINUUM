@@ -108,6 +108,17 @@ export class SQLiteStorageBackend implements StorageBackend {
     return _insertObservationsBulk(this.db, observations);
   }
 
+  // ── Hard delete (INCIDENT RESPONSE — Issue #10) ───────────────────────────
+  //
+  // The AFTER DELETE trigger on `observations` (see db.ts:98-101) takes
+  // care of cleaning the matching FTS5 row, so this is a single statement.
+  // Returns true iff a row matched and was removed.
+
+  deleteObservation(id: string): boolean {
+    const info = this.db.prepare('DELETE FROM observations WHERE id = ?').run(id);
+    return info.changes > 0;
+  }
+
   // ── Search (FTS5 — Progressive Disclosure Layer-1) ────────────────────────
 
   searchObservations(query: string, limit = 20): SearchHit[] {
