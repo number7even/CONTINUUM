@@ -24,7 +24,7 @@
 | 2 | **Taste Skill** (`Leonxlnx/taste-skill`) — v2 + v1 preserved | Claude skill | `~/.claude/skills/design-taste-frontend` + `…-v1` | ✅ installed 2026-05-31 |
 | 3 | **Emil Design Eng** (`emilkowalski/skill`) | Claude skill | `~/.claude/skills/emil-design-eng` | ✅ installed 2026-05-31 |
 | 4 | **UI UX Pro Max** (`nextlevelbuilder/ui-ux-pro-max-skill`) — 161 rules / 67 styles | Claude skill + bonus `ckm:slides`, `ckm:ui-styling` | `~/.claude/skills/ui-ux-pro-max` | ✅ installed 2026-05-31 |
-| 5 | **21st.dev Magic MCP** (`21st-dev/magic-mcp`) | MCP server | `~/.claude/mcp_config.json` (per CLI) | ⏳ **install pending operator API key** |
+| 5 | **21st.dev Magic MCP** (`21st-dev/magic-mcp`) | MCP server | `~/.claude.json` (operator-only mode 600) | ✅ installed 2026-05-31 · `magic: npx -y @21st-dev/magic@latest - ✓ Connected` |
 
 All installed via `npx skills@latest add <repo> -g -a claude-code -s '*' -y` —
 the vercel-labs/skills CLI's user-scope installer. Magic-MCP is a separate
@@ -224,7 +224,7 @@ into the skills tree — separate skills from the same author family.
 
 ---
 
-## 5 · 21st.dev Magic MCP — ⏳ install pending operator API key
+## 5 · 21st.dev Magic MCP — ✅ installed + connected
 
 **Repo:** [21st-dev/magic-mcp](https://github.com/21st-dev/magic-mcp)
 **Mechanism:** MCP server (NOT a skill — different install path).
@@ -250,26 +250,34 @@ The four above shape *judgment*. Magic-MCP shortens the path from "I know
 what I want" to "here's a polished slot I can place". Use the four to
 critique, the fifth to generate the first cut. Then critique again.
 
-### Install — your leap (P1 + P9)
+### Install record
 
-This needs your API key from https://21st.dev/magic/console. I will not
-ask you to paste the key into chat — that puts it in the conversation
-transcript. Two paths:
-
-**Option A — official one-line install:**
+Installed 2026-05-31 via the official one-line installer:
 ```bash
 npx @21st-dev/cli@latest install claude --api-key <YOUR_KEY>
 ```
-This writes the MCP server config into `~/.claude/mcp_config.json`
-automatically. Restart Claude Code after.
-
-**Option B — manual user-scope MCP registration (matches the codegraph pattern):**
+Config landed at `~/.claude.json` (mode 600 — operator-only). Verified
+immediately with:
 ```bash
-claude mcp add --scope user magic -- npx -y @21st-dev/magic@latest API_KEY="<YOUR_KEY>"
+$ claude mcp list 2>&1 | grep magic
+magic: npx -y @21st-dev/magic@latest - ✓ Connected
 ```
-Verify with `claude mcp list 2>&1 | grep magic`. Should show `✓ Connected`.
+No restart needed — Claude Code picked it up on next session start.
 
-After install: `/ui <description>` in any Claude Code session triggers it.
+### Re-install / rotate the API key
+
+Generate a new key at https://21st.dev/magic/console, then re-run the
+installer with the new key — it will overwrite the existing config:
+```bash
+npx @21st-dev/cli@latest install claude --api-key <NEW_KEY>
+```
+Verify again with `claude mcp list 2>&1 | grep magic`.
+
+### Usage
+
+`/ui <description>` in any Claude Code session triggers it. The MCP
+exposes tools the model can call autonomously when natural-language UI
+intent is detected.
 
 ---
 
