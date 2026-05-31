@@ -17,6 +17,10 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
   (AI Developer, Business Operator, Solo Developer) with tier labels
   per component. ~100% real for Journey 3, ~50% for Journey 1,
   ~10% for Journey 2 — the canonical UX framing.
+- [`UI-SKILLS.md`](./UI-SKILLS.md) — operator-toolkit reference for the
+  5 UI/interface-building skills (Impeccable, Taste Skill, Emil Design
+  Eng, UI UX Pro Max, 21st.dev Magic MCP). Installed globally at
+  `~/.claude/skills/`; available across all projects.
 - [`VISION/UNIFIED-ARCHITECTURE.md`](./VISION/UNIFIED-ARCHITECTURE.md) —
   6-layer target-state architecture (RVM → CONTINUUM → Vibely → H-MARA →
   Hyperscale → Perimeter, governed by The Nine). Multi-year horizon.
