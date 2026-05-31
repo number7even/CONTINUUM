@@ -14,6 +14,34 @@
  */
 import type { StateEntry, StorageBackend } from '@continuum/core';
 
+/**
+ * Resolve the briefing window length in hours.
+ *
+ * Issue #15 / W23-4. Default 24h preserves prior behaviour; operators
+ * pass a different number via the CONTINUUM_BRIEFING_WINDOW_HOURS env
+ * var when they want a tighter (e.g. 4h "just back from lunch") or
+ * wider (168 = one week "back from holiday") briefing. Capped at 168
+ * to prevent absurd values that would blow up the observation scan.
+ *
+ * Bad values (non-numeric, 0, negative) silently fall back to 24 — a
+ * malformed env var should not break the briefing.
+ */
+function briefingWindowHours(): number {
+  const raw = process.env.CONTINUUM_BRIEFING_WINDOW_HOURS;
+  if (!raw) return 24;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return 24;
+  return Math.min(n, 168);
+}
+
+/**
+ * Format an ISO timestamp as "YYYY-MM-DD HH:MM UTC" for human-scannable
+ * briefing freshness. Spec from SPRINT-2026-W22 §W23-4.
+ */
+function formatBriefingHeaderTime(iso: string): string {
+  return iso.replace('T', ' ').slice(0, 16) + ' UTC';
+}
+
 // ── Layer-0 Session Briefing ────────────────────────────────────────────────
 //
 // Composes current state + open todos + recent activity into a single markdown
@@ -22,18 +50,34 @@ import type { StateEntry, StorageBackend } from '@continuum/core';
 
 export function composeBriefing(storage: StorageBackend, projectId: string): string {
   const now = new Date().toISOString();
+  const windowHours = briefingWindowHours();
   const snapshot = storage.getStateAt();
   const openTodos = storage.listTodos({ status: 'open' });
   const inProgressTodos = storage.listTodos({ status: 'in_progress' });
   const allSnapshots = storage.listSnapshots(10);
-  const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const cutoff = new Date(Date.now() - windowHours * 3600 * 1000).toISOString();
   const recent = allSnapshots.filter(s => s.timestamp >= cutoff);
+
+  // Observation count in window — surfaces raw event-log activity
+  // alongside the checkpoint count. listObservationsAround caps at
+  // limit=200; if we hit the cap we suffix "+" so the operator sees
+  // "this window is saturated, narrow it or look at the timeline tool".
+  const recentObs = storage.listObservationsAround({
+    at: now,
+    beforeHours: windowHours,
+    afterHours: 0,
+    limit: 200,
+  });
+  const obsCount = recentObs.length >= 200 ? '200+' : String(recentObs.length);
 
   const lines: string[] = [
     '# Continuum Session Briefing',
     '',
-    `_Generated: ${now}_  `,
-    `_Project: ${projectId}_`,
+    // Issue #14 + W23-4 — freshness header. Single line, data-dense,
+    // human-scannable. Replaces the prior italic _Generated_ + _Project_
+    // pair so the most important signal (when was this rendered, how
+    // much happened in the window) is the first thing the AI reads.
+    `## Briefing as of ${formatBriefingHeaderTime(now)} · ${obsCount} observation${obsCount === '1' ? '' : 's'} in last ${windowHours}h · project \`${projectId}\``,
     '',
     '## Current State',
     '',
@@ -94,7 +138,7 @@ export function composeBriefing(storage: StorageBackend, projectId: string): str
   }
 
   lines.push(
-    '## Recent Activity (last 24h)',
+    `## Recent Activity (last ${windowHours}h)`,
     '',
     `_${recent.length} checkpoint${recent.length === 1 ? '' : 's'} in window_`,
     '',
