@@ -139,8 +139,11 @@ try {
 
   // ── (d) MCP roundtrips ──────────────────────────────────────────────────
   const tools = await client.listTools();
-  check('tools/list returns 7 tools',
-    tools.tools.length === 7,
+  // Tool count = V0 baseline (7) + Layer-2 timeline + Layer-3
+  // get_observations (commit e0de609, 2026-05-28) + delete_observation
+  // (Issue #10 / W22-3, commit 8b987dc, 2026-05-30) = 10.
+  check('tools/list returns 10 tools',
+    tools.tools.length === 10,
     `got ${tools.tools.length}: ${tools.tools.map(t => t.name).join(',')}`);
 
   const resources = await client.listResources();
