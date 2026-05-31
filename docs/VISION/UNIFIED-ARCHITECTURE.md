@@ -158,6 +158,150 @@ H-MARA cannot ship before:
 H-MARA prototyping (Rung 1 of the 4-rung ladder per `H-MARA-INTEGRATION-PLAN.md`)
 can start once RVM has a working sandbox-and-witness path. Best case: late 2027.
 
+### v0.2 Future-state enhancements (5-bucket spec) 🔮
+
+> **Filed:** 2026-05-30 per operator CTO analysis. Every bucket below
+> is **🔮 aspirational** with explicit dependency footnotes. None of
+> this gets built before the baseline H-MARA exists; baseline H-MARA
+> does not exist before RVM + local inference exist. Capturing here so
+> the architectural intent is preserved without contaminating sprint
+> scope. Source spec: operator pasted CTO analysis, 2026-05-30 session.
+
+#### B1 · Latent-Space Recursion (RecursiveMAS) 🔮
+
+Replace text-based agent-to-agent passing with hidden latent state
+hand-off. RecursiveLink modules forward raw activation tensors rather
+than re-serialising to text and re-tokenising. Published research
+claims **2.4x faster · 75% fewer tokens · <$5 training cost** per
+recursion module.
+
+- **Hard dependency:** ¹ local inference engine that exposes hidden
+  states across the agent boundary. Anthropic / OpenAI / Google APIs
+  do **not** expose hidden states — only token streams. Same
+  blocker tracked in Issue #3.
+- **Soft dependency:** ² a stable multi-agent baseline to wrap. Without
+  a baseline H-MARA, there is nothing to recurse over.
+
+#### B2 · MCTS upgrades — lazy eval, cost-aware UCT, decay, symbolic output 🔮
+
+Four sub-enhancements to the MCTS Gladiator Arena (Layer 4 core):
+
+- **Dual-Tier Lazy Evaluation:** quantised sub-2B Tier-1 Heuristic
+  Critic scores all candidate nodes cheaply; heavy Tier-2 Lazy
+  Deterministic Judge fires only on the highest-scored candidate
+  (in an RVM sandbox).
+- **Cost-Penalized UCT:** UCT formula subtracts an explicit operational
+  compute penalty `λ(C_compute)` to bias toward shallow consensus
+  over deep argumentative paths that burn budget.
+- **Exponential Decay:** discount factor `γ^d` on node reward decays
+  with tree depth. Prevents Proponent/Skeptic infinite-loop arguments
+  over diminishing-return corrections.
+- **Native Symbolic Output:** agents output Python AST or JSON-schema
+  structures directly, not text. Invalid structure → instant -1.0
+  reward. Eliminates brittle NLP DAG extraction.
+
+  - **Hard dependencies:** ¹ RVM sandbox detonation for Tier-2 judge;
+    ² baseline MCTS impl to enhance; ³ a quantised value-network
+    Tier-1 critic model deployment.
+
+#### B3 · Dynamic Mixture-of-Agents + Test-Time Compute throttling 🔮
+
+Rebuild the (also-aspirational) Knapsack Engine as a Dynamic MoA router:
+
+- **TTC Throttling:** upstream router predicts query difficulty
+  `Q_diff`. Heavy MCTS only fires for math/logic bottlenecks; simple
+  operational queries route to small models. Maps to Vibely's
+  Mercury-dLLM-vs-H-MARA escalation gate.
+- **MoA Execution Matrix:** 3 cheap diverse SLMs as a "proposer" layer
+  generating varied MCTS branches; 1 frontier model as an "aggregator"
+  synthesising. Published research claims this outperforms a single
+  frontier model on aggregate benchmarks.
+- **MCTS Multiplexing (continuous batching):** instead of N×K
+  separate inference requests for N agents × K candidate nodes,
+  bundle into a single batched tensor payload. Targets 99% GPU
+  utilisation and claims up to 80% IRT reduction.
+
+  - **Hard dependencies:** ¹ the Knapsack Engine (Layer 5) itself,
+    which is 🔮; ² multiple inference providers wired up; ³ a GPU
+    inference path that supports continuous batching (vLLM / TGI /
+    similar) — not present in any CONTINUUM dependency today.
+
+#### B4 · Zero-Compute Bypass (Semantic State Caching) 🔮
+
+The most efficient token is the one never generated.
+
+- **MCTS Vector Memory Layer:** before routing to LLMs, embed the
+  Objective State Payload and cosine-search against a database of
+  historically verified MCTS consensus paths.
+- **Cache-hit path:** similarity ≥ 0.96 → bypass agents entirely.
+  System pulls the historically verified AST patch, dynamically
+  swaps variables, and injects the fix for a fraction of a cent.
+
+  - **Soft dependency:** ¹ a vector memory layer that survives long
+    enough to accumulate "historically verified MCTS consensus paths"
+    — requires baseline H-MARA running long enough to have history.
+  - **Hard dependency:** ² an AST-aware patch synthesiser
+    (template + variable-swap engine) that does not exist yet.
+
+#### B5 · Hardened DEC — Constraint Extraction, Orthogonal Bias, Differential Privacy 🔮
+
+Harden the De-Biasing Extraction Compiler (currently 🟠 specced):
+
+- **Latent Constraint Extraction (Stage B):** translate subjective
+  rhetoric ("insanely fast", "cheap") into quantifiable mathematical
+  bounds (`C(SLA) < 50ms`, `C(Budget) = MinimalOPEX`).
+- **Orthogonal Bias Projection:** isolate the user's emotional rhetoric
+  into a Bias Vector; require final output to be mathematically
+  orthogonal (90°) to it. Mathematical defence against sycophantic
+  generation.
+- **Differential Privacy (Stage C):** swap PII for synthetic proxies
+  before payload reaches agents. MCTS executes on anonymised data;
+  real PII reattached only at final output generation.
+
+  - **Hard dependency:** ¹ a DEC pipeline at all — currently zero code.
+  - **Soft dependency:** ² a bias-projection embedding model trained
+    on rhetorical-tone vs neutral-tone pairs.
+
+#### Why these are in the VISION doc and not the sprint
+
+Per `SPRINT-2026-W22.md §"Non-goals"` and partner-clause #3, none of
+B1–B5 is buildable this sprint, next sprint, or this year. They sit
+behind:
+
+1. RVM (Layer 1 — 🔮)
+2. Local inference exposing hidden states (Issue #3 blocker)
+3. A baseline H-MARA implementation (Layer 4 — 🟠)
+4. Multiple downstream infra (continuous-batching GPU, vector memory
+   over historical consensus paths, AST patch synthesiser)
+
+The 5 buckets are intellectually serious and well-grounded in current
+ML systems literature. They are **filed here, not started**, so future
+sessions can pick them up against a real H-MARA without re-deriving the
+intent.
+
+#### Footnote ¹ — local inference for hidden states
+
+Cloud LLM APIs (Anthropic, OpenAI, Google) return tokens, not hidden
+states. Cross-agent latent-state passing requires either: (a)
+self-hosting the model (vLLM/llama.cpp/etc.) and exposing
+`generate_with_hidden_states()`, or (b) a future API endpoint that
+exposes activations (no provider has committed to this). Same blocker
+as Issue #3 (RecursiveMAS integration). **Status: 🔮 — no committed
+provider, no in-repo inference path.**
+
+#### Footnote ² — baseline H-MARA
+
+"Enhance H-MARA" presumes H-MARA exists. H-MARA itself is 🟠 (specced
+in `docs/H-MARA-CONTINUUM/H-MARA-INTEGRATION-PLAN.md` v0.1, zero code).
+Rung 1 of that 4-rung ladder must ship before B1–B5 become coherent
+work items.
+
+#### Footnote ³ — RVM sandbox
+
+Tier-2 judge detonation requires RVM (Layer 1 — 🔮). RVM source
+checkout exists at `~/Development/rvm`, `cargo check` is green
+(Issue #19), no integration code in this repo.
+
 ---
 
 ## Layer 5 — Hyperscale Network & Inference Topology 🔮
