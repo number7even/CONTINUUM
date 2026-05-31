@@ -26,6 +26,7 @@
 import { basename, resolve as resolvePath } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import {
   openStorage,
   parseStateMdToCheckpoint,
@@ -96,6 +97,9 @@ COMMANDS
   status         Print current state, todo counts, and data location.
   import-state   Parse a STATE.md and record it as a new checkpoint. Always
                  creates a checkpoint (use this to re-snapshot after edits).
+  verify         Re-run every verify_command in the latest snapshot. Exit code
+                 = number of failures (0 = all green). Use this to confirm
+                 state-snapshot claims are still true on the current machine.
 
 OPTIONS
   --project-id, -p <id>   Project ID (default: $CONTINUUM_PROJECT_ID or cwd basename).
@@ -106,6 +110,7 @@ OPTIONS
 EXAMPLES
   continuum init --project-id my-project
   continuum status
+  continuum verify                              # exit 0 if every verify_command passes
   continuum import-state --state-md=./STATE.md
   CONTINUUM_PROJECT_ID=vc-hospitality continuum start
   CONTINUUM_HTTP_TOKEN=$(openssl rand -hex 32) continuum serve
@@ -327,6 +332,124 @@ function commandStatus(projectId: string): void {
   }
 }
 
+// ── continuum verify ──────────────────────────────────────────────────────────
+//
+// Issue #13 / W23-3. Pulls the latest snapshot, walks every entry with a
+// verifyCommand, runs each via execSync with a 30s per-command timeout, and
+// reports pass/fail. Exit code == number of failures so it can chain into
+// scripts (`continuum verify && fly deploy ...`).
+//
+// Surface decisions:
+//   - Section labels preserve grouping (active / dormant / broken) so the
+//     operator sees the WHY of a failure in context. A "broken" entry that
+//     fails verify is expected; an "active" entry that fails verify is a
+//     regression. Same numeric exit, but the per-line label tells you which.
+//   - On failure: show exit code + last 200 chars of stderr inline. Do NOT
+//     abort the loop — operator wants to see EVERY failure, not just the
+//     first one. "Surfaces the exact failing command + its stderr on first
+//     failure" in SPRINT-W22 §W23-3 reads as "show the cmd + stderr WHEN a
+//     failure occurs", not "stop after the first failure". Defensive default
+//     is to keep running so a single broken verify_command doesn't mask the
+//     rest of the snapshot's health.
+//   - Empty snapshot / no verify_commands → exit 0 with a clear note.
+
+interface VerifyEntry {
+  section: 'active' | 'dormant' | 'broken';
+  name: string;
+  where: string;
+  verifyCommand: string;
+}
+
+function commandVerify(projectId: string): void {
+  const storage = openStorage(projectId);
+  try {
+    const snapshot = storage.getStateAt();
+    if (!snapshot) {
+      process.stdout.write(
+        `continuum verify — no snapshot found for project '${projectId}'.\n` +
+          `  Capture one via continuum_record_checkpoint inside an AI client,\n` +
+          `  or run 'continuum import-state' to import from STATE.md.\n`,
+      );
+      process.exit(0);
+    }
+
+    const entries: VerifyEntry[] = [
+      ...snapshot.active
+        .filter(e => e.verifyCommand?.trim())
+        .map(e => ({ section: 'active' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand! })),
+      ...snapshot.dormant
+        .filter(e => e.verifyCommand?.trim())
+        .map(e => ({ section: 'dormant' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand! })),
+      ...snapshot.broken
+        .filter(e => e.verifyCommand?.trim())
+        .map(e => ({ section: 'broken' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand! })),
+    ];
+
+    if (entries.length === 0) {
+      process.stdout.write(
+        `continuum verify — snapshot ${snapshot.id.slice(0, 8)} has no entries with verify_command.\n` +
+          `  Reason: ${snapshot.reason}\n` +
+          `  Add verify_commands to your StateEntry inputs to enable the verify-then-dissolve discipline.\n`,
+      );
+      process.exit(0);
+    }
+
+    process.stdout.write(
+      `continuum verify — project '${projectId}' · snapshot ${snapshot.id.slice(0, 8)}\n` +
+        `  captured ${snapshot.timestamp}\n` +
+        `  reason:  ${snapshot.reason}\n` +
+        `  running ${entries.length} verify_command${entries.length === 1 ? '' : 's'}…\n\n`,
+    );
+
+    let failures = 0;
+    for (const entry of entries) {
+      try {
+        execSync(entry.verifyCommand, {
+          stdio: 'pipe',
+          timeout: 30_000,
+          // Run from cwd of the CLI invocation. Verify commands are
+          // intentionally repo-relative (grep, curl, fly status, etc.).
+        });
+        process.stdout.write(`  ✓ [${entry.section}] ${entry.name}\n`);
+      } catch (err) {
+        failures++;
+        const e = err as NodeJS.ErrnoException & {
+          status?: number | null;
+          stderr?: Buffer;
+          stdout?: Buffer;
+          signal?: string;
+        };
+        const exitCode = e.status ?? (e.signal ? `signal=${e.signal}` : 'unknown');
+        const stderr = e.stderr?.toString().trim() ?? '';
+        const stdoutTail = e.stdout?.toString().trim() ?? '';
+        process.stdout.write(
+          `  ✗ [${entry.section}] ${entry.name} — exit ${exitCode}\n` +
+            `      where:   ${entry.where}\n` +
+            `      command: ${entry.verifyCommand}\n`,
+        );
+        if (stderr) {
+          process.stdout.write(
+            `      stderr:  ${stderr.slice(-200).replace(/\n/g, '\n               ')}\n`,
+          );
+        } else if (stdoutTail) {
+          // No stderr but stdout might explain — show tail.
+          process.stdout.write(
+            `      stdout:  ${stdoutTail.slice(-200).replace(/\n/g, '\n               ')}\n`,
+          );
+        }
+      }
+    }
+
+    const passes = entries.length - failures;
+    process.stdout.write(
+      `\nSummary: ${passes} pass · ${failures} fail (exit ${failures})\n`,
+    );
+    process.exit(failures);
+  } finally {
+    storage.close();
+  }
+}
+
 // ── continuum start ───────────────────────────────────────────────────────────
 
 async function commandStart(projectId: string): Promise<void> {
@@ -386,6 +509,10 @@ async function main(): Promise<void> {
 
     case 'import-state':
       commandImportState(projectId, stateMd);
+      return;
+
+    case 'verify':
+      commandVerify(projectId);
       return;
 
     default:
