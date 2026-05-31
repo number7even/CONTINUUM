@@ -13,6 +13,10 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
   plan (2026-05-29 → 2026-06-12): verify the `/chat` Progressive
   Disclosure moat under live fire, close Tier-A defects, promote V0.5
   hybrid backend.
+- [`UX-JOURNEYS.md`](./UX-JOURNEYS.md) — the three customer journeys
+  (AI Developer, Business Operator, Solo Developer) with tier labels
+  per component. ~100% real for Journey 3, ~50% for Journey 1,
+  ~10% for Journey 2 — the canonical UX framing.
 - [`VISION/UNIFIED-ARCHITECTURE.md`](./VISION/UNIFIED-ARCHITECTURE.md) —
   6-layer target-state architecture (RVM → CONTINUUM → Vibely → H-MARA →
   Hyperscale → Perimeter, governed by The Nine). Multi-year horizon.
