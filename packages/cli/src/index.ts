@@ -10,15 +10,22 @@
  *   continuum status  — print current state + todo counts + data location
  *
  * Project-id resolution (highest precedence first):
- *   1. --project-id <id>     CLI flag
- *   2. CONTINUUM_PROJECT_ID  env var
- *   3. basename of CWD       (e.g. "vc-hospitality" if invoked from there)
+ *   1. --project-id <id>     CLI flag         (preserved as given)
+ *   2. CONTINUUM_PROJECT_ID  env var          (preserved as given)
+ *   3. basename of CWD       LOWERCASED       (silent-foot-gun fix per Issue #9)
  *   4. "default"             final fallback
+ *
+ * Why lowercase only the cwd fallback? Explicit values (flag, env) are
+ * user-typed — preserve whatever case the operator chose. The CWD basename
+ * is *implicit* — if the user happens to clone the repo into "MyProject"
+ * on one machine and "myproject" on another, both should resolve to the
+ * same Continuum DB. Folder-case is a filesystem accident, not an intent.
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
 import { basename, resolve as resolvePath } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   openStorage,
   parseStateMdToCheckpoint,
@@ -59,11 +66,15 @@ function parseArgs(argv: string[]): ParsedArgs {
   return { command, projectId, stateMd, help };
 }
 
-function resolveProjectId(flagValue?: string): string {
+export function resolveProjectId(flagValue?: string, opts?: { cwd?: string }): string {
   if (flagValue && flagValue.trim()) return flagValue.trim();
   const envValue = process.env.CONTINUUM_PROJECT_ID;
   if (envValue && envValue.trim()) return envValue.trim();
-  const cwdBase = basename(process.cwd());
+  // Issue #9 — lowercase the implicit cwd-basename fallback so folder-case
+  // accidents (cloning into MyProject vs myproject) don't silently fork the DB.
+  // Explicit flag / env values are preserved above; this normalisation
+  // applies only to the implicit derivation.
+  const cwdBase = basename(opts?.cwd ?? process.cwd()).toLowerCase();
   if (cwdBase && cwdBase !== '/' && cwdBase !== '.') return cwdBase;
   return 'default';
 }
@@ -384,8 +395,16 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(err => {
-  const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`continuum: ${message}\n`);
-  process.exit(1);
-});
+// Only auto-execute when invoked as the entry point (not when imported by
+// tests / consumers). Without this gate, importing `./index.js` in a test
+// would unconditionally run the CLI and print USAGE to stdout.
+const isEntryPoint =
+  process.argv[1] !== undefined &&
+  process.argv[1] === fileURLToPath(import.meta.url);
+if (isEntryPoint) {
+  main().catch(err => {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`continuum: ${message}\n`);
+    process.exit(1);
+  });
+}
