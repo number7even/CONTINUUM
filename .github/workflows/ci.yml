@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Cancel in-flight runs on the same branch when a new commit arrives —
+# saves CI minutes when you push twice in quick succession.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: build + node --test
+    runs-on: ubuntu-latest
+
+    # Match the engines pin in root package.json + the runtime image
+    # used by Fly (node:20-bookworm-slim). If we ever bump that, bump
+    # this in lockstep so CI catches engine-version regressions.
+    strategy:
+      matrix:
+        node: ['20']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        # --ignore-scripts skips lifecycle hooks on transitive ML deps that
+        # take forever (matches the Dockerfile pattern). better-sqlite3
+        # gets its native build via the explicit rebuild step below.
+        run: npm ci --ignore-scripts
+
+      - name: Build better-sqlite3 native addon
+        run: npm rebuild better-sqlite3 --workspace=@continuum/core
+
+      - name: Build workspaces
+        # Per-workspace build in dep order. apps/console (Next.js) is
+        # excluded — its build is heavier and Vercel owns that pipeline.
+        # When apps/console gains an opt-in test suite we'll add it
+        # back to CI.
+        run: |
+          npm run build --workspace=@continuum/core
+          npm run build --workspace=@continuum/mcp-server
+          npm run build --workspace=@continuum/cli
+          npm run build --workspace=@continuum/adapter-docs
+          npm run build --workspace=@continuum/adapter-export
+          npm run build --workspace=@continuum/adapter-git
+
+      - name: Run node --test across workspaces
+        # Root npm test → `npm run test --workspaces --if-present`, so
+        # any workspace that adds a "test" script is automatically picked
+        # up. Per-workspace test scripts call `node --test dist/` — the
+        # canonical pattern established in W23-2 (Issue #11).
+        run: npm test
