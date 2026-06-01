@@ -48,12 +48,17 @@ RUN npm rebuild better-sqlite3 --workspace=@continuum/core
 # Bring in source + tsconfigs
 COPY packages packages/
 
-# Build only the two workspaces the engine actually needs at runtime.
-# (apps/console is a Vercel concern; adapters are CLI-invoked, not needed by
-# the HTTP transport. CLI itself we skip — the bin is for operator dev, not
-# the deployed engine.)
+# Build the engine + the ops-CLI surface.
+# (apps/console is a Vercel concern.)
+# CLI + adapters are included so the operator can run `continuum migrate`,
+# `continuum reindex`, `continuum verify`, `continuum adapter docs --watch`
+# etc inside the container via `fly ssh console`. Added 2026-06-01 to
+# support the V0.5 hybrid promotion remote-backfill workflow.
 RUN npm run build --workspace=@continuum/core \
- && npm run build --workspace=@continuum/mcp-server
+ && npm run build --workspace=@continuum/mcp-server \
+ && npm run build --workspace=@continuum/cli \
+ && npm run build --workspace=@continuum/adapter-docs \
+ && npm run build --workspace=@continuum/adapter-git
 
 # ─── Stage 2 ── runtime ────────────────────────────────────────────────────
 FROM node:20-bookworm-slim AS runtime
@@ -67,12 +72,23 @@ RUN apt-get update \
 WORKDIR /app
 
 # Copy node_modules + dist from builder. Skip source + tests + .next.
-COPY --from=builder /build/node_modules                       ./node_modules
-COPY --from=builder /build/package.json                       ./
-COPY --from=builder /build/packages/core/package.json         packages/core/
-COPY --from=builder /build/packages/core/dist                 packages/core/dist/
-COPY --from=builder /build/packages/mcp-server/package.json   packages/mcp-server/
-COPY --from=builder /build/packages/mcp-server/dist           packages/mcp-server/dist/
+# The npm workspaces symlinks under node_modules/@continuum/* point at
+# packages/*/, so each workspace's package.json + dist must be present
+# in the runtime tree or those symlinks dangle.
+COPY --from=builder /build/node_modules                          ./node_modules
+COPY --from=builder /build/package.json                          ./
+COPY --from=builder /build/packages/core/package.json            packages/core/
+COPY --from=builder /build/packages/core/dist                    packages/core/dist/
+COPY --from=builder /build/packages/mcp-server/package.json      packages/mcp-server/
+COPY --from=builder /build/packages/mcp-server/dist              packages/mcp-server/dist/
+# Ops-CLI + adapters (added 2026-06-01 for V0.5 migrate/reindex/verify
+# over `fly ssh console`).
+COPY --from=builder /build/packages/cli/package.json             packages/cli/
+COPY --from=builder /build/packages/cli/dist                     packages/cli/dist/
+COPY --from=builder /build/packages/adapters/docs/package.json   packages/adapters/docs/
+COPY --from=builder /build/packages/adapters/docs/dist           packages/adapters/docs/dist/
+COPY --from=builder /build/packages/adapters/git/package.json    packages/adapters/git/
+COPY --from=builder /build/packages/adapters/git/dist            packages/adapters/git/dist/
 
 ENV NODE_ENV=production
 ENV CONTINUUM_HTTP_PORT=7878
