@@ -23,10 +23,10 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
-import { basename, resolve as resolvePath } from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { basename, join as joinPath, resolve as resolvePath } from 'node:path';
+import { existsSync, readFileSync, watch as fsWatch } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import {
   openStorage,
   parseStateMdToCheckpoint,
@@ -100,6 +100,12 @@ COMMANDS
   verify         Re-run every verify_command in the latest snapshot. Exit code
                  = number of failures (0 = all green). Use this to confirm
                  state-snapshot claims are still true on the current machine.
+  adapter        Run a source adapter (docs|git) once, or with --watch as a
+                 long-running daemon that re-syncs on file change.
+                 Examples:
+                   continuum adapter docs
+                   continuum adapter docs --watch --docs-dir=./docs
+                   continuum adapter git  --watch --repo-dir=.
 
 OPTIONS
   --project-id, -p <id>   Project ID (default: $CONTINUUM_PROJECT_ID or cwd basename).
@@ -112,6 +118,8 @@ EXAMPLES
   continuum status
   continuum verify                              # exit 0 if every verify_command passes
   continuum import-state --state-md=./STATE.md
+  continuum adapter docs --watch                # daemon mode, 2s debounce
+  continuum adapter git --watch --repo-dir=.    # re-ingest on every commit
   CONTINUUM_PROJECT_ID=vc-hospitality continuum start
   CONTINUUM_HTTP_TOKEN=$(openssl rand -hex 32) continuum serve
 
@@ -332,6 +340,166 @@ function commandStatus(projectId: string): void {
   }
 }
 
+// ── continuum adapter <name> [--watch] ────────────────────────────────────────
+//
+// Issue #16 / W23-5. Operator-facing wrapper over the two existing adapter
+// binaries (@continuum/adapter-docs, @continuum/adapter-git). Two modes:
+//
+//   continuum adapter docs                — run once, exit
+//   continuum adapter docs --watch        — run once, then watch + debounce
+//
+// Why a CLI wrapper instead of `--watch` inside each adapter?
+//
+//   1. Keeps adapter packages simple — they remain pure "sync once and
+//      exit" tools. The lifecycle concern (watch / debounce / signal
+//      handling) lives in the operator surface, not the data layer.
+//   2. One debounce policy across all adapters. Future adapters
+//      (claude-mem, sona, taskmaster) drop in by name without rewriting
+//      watch logic each time.
+//   3. The adapter sub-process is short-lived per cycle — a crash on one
+//      sync doesn't kill the watcher.
+//
+// Watch targets:
+//   docs → docs-dir, recursive, .md/.mdx files only
+//   git  → .git/logs/HEAD (single-file watch, fires on commit/checkout/reset)
+//
+// Debounce: 2 seconds (spec), single timer reset per change event.
+// Idempotency: provided by the adapters' upsertObservation primitive —
+// re-running on the same content is a no-op at the DB row level.
+
+const ADAPTER_NAMES = ['docs', 'git'] as const;
+type AdapterName = (typeof ADAPTER_NAMES)[number];
+
+interface AdapterOpts {
+  watch: boolean;
+  docsDir?: string;
+  repoDir?: string;
+}
+
+function parseAdapterArgs(argv: string[]): { name: AdapterName | undefined; opts: AdapterOpts } {
+  // argv has already been sliced past 'node' + 'index.js'. Find the
+  // 'adapter' positional, then scan everything after it.
+  const args = argv.slice(2);
+  const start = args.indexOf('adapter');
+  const opts: AdapterOpts = { watch: false };
+  let name: AdapterName | undefined;
+  if (start === -1) return { name, opts };
+  for (let i = start + 1; i < args.length; i++) {
+    const a = args[i];
+    if (a === undefined) continue;
+    if (a === '--watch') opts.watch = true;
+    else if (a.startsWith('--docs-dir=')) opts.docsDir = resolvePath(a.split('=').slice(1).join('='));
+    else if (a.startsWith('--repo-dir=')) opts.repoDir = resolvePath(a.split('=').slice(1).join('='));
+    else if (!a.startsWith('-') && name === undefined) {
+      if ((ADAPTER_NAMES as readonly string[]).includes(a)) name = a as AdapterName;
+    }
+  }
+  return { name, opts };
+}
+
+function resolveAdapterBin(name: AdapterName): string {
+  const pkg = `@continuum/adapter-${name}`;
+  try {
+    return fileURLToPath(import.meta.resolve(pkg));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`cannot resolve ${pkg} bin — is it installed in this workspace? (${msg})`);
+  }
+}
+
+function commandAdapter(projectId: string): void {
+  const { name, opts } = parseAdapterArgs(process.argv);
+  if (!name) {
+    process.stderr.write(
+      `continuum adapter: name required — one of ${ADAPTER_NAMES.join(', ')}\n` +
+        `  examples:\n` +
+        `    continuum adapter docs\n` +
+        `    continuum adapter docs --watch --docs-dir=./docs\n` +
+        `    continuum adapter git --watch --repo-dir=.\n`,
+    );
+    process.exit(2);
+  }
+
+  let bin: string;
+  try {
+    bin = resolveAdapterBin(name);
+  } catch (err) {
+    process.stderr.write(`continuum adapter: ${(err as Error).message}\n`);
+    process.exit(2);
+  }
+
+  const docsDir = opts.docsDir ?? resolvePath(process.cwd(), 'docs');
+  const repoDir = opts.repoDir ?? process.cwd();
+
+  const adapterArgs =
+    name === 'docs'
+      ? [`--project=${projectId}`, `--docs-dir=${docsDir}`, '--once']
+      : [`--project=${projectId}`, `--repo-dir=${repoDir}`, '--once'];
+
+  const runOnce = (): void => {
+    try {
+      execFileSync(process.execPath, [bin, ...adapterArgs], { stdio: 'inherit' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`[adapter:${name}] sync failed: ${msg}\n`);
+      // In watch mode we continue — don't die on a transient error.
+    }
+  };
+
+  // Always sync once at startup so the operator gets the same baseline
+  // whether they passed --watch or not.
+  runOnce();
+
+  if (!opts.watch) return;
+
+  // Resolve watch target. docs = directory (recursive); git = single file.
+  let watchTarget: string;
+  let recursive: boolean;
+  if (name === 'docs') {
+    watchTarget = docsDir;
+    recursive = true;
+  } else {
+    watchTarget = joinPath(repoDir, '.git', 'logs', 'HEAD');
+    recursive = false;
+  }
+  if (!existsSync(watchTarget)) {
+    process.stderr.write(`[adapter:${name}] watch target not found: ${watchTarget}\n`);
+    process.exit(2);
+  }
+
+  process.stdout.write(
+    `\n[adapter:${name}] watching ${watchTarget} (debounce 2000ms, Ctrl-C to stop)\n`,
+  );
+
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  const watcher = fsWatch(watchTarget, { recursive }, (_eventType, filename) => {
+    // Filter: docs only cares about markdown changes; git's single-file
+    // watch already filters by construction.
+    if (
+      name === 'docs' &&
+      typeof filename === 'string' &&
+      !/\.(md|mdx)$/i.test(filename)
+    ) {
+      return;
+    }
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      const label = typeof filename === 'string' ? filename : '<unnamed>';
+      process.stdout.write(`[adapter:${name}] change detected (${label}), re-syncing…\n`);
+      runOnce();
+    }, 2000);
+  });
+
+  const shutdown = (sig: NodeJS.Signals): void => {
+    process.stdout.write(`\n[adapter:${name}] caught ${sig}, shutting down\n`);
+    watcher.close();
+    if (debounceTimer) clearTimeout(debounceTimer);
+    process.exit(0);
+  };
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
 // ── continuum verify ──────────────────────────────────────────────────────────
 //
 // Issue #13 / W23-3. Pulls the latest snapshot, walks every entry with a
@@ -513,6 +681,10 @@ async function main(): Promise<void> {
 
     case 'verify':
       commandVerify(projectId);
+      return;
+
+    case 'adapter':
+      commandAdapter(projectId);
       return;
 
     default:
