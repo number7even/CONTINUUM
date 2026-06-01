@@ -36,7 +36,7 @@
 import { join } from 'node:path';
 
 import { SQLiteStorageBackend } from './storage-sqlite.js';
-import { embed, embedBatch, embeddingDimensions } from './embedder.js';
+import { embed, embedBatchParallel, embeddingDimensions } from './embedder.js';
 import { continuumDataRoot } from './db.js';
 import type {
   Observation,
@@ -180,7 +180,9 @@ export class HybridStorageBackend implements StorageBackend {
 
     const task = (async () => {
       try {
-        const vectors = await embedBatch(batch.map(o => o.content));
+        // W23-1 Path B — route through the worker pool. Falls back to
+        // inline batch when CONTINUUM_EMBED_WORKERS=0.
+        const vectors = await embedBatchParallel(batch.map(o => o.content));
         const db = await this.getVectorDb();
         // RuVector's bulk-insert API is per-call insert today; batching
         // the embed forward pass is the dominant cost, so this still
