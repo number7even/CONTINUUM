@@ -36,7 +36,7 @@
 import { join } from 'node:path';
 
 import { SQLiteStorageBackend } from './storage-sqlite.js';
-import { embed, embeddingDimensions } from './embedder.js';
+import { embed, embedBatch, embeddingDimensions } from './embedder.js';
 import { continuumDataRoot } from './db.js';
 import type {
   Observation,
@@ -89,13 +89,30 @@ interface VectorDbCtor {
   }): VectorDb;
 }
 
+// W23-1 Path A — embed in batches of 32 to amortise the forward-pass
+// overhead. Benchmark on 2026-06-01 showed sequential per-observation
+// embedding took 13ms × 10k = 136s; batching unlocks G1 (insertion
+// <60s) without changing the embedding model.
+const EMBED_BATCH_SIZE = 32;
+// Quiet-period flush — if the buffer hasn't filled within this window,
+// emit it anyway so a single-observation insert doesn't sit forever.
+// 50ms is short enough to be invisible to operators but long enough
+// to gather a useful batch during bursty inserts.
+const EMBED_BATCH_QUIET_MS = 50;
+
 export class HybridStorageBackend implements StorageBackend {
   private readonly sqlite: SQLiteStorageBackend;
   private readonly vectorDbPath: string;
   private _vectorDb: VectorDb | null = null;
   private _vectorDbLoadPromise: Promise<VectorDb> | null = null;
-  // Append-only queue. flushVectorWrites() swaps it to drain. A new
-  // promise can land mid-flush; the next flush call picks it up.
+  // Two-tier queue (W23-1 Path A):
+  //   pendingBatch  — observations awaiting their batch's forward pass
+  //   pendingEmbeds — already-scheduled batch promises (the drain target)
+  // flushVectorWrites first flushes any pending batch, then awaits all
+  // scheduled batches. New observations can land mid-flush; the loop
+  // picks them up on the next iteration.
+  private pendingBatch: Observation[] = [];
+  private batchTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingEmbeds: Array<Promise<void>> = [];
 
   constructor(projectId: string) {
@@ -133,25 +150,60 @@ export class HybridStorageBackend implements StorageBackend {
    * Queue an embedding + vector insert for an Observation that was just
    * persisted to SQLite. Fire-and-forget — errors log to stderr but
    * never throw back at the synchronous insert path.
+   *
+   * W23-1 Path A: buffer observations and flush in batches of
+   * EMBED_BATCH_SIZE (32). A short quiet-period timer (50ms) ensures
+   * single-observation inserts don't sit in the buffer indefinitely.
+   * Batching amortises the forward-pass cost across many inputs.
    */
   private queueVectorIndex(obs: Observation): void {
+    this.pendingBatch.push(obs);
+    if (this.pendingBatch.length >= EMBED_BATCH_SIZE) {
+      this.scheduleBatchFlush();
+    } else if (this.batchTimer === null) {
+      this.batchTimer = setTimeout(() => this.scheduleBatchFlush(), EMBED_BATCH_QUIET_MS);
+    }
+  }
+
+  /**
+   * Move the current pendingBatch into a fire-and-forget batch-embed
+   * + batch-insert task. Resets the buffer + timer atomically.
+   */
+  private scheduleBatchFlush(): void {
+    if (this.batchTimer !== null) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+    if (this.pendingBatch.length === 0) return;
+    const batch = this.pendingBatch;
+    this.pendingBatch = [];
+
     const task = (async () => {
       try {
-        const vector = await embed(obs.content);
+        const vectors = await embedBatch(batch.map(o => o.content));
         const db = await this.getVectorDb();
-        await db.insert({
-          id: obs.id,
-          vector,
-          metadata: {
-            sourceId: obs.sourceId,
-            type: obs.type,
-            timestamp: obs.timestamp,
-          },
-        });
+        // RuVector's bulk-insert API is per-call insert today; batching
+        // the embed forward pass is the dominant cost, so this still
+        // wins. If RuVector adds db.insertMany later, swap here.
+        await Promise.all(
+          vectors.map((vec, i) => {
+            const o = batch[i]!;
+            return db.insert({
+              id: o.id,
+              vector: vec,
+              metadata: {
+                sourceId: o.sourceId,
+                type: o.type,
+                timestamp: o.timestamp,
+              },
+            });
+          }),
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        const ids = batch.map(o => o.id).join(',');
         process.stderr.write(
-          `[continuum:hybrid] vector index failed for ${obs.id}: ${msg}\n`,
+          `[continuum:hybrid] vector batch failed (${batch.length} ids=${ids.slice(0, 200)}…): ${msg}\n`,
         );
       }
     })();
@@ -281,12 +333,18 @@ export class HybridStorageBackend implements StorageBackend {
 
   /** Wait until every in-flight background vector-index write has settled. */
   async flushVectorWrites(): Promise<void> {
-    // Loop in case more writes land while we're awaiting the current batch.
-    while (this.pendingEmbeds.length > 0) {
-      const inFlight = this.pendingEmbeds;
-      this.pendingEmbeds = [];
-      await Promise.allSettled(inFlight);
-    }
+    // First flush any observations still sitting in the batch buffer —
+    // they may not have hit the size threshold yet. Then drain pending
+    // batch promises. Loop because new observations can land mid-drain
+    // (or a new batch can be scheduled while we await the current one).
+    do {
+      if (this.pendingBatch.length > 0) this.scheduleBatchFlush();
+      if (this.pendingEmbeds.length > 0) {
+        const inFlight = this.pendingEmbeds;
+        this.pendingEmbeds = [];
+        await Promise.allSettled(inFlight);
+      }
+    } while (this.pendingBatch.length > 0 || this.pendingEmbeds.length > 0);
   }
 
   /**
