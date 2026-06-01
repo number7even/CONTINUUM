@@ -45,6 +45,15 @@ RUN npm ci --workspaces --include-workspace-root --ignore-scripts || npm install
 # Compile better-sqlite3 against the Node runtime in this image.
 RUN npm rebuild better-sqlite3 --workspace=@continuum/core
 
+# Sharp is a transitive dep of @xenova/transformers. Its prebuilt
+# platform-specific binary normally lands via a postinstall script,
+# which --ignore-scripts above blocks. Force the install so
+# sharp-linux-x64.node is present and the embedder pipeline doesn't
+# crash inside the worker pool on first batch. Discovered 2026-06-01
+# during the V0.5 remote migrate (W23-1 Path B) — first run failed
+# every batch with "Cannot find module sharp-linux-x64.node".
+RUN npm install --no-save --ignore-scripts=false --platform=linux --arch=x64 sharp
+
 # Bring in source + tsconfigs
 COPY packages packages/
 
