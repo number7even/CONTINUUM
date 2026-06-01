@@ -24,7 +24,7 @@
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
 import { basename, join as joinPath, resolve as resolvePath } from 'node:path';
-import { existsSync, readFileSync, watch as fsWatch } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, watch as fsWatch } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
 import {
@@ -106,6 +106,15 @@ COMMANDS
                    continuum adapter docs
                    continuum adapter docs --watch --docs-dir=./docs
                    continuum adapter git  --watch --repo-dir=.
+  reindex        Rebuild the hybrid backend's vector store from the SQLite
+                 ground-truth. Idempotent — safe to re-run. Required after
+                 corruption, ruvector.db deletion, or upgrading the
+                 embedding model.
+  migrate        One-time migration of a V0 SQLite-only project DB into the
+                 V0.5 hybrid backend. Backs up the SQLite file first, then
+                 builds the vector store from existing observations.
+                 Examples:
+                   continuum migrate --backend hybrid
 
 OPTIONS
   --project-id, -p <id>   Project ID (default: $CONTINUUM_PROJECT_ID or cwd basename).
@@ -500,6 +509,157 @@ function commandAdapter(projectId: string): void {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
+// ── continuum reindex / migrate (W23-1 sub-deliverables 2 + 3) ───────────────
+//
+// reindex — rebuild the hybrid backend's vector store from the SQLite
+//           ground-truth. Idempotent. Use when ruvector.db is corrupted,
+//           manually deleted, or after upgrading the embedding model.
+//
+// migrate — one-time backfill of a V0 SQLite-only project DB into the
+//           V0.5 hybrid backend. Backs up the SQLite file first
+//           (defensive — SQLite isn't modified, but the operator's
+//           project directory gains a ruvector.db sidecar, which is
+//           worth a snapshot in case something goes wrong).
+//
+// Both forces CONTINUUM_STORAGE_BACKEND=hybrid for this invocation so
+// they work even when the default is sqlite (e.g. ops on a V0 project).
+// HybridStorageBackend opens the existing continuum.db AND creates the
+// ruvector.db sidecar; rebuildVectorStore() walks every SQLite row,
+// re-embeds via the worker pool, and inserts into the vector store.
+
+async function commandReindex(projectId: string): Promise<void> {
+  process.env.CONTINUUM_STORAGE_BACKEND = 'hybrid';
+  const { HybridStorageBackend } = await import('@continuum/core');
+  const storage = new HybridStorageBackend(projectId);
+
+  process.stdout.write(
+    `continuum reindex — project '${projectId}'\n` +
+      `  SQLite: ${storage.dataLocation()}\n` +
+      `  reading observation IDs from SQLite and re-embedding…\n\n`,
+  );
+
+  const t0 = Date.now();
+  let lastReportedPct = -1;
+  const result = await storage.rebuildVectorStore({
+    onProgress: (done, total) => {
+      if (total === 0) return;
+      const pct = Math.floor((done / total) * 100);
+      if (pct !== lastReportedPct && pct % 10 === 0) {
+        lastReportedPct = pct;
+        process.stdout.write(`  ${pct}%  (${done}/${total})\n`);
+      }
+    },
+  });
+  const elapsedSec = ((Date.now() - t0) / 1000).toFixed(1);
+
+  const vectorCount = await storage.vectorCount();
+  storage.close();
+
+  process.stdout.write(
+    `\n  ✓ reindex complete in ${elapsedSec}s\n` +
+      `    rebuilt: ${result.rebuilt} / ${result.total}\n` +
+      `    failed:  ${result.failed}\n` +
+      `    vectors now in index: ${vectorCount}\n`,
+  );
+
+  if (result.failed > 0) {
+    process.stderr.write(
+      `\n  ⚠ ${result.failed} observation(s) failed to embed — re-run reindex to retry.\n`,
+    );
+    process.exit(1);
+  }
+  // Force-terminate after admin op completes. The hybrid backend's RuVector
+  // native binding holds resources that don't release cleanly on natural
+  // event-loop drain — without this exit, the CLI process hangs forever
+  // (observed 2026-06-01 with the first smoke run of migrate).
+  process.exit(0);
+}
+
+async function commandMigrate(projectId: string): Promise<void> {
+  // Parse --backend flag; only 'hybrid' is a valid migration target today.
+  const args = process.argv.slice(2);
+  const backendIdx = args.indexOf('--backend');
+  const backendArg = backendIdx >= 0 ? args[backendIdx + 1] : 'hybrid';
+  if (backendArg !== 'hybrid') {
+    process.stderr.write(
+      `continuum migrate: only --backend hybrid is supported today (got: ${backendArg})\n`,
+    );
+    process.exit(2);
+  }
+
+  // Defensive backup of the SQLite file before we open hybrid (which
+  // creates the ruvector.db sidecar in the same project directory).
+  // The SQLite file itself isn't modified, but a backup lets the
+  // operator roll back the whole project-dir state if anything in the
+  // hybrid backend's index-building goes sideways.
+  process.env.CONTINUUM_STORAGE_BACKEND = 'sqlite';
+  const { openStorage } = await import('@continuum/core');
+  const probe = openStorage(projectId);
+  const sqlitePath = probe.dataLocation();
+  probe.close();
+
+  if (!existsSync(sqlitePath)) {
+    process.stderr.write(
+      `continuum migrate: SQLite file not found at ${sqlitePath}\n` +
+        `  Run 'continuum init' first to create the project DB.\n`,
+    );
+    process.exit(2);
+  }
+
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const backupPath = `${sqlitePath}.backup-${ts}`;
+  copyFileSync(sqlitePath, backupPath);
+  process.stdout.write(
+    `continuum migrate — project '${projectId}'\n` +
+      `  source:  ${sqlitePath}\n` +
+      `  backup:  ${backupPath}\n` +
+      `  target:  hybrid (SQLite + RuVector + MiniLM-L6-v2)\n\n`,
+  );
+
+  // Now open hybrid and rebuild the vector store from the SQLite ground-truth.
+  process.env.CONTINUUM_STORAGE_BACKEND = 'hybrid';
+  const { HybridStorageBackend } = await import('@continuum/core');
+  const storage = new HybridStorageBackend(projectId);
+  process.stdout.write(`  vector store: ${storage.vectorDataLocation()}\n`);
+
+  const t0 = Date.now();
+  let lastReportedPct = -1;
+  const result = await storage.rebuildVectorStore({
+    onProgress: (done, total) => {
+      if (total === 0) return;
+      const pct = Math.floor((done / total) * 100);
+      if (pct !== lastReportedPct && pct % 10 === 0) {
+        lastReportedPct = pct;
+        process.stdout.write(`  ${pct}%  (${done}/${total})\n`);
+      }
+    },
+  });
+  const elapsedSec = ((Date.now() - t0) / 1000).toFixed(1);
+  const vectorCount = await storage.vectorCount();
+  storage.close();
+
+  process.stdout.write(
+    `\n  ✓ migration complete in ${elapsedSec}s\n` +
+      `    rebuilt:    ${result.rebuilt} / ${result.total}\n` +
+      `    failed:     ${result.failed}\n` +
+      `    vectors:    ${vectorCount}\n` +
+      `    backup:     ${backupPath}\n\n` +
+      `  Your project is now V0.5-hybrid. The MCP surface is unchanged;\n` +
+      `  Layer-1 search continues to use FTS5 (no behavior change).\n` +
+      `  Vector search becomes available via future RRF-fusion work.\n` +
+      `  To roll back: rm ${storage.vectorDataLocation()} && cp ${backupPath} ${sqlitePath}\n`,
+  );
+
+  if (result.failed > 0) {
+    process.stderr.write(
+      `\n  ⚠ ${result.failed} observation(s) failed to embed — re-run 'continuum reindex' to retry.\n`,
+    );
+    process.exit(1);
+  }
+  // Same hang-on-natural-exit as commandReindex — force-terminate.
+  process.exit(0);
+}
+
 // ── continuum verify ──────────────────────────────────────────────────────────
 //
 // Issue #13 / W23-3. Pulls the latest snapshot, walks every entry with a
@@ -685,6 +845,14 @@ async function main(): Promise<void> {
 
     case 'adapter':
       commandAdapter(projectId);
+      return;
+
+    case 'reindex':
+      await commandReindex(projectId);
+      return;
+
+    case 'migrate':
+      await commandMigrate(projectId);
       return;
 
     default:

@@ -119,6 +119,25 @@ export class SQLiteStorageBackend implements StorageBackend {
     return info.changes > 0;
   }
 
+  // ── Admin: list all observation IDs (W23-1 sub-deliverable 2/3) ──────────
+  //
+  // Used by HybridStorageBackend.rebuildVectorStore() (and the
+  // `continuum reindex` / `continuum migrate` CLI commands) to enumerate
+  // every observation for re-embedding. Insertion-order (rowid) so a
+  // partial run can be resumed deterministically by skipping already-
+  // processed IDs.
+  //
+  // Not on the StorageBackend interface — admin-only primitive, kept
+  // off the public surface to avoid encouraging full-table scans in
+  // user-facing tool handlers.
+
+  listAllObservationIds(): string[] {
+    const rows = this.db
+      .prepare('SELECT id FROM observations ORDER BY rowid')
+      .all() as Array<{ id: string }>;
+    return rows.map(r => r.id);
+  }
+
   // ── Search (FTS5 — Progressive Disclosure Layer-1) ────────────────────────
 
   searchObservations(query: string, limit = 20): SearchHit[] {

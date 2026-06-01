@@ -21,6 +21,11 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
   5 UI/interface-building skills (Impeccable, Taste Skill, Emil Design
   Eng, UI UX Pro Max, 21st.dev Magic MCP). Installed globally at
   `~/.claude/skills/`; available across all projects.
+- [`V0.5-HYBRID.md`](./V0.5-HYBRID.md) — V0.5 hybrid storage backend
+  reference (SQLite + RuVector + MiniLM-L6-v2). Default since
+  2026-06-01. Covers migration from V0, performance characteristics,
+  rollback path, memory tuning. Read before running `continuum
+  migrate --backend hybrid` on an existing project.
 - [`VISION/UNIFIED-ARCHITECTURE.md`](./VISION/UNIFIED-ARCHITECTURE.md) —
   6-layer target-state architecture (RVM → CONTINUUM → Vibely → H-MARA →
   Hyperscale → Perimeter, governed by The Nine). Multi-year horizon.

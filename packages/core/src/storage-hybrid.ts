@@ -388,4 +388,100 @@ export class HybridStorageBackend implements StorageBackend {
   vectorDataLocation(): string {
     return this.vectorDbPath;
   }
+
+  // ── Admin: rebuild vector store from SQLite ground-truth ────────────────
+  //
+  // W23-1 sub-deliverables 2 + 3 (Issue #20). Iterates every observation
+  // in SQLite, re-embeds via the worker pool, and re-inserts into the
+  // RuVector index. SQLite is the source of truth — if SQLite has it,
+  // the vector store should too. Used by both:
+  //
+  //   continuum reindex --backend hybrid   (rebuild from current SQLite)
+  //   continuum migrate --backend hybrid   (one-time backfill after a
+  //                                          V0 → V0.5 migration)
+  //
+  // Implementation:
+  //   1. Enumerate all observation IDs from SQLite (insertion order).
+  //   2. Chunk into batches of EMBED_BATCH_SIZE (32) — matches the
+  //      hot-path batching used by queueVectorIndex.
+  //   3. For each chunk: fetch full observations, best-effort delete
+  //      any existing vectors (idempotency — safe to re-run), embed
+  //      batch via worker pool, insert into RuVector.
+  //   4. Report progress via optional callback.
+  //   5. Return {rebuilt, failed} counts. Caller decides what to do
+  //      with failures (CLI prints them; programmatic callers can retry).
+  //
+  // Throughput on the W23-1 benchmark hardware: ~112 inserts/sec with
+  // Workers=4. For a 10k observation project: ~90s. For a 1k project: ~9s.
+
+  async rebuildVectorStore(
+    opts: { onProgress?: (done: number, total: number) => void } = {},
+  ): Promise<{ rebuilt: number; failed: number; total: number }> {
+    const ids = this.sqlite.listAllObservationIds();
+    const total = ids.length;
+    let rebuilt = 0;
+    let failed = 0;
+
+    if (total === 0) {
+      opts.onProgress?.(0, 0);
+      return { rebuilt: 0, failed: 0, total: 0 };
+    }
+
+    const BATCH = EMBED_BATCH_SIZE;
+    const db = await this.getVectorDb();
+
+    for (let i = 0; i < total; i += BATCH) {
+      const chunkIds = ids.slice(i, i + BATCH);
+      // getObservations caps at 50; BATCH=32 stays well under.
+      const observations = this.sqlite.getObservations(chunkIds);
+      if (observations.length === 0) {
+        // Rows disappeared between listAllObservationIds() and now (DELETE
+        // race). Skip; the caller's next migrate run will see the new state.
+        opts.onProgress?.(rebuilt + failed, total);
+        continue;
+      }
+
+      try {
+        // Best-effort delete to keep this method idempotent — re-running
+        // it shouldn't create duplicate vectors. RuVector.delete returns
+        // false on not-found (no exception); we swallow either way.
+        await Promise.all(
+          observations.map(o => db.delete(o.id).catch(() => false)),
+        );
+        // Embed the batch through the worker pool (W23-1 Path B).
+        const vectors = await embedBatchParallel(observations.map(o => o.content));
+        // Insert each. RuVector's insert API is per-call; the WIN from
+        // batching is the embedder forward pass, which already happened.
+        await Promise.all(
+          vectors.map((vec, idx) => {
+            const o = observations[idx]!;
+            return db.insert({
+              id: o.id,
+              vector: vec,
+              metadata: {
+                sourceId: o.sourceId,
+                type: o.type,
+                timestamp: o.timestamp,
+              },
+            });
+          }),
+        );
+        rebuilt += observations.length;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(
+          `[continuum:hybrid:rebuild] batch ${i}-${i + chunkIds.length} failed: ${msg}\n`,
+        );
+        failed += chunkIds.length;
+      }
+      opts.onProgress?.(rebuilt + failed, total);
+    }
+
+    // Wait for any background embed promises that may have been
+    // triggered concurrently (shouldn't be, since we await every
+    // batch — but defensive).
+    await this.flushVectorWrites();
+
+    return { rebuilt, failed, total };
+  }
 }
