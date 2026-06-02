@@ -54,3 +54,7 @@ Thumbs.db
 .cache/
 tmp/
 temp/
+
+# Operator-side exports (large PDFs / one-off artifacts at repo root).
+# Added 2026-06-02 after CI/CONTINUUM.pdf (19MB) appeared in `git status`.
+CI/
