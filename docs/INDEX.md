@@ -9,10 +9,14 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
 - [`STATUS-2026-05-29.md`](./STATUS-2026-05-29.md) — one-page truthful ledger
   of what is shipped, partial, planned, or aspirational. Layer-by-layer
   reality check + today's commit history + open verification debt.
-- [`SPRINT-2026-W22.md`](./SPRINT-2026-W22.md) — current 2-week sprint
-  plan (2026-05-29 → 2026-06-12): verify the `/chat` Progressive
-  Disclosure moat under live fire, close Tier-A defects, promote V0.5
-  hybrid backend.
+- [`SPRINT-2026-W22.md`](./SPRINT-2026-W22.md) — closed W22 + W23
+  sprint plan with G1 Path D revision history. Verify-the-moat + close
+  Tier-A defects + V0.5 hybrid promotion. **All tickets closed**
+  except #11 (CI gated on operator GH billing, out-of-band).
+- [`SPRINT-2026-W24.md`](./SPRINT-2026-W24.md) — **current sprint**
+  (2026-06-12 → 2026-06-26): V1.1 HTTP Polish — the OSS/Docker
+  Baseline. TLS + JWT + supervision + container hardening + clear
+  #18 FTS5 canary fixture.
 - [`UX-JOURNEYS.md`](./UX-JOURNEYS.md) — the three customer journeys
   (AI Developer, Business Operator, Solo Developer) with tier labels
   per component. ~100% real for Journey 3, ~50% for Journey 1,
