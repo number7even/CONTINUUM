@@ -1,0 +1,42 @@
+# Caddy configuration for self-hosted CONTINUUM
+#
+# Caddy obtains HTTPS certs automatically via Let's Encrypt (HTTP-01 challenge).
+# Required: $CONTINUUM_DOMAIN and $CONTINUUM_OPERATOR_EMAIL in the environment.
+# Required: ports 80 + 443 reachable from the internet on first start (Caddy
+# needs port 80 to complete the ACME challenge).
+#
+# For DNS-01 challenge (works behind firewalls / private networks), see the
+# README in this directory.
+#
+# SSE works out of the box — Caddy doesn't buffer responses by default and
+# its default proxy timeouts accommodate long-lived streams.
+
+{
+    # Email used to register the Let's Encrypt account. Renewal-failure
+    # notices arrive here. Required by Let's Encrypt ToS.
+    email {$CONTINUUM_OPERATOR_EMAIL}
+}
+
+{$CONTINUUM_DOMAIN} {
+    # Reverse-proxy every request to the engine on the internal docker
+    # network. The engine listens on plain HTTP at :7878.
+    reverse_proxy continuum-engine:7878
+
+    # Caddy logs to stdout by default — docker compose logs caddy captures
+    # all access + error logs.
+    log {
+        output stdout
+        format console
+    }
+
+    # Optional: security headers. Comment out if you have a downstream proxy
+    # that sets these.
+    header {
+        # Modern browsers — opt-in to strict transport security AFTER you've
+        # confirmed HTTPS works. Uncomment when you're sure.
+        # Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+}

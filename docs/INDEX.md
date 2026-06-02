@@ -39,6 +39,10 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
 
 - [`HOW_CONTINUUM_WORKS.md`](./HOW_CONTINUUM_WORKS.md) — product narrative
   + architectural mechanics deep-dive.
+- [`DEPLOY_SELF_HOSTED.md`](./DEPLOY_SELF_HOSTED.md) — **NEW (W24-1)** Docker
+  self-hosting walkthrough with Caddy (recommended) / nginx / Traefik TLS
+  terminator examples. One-command HTTPS via the
+  [`examples/caddy/`](./examples/caddy/) stack.
 - [`DEPLOY_FLY.md`](./DEPLOY_FLY.md) — Fly.io engine deployment walkthrough.
 - [`CTO_ANALYSIS_2026-05-20.md`](./CTO_ANALYSIS_2026-05-20.md) — early CTO
   analysis snapshot.

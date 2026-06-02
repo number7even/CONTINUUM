@@ -1,0 +1,77 @@
+# CONTINUUM + Caddy self-hosted stack
+#
+# Boot with:
+#   cp .env.example .env && $EDITOR .env   # set CONTINUUM_DOMAIN, _OPERATOR_EMAIL, _HTTP_TOKEN
+#   docker compose up -d
+#
+# Verify with:
+#   curl https://$CONTINUUM_DOMAIN/healthz
+#   → {"ok":true,"version":"0.0.1","transport":"http+sse","sessions":0}
+#
+# Tear down (preserves data volumes):
+#   docker compose down
+#
+# Nuke everything including data:
+#   docker compose down -v
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"      # required for ACME HTTP-01 challenge + HTTP→HTTPS redirect
+      - "443:443"    # the actual TLS endpoint
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data           # cert storage (rotation state)
+      - caddy_config:/config       # parsed config cache
+    environment:
+      CONTINUUM_DOMAIN: ${CONTINUUM_DOMAIN}
+      CONTINUUM_OPERATOR_EMAIL: ${CONTINUUM_OPERATOR_EMAIL}
+    depends_on:
+      continuum-engine:
+        condition: service_healthy
+    networks:
+      - continuum
+
+  continuum-engine:
+    # Build from the repo root. If you've published your own image to GHCR
+    # / Docker Hub / a private registry, swap to:
+    #   image: ghcr.io/<you>/continuum-engine:<tag>
+    # ...and remove the `build:` block.
+    build:
+      context: ../../..            # repo root (this file is at docs/examples/caddy/)
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # Bearer shared-secret. Required. Generate with: openssl rand -hex 32
+      CONTINUUM_HTTP_TOKEN: ${CONTINUUM_HTTP_TOKEN}
+      # Project ID — directory name under /data for SQLite + ruvector files.
+      CONTINUUM_PROJECT_ID: ${CONTINUUM_PROJECT_ID:-continuum}
+      # Hybrid backend by default (V0.5+). Set to `sqlite` to opt out.
+      CONTINUUM_STORAGE_BACKEND: ${CONTINUUM_STORAGE_BACKEND:-hybrid}
+      # Worker pool size. On 512MB VPS use 1; on 1GB use 2; on 2GB+ leave
+      # unset and let it default to min(cores, 4). See DEPLOY_SELF_HOSTED.md
+      # § "Memory profile per VPS class".
+      CONTINUUM_EMBED_WORKERS: ${CONTINUUM_EMBED_WORKERS:-1}
+    volumes:
+      - continuum_data:/data       # SQLite + ruvector persistence
+    # No `ports:` block — engine is reachable only via the internal `continuum`
+    # network. Caddy is the only public-facing entry point.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7878/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - continuum
+
+volumes:
+  caddy_data:
+  caddy_config:
+  continuum_data:
+
+networks:
+  continuum:
+    driver: bridge
