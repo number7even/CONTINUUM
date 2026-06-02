@@ -44,8 +44,15 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      # Bearer shared-secret. Required. Generate with: openssl rand -hex 32
-      CONTINUUM_HTTP_TOKEN: ${CONTINUUM_HTTP_TOKEN}
+      # Auth mode A (shared-secret, V1 default). Used when JWT_ISSUER below
+      # is unset. Generate with: openssl rand -hex 32
+      CONTINUUM_HTTP_TOKEN: ${CONTINUUM_HTTP_TOKEN:-}
+      # Auth mode B (JWT, V1.1). When BOTH are set, engine boots in JWT mode
+      # and ignores HTTP_TOKEN. Leave unset to stay in Mode A. See
+      # DEPLOY_SELF_HOSTED.md § Authentication.
+      CONTINUUM_JWT_ISSUER: ${CONTINUUM_JWT_ISSUER:-}
+      CONTINUUM_JWT_AUDIENCE: ${CONTINUUM_JWT_AUDIENCE:-}
+      CONTINUUM_JWT_TENANT_CLAIM: ${CONTINUUM_JWT_TENANT_CLAIM:-tenant}
       # Project ID — directory name under /data for SQLite + ruvector files.
       CONTINUUM_PROJECT_ID: ${CONTINUUM_PROJECT_ID:-continuum}
       # Hybrid backend by default (V0.5+). Set to `sqlite` to opt out.

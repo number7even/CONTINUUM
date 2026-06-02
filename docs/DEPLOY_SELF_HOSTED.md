@@ -89,11 +89,36 @@ If your operator profile already has DNS-01 setup (Cloudflare, Route53), see `do
 
 ## Configuration reference
 
-### Required environment variables
+### Authentication — pick ONE mode
+
+The engine supports two mutually-exclusive auth modes at startup. **Pick one per deployment.** The mode is determined by which env vars are set.
+
+#### Mode A — Shared-secret Bearer (V1 default, simplest)
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `CONTINUUM_HTTP_TOKEN` | **(required)** | Bearer shared secret. Generate with `openssl rand -hex 32`. Any MCP client must send `Authorization: Bearer <this>`. |
+| `CONTINUUM_HTTP_TOKEN` | **(required for this mode)** | Bearer shared secret. Generate with `openssl rand -hex 32`. Every MCP client sends `Authorization: Bearer <this>`. |
+
+When `CONTINUUM_HTTP_TOKEN` is set AND no JWT env vars are set, the engine boots in shared-secret mode. This is what the Vercel frontend uses today and is fully sufficient for single-operator OSS deployments.
+
+#### Mode B — JWT (bring-your-own-OAuth, V1.1)
+
+When `CONTINUUM_JWT_ISSUER` AND `CONTINUUM_JWT_AUDIENCE` are both set, the engine boots in JWT mode. The shared-secret env var is **ignored** (you pick one mode — operator clarity).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CONTINUUM_JWT_ISSUER` | **(required for this mode)** | The OIDC issuer URL (e.g. `https://your-tenant.auth0.com/`). The engine fetches JWKS from `<issuer>/.well-known/jwks.json` and caches it (rotating automatically when new kids appear). |
+| `CONTINUUM_JWT_AUDIENCE` | **(required for this mode)** | The expected `aud` claim. Configured in your OIDC provider when you register the CONTINUUM API as a resource. |
+| `CONTINUUM_JWT_TENANT_CLAIM` | `tenant` | Which JWT claim to read into `req.user.tenant`. Auth0 typically uses a namespaced claim like `https://yourdomain.com/tenant`; Clerk uses `org_id`; Keycloak uses `tenant` or a custom one. **Tenant routing is not yet wired** — that's V1.2 work — but the auth boundary lands here. |
+
+Tested OIDC providers: any compliant issuer with a standards-compliant JWKS endpoint and RS256-signed tokens. We've validated against synthetic JWKS in CI; production validation against Auth0 / Clerk / Keycloak is part of the W24 exit criteria.
+
+**Backwards compatibility:** with only `CONTINUUM_HTTP_TOKEN` set, behavior is unchanged from V1. Existing deployments (Vercel frontend, Fly engine, all OSS self-hosters) keep working — no migration required to upgrade to V1.1.
+
+### Required Caddy variables (only if using the Caddy example)
+
+| Variable | Default | Purpose |
+|---|---|---|
 | `CONTINUUM_DOMAIN` | **(required for Caddy)** | The public domain Caddy obtains certs for. Must have A/AAAA records pointing at the host. |
 | `CONTINUUM_OPERATOR_EMAIL` | **(required for Caddy)** | Used in the Let's Encrypt account registration. Renewal-failure notices go here. |
 

@@ -36,19 +36,24 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
-import express, { type Request, type Response, type NextFunction } from 'express';
+import express, { type Request, type Response } from 'express';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { buildServer, type ServerHandle } from './server.js';
+import { createAuthMiddleware, resolveAuthConfig } from './auth.js';
 
 const PORT = Number(process.env.CONTINUUM_HTTP_PORT ?? 7878);
-const TOKEN = process.env.CONTINUUM_HTTP_TOKEN;
 const DEFAULT_PROJECT = process.env.CONTINUUM_PROJECT_ID ?? 'default';
 
-if (!TOKEN || !TOKEN.trim()) {
-  process.stderr.write(
-    '[continuum-http] FATAL: $CONTINUUM_HTTP_TOKEN required. ' +
-      'Generate one (e.g. `openssl rand -hex 32`) and re-launch.\n',
-  );
+// Resolve auth at startup so the server refuses to launch in an undecided
+// state. Throws if neither CONTINUUM_HTTP_TOKEN (shared-secret) NOR
+// CONTINUUM_JWT_ISSUER + CONTINUUM_JWT_AUDIENCE (JWT mode) is set.
+// See ./auth.ts and docs/DEPLOY_SELF_HOSTED.md.
+let authConfig: ReturnType<typeof resolveAuthConfig>;
+try {
+  authConfig = resolveAuthConfig();
+} catch (err) {
+  const msg = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`[continuum-http] FATAL: ${msg}\n`);
   process.exit(1);
 }
 
@@ -56,20 +61,9 @@ const app = express();
 app.use(express.json({ limit: '4mb' }));
 
 // ── Auth middleware ──────────────────────────────────────────────────────────
-// /healthz exempt so load balancers can probe without credentials.
+// /healthz exempt so orchestrator probes don't need credentials.
 
-app.use((req: Request, res: Response, next: NextFunction): void => {
-  if (req.path === '/healthz') {
-    next();
-    return;
-  }
-  const auth = req.headers.authorization ?? '';
-  if (auth !== `Bearer ${TOKEN}`) {
-    res.status(401).json({ error: 'unauthorized' });
-    return;
-  }
-  next();
-});
+app.use(createAuthMiddleware(authConfig));
 
 // ── Per-session transport + server registry ──────────────────────────────────
 
@@ -148,8 +142,12 @@ app.get('/healthz', (_req: Request, res: Response): void => {
 // ── Listen + graceful shutdown ───────────────────────────────────────────────
 
 const httpServer = app.listen(PORT, () => {
+  const authDesc =
+    authConfig.mode === 'shared-secret'
+      ? `Bearer[shared-secret,len=${authConfig.token.length}]`
+      : `Bearer[jwt,iss=${authConfig.issuer},aud=${authConfig.audience}]`;
   process.stderr.write(
-    `[continuum-http] listening on :${PORT}  defaultProject=${DEFAULT_PROJECT}  authToken=Bearer[len=${TOKEN.length}]\n`,
+    `[continuum-http] listening on :${PORT}  defaultProject=${DEFAULT_PROJECT}  auth=${authDesc}\n`,
   );
 });
 
