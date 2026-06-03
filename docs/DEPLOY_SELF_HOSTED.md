@@ -406,25 +406,57 @@ docker run --rm anchore/grype:latest ghcr.io/number7even/continuum-engine:latest
 
 Add either to your CD pipeline as a gating step before promoting to prod.
 
-### Current npm audit baseline (P4 — honest)
+### Current npm audit baseline (P4 — honest, updated 2026-06-03)
 
-As of 2026-06-03 the production dependency tree carries the following known CVEs, all in the `@xenova/transformers → onnxruntime-web → onnx-proto → protobufjs` chain:
+As of 2026-06-03 (later in the day than the W24-4 commit), the production dependency tree carries the following known CVEs, **all in the `@xenova/transformers → onnxruntime-web → onnx-proto → protobufjs` chain**:
 
-| Severity | Advisory | Impact |
+| Severity | Advisory | Impact class |
 |---|---|---|
+| **Critical** | GHSA-xq3m-2v4x-88gg | protobufjs arbitrary code execution |
+| **Critical** | GHSA-66ff-xgx4-vchm | protobufjs code injection through bytes field defaults |
+| **High** | GHSA-fx83-v9x8-x52w | protobufjs prototype injection in generated message constructors |
+| **High** | GHSA-75px-5xx7-5xc7 | protobufjs code generation gadget after prototype pollution |
+| **High** | GHSA-2pr8-phx7-x9h3 | protobufjs DoS from crafted field names in generated code |
 | Critical | GHSA-jvwf-75h9-cwgg | protobufjs process-wide DoS via unsafe option paths |
 | High | GHSA-685m-2w69-288q | protobufjs DoS via unbounded recursion |
 | High | GHSA-q6x5-8v7m-xcrf | protobufjs overlong UTF-8 decoding |
 | High | GHSA-jggg-4jg4-v7c6 | protobufjs DoS via unbounded recursive JSON descriptor expansion |
 
-**Mitigation analysis:**
+**The escalation:** the W24-4 commit's earlier draft of this section described the chain as "all DoS, no RCE." That was accurate at audit-DB-time-of-writing; the DB updated within the hour to add four new advisories of **RCE / code-injection class**. The gate caught this escalation immediately on the next push — exactly the design intent.
 
-- All four are **denial-of-service**, not RCE / data exfiltration. Worst case is the engine process crashes — `--restart=unless-stopped` brings it back.
-- The vulnerable code path requires **user-controlled protobuf bytes** to reach the embedder. CONTINUUM's embedder only sees Observation **content** which (a) has already passed through the privacy filter at write-time, (b) is plain UTF-8 text, never raw protobuf, and (c) is never sourced from un-trusted public input — only from operator-controlled adapters (docs, git, AI sessions).
-- **No upstream fix is available.** `@xenova/transformers` has not published a patched release; the audit's suggested fix (`npm audit fix --force`) would DOWNGRADE the package and break the V0.5 hybrid backend.
-- The 1 critical + 3 high will surface in any scan today. The CI gate is wired to catch **future** additions; the current findings are documented as accepted-with-mitigation pending upstream patch.
+**Mitigation analysis (RCE-class CVEs):**
 
-When `@xenova/transformers` publishes a fixed release, bump the pin, re-run `npm audit`, and these entries disappear without code change.
+The protobufjs RCE codepaths (arbitrary code execution, code injection via bytes defaults, prototype pollution, generated-code gadgets) **require attacker-controlled protobuf bytes or attacker-controlled `.proto` descriptors** to reach the vulnerable parser. CONTINUUM's specific use of `protobufjs` is **transitive** via `@xenova/transformers → onnxruntime-web → onnx-proto`:
+
+- `@xenova/transformers` calls into ONNX Runtime
+- ONNX Runtime loads model files (`.onnx` format) using `onnx-proto` (which uses protobufjs)
+- The `.onnx` model file is **downloaded once from Hugging Face**, cached at `~/.cache/huggingface/`, and never re-parsed from a user-controlled source at runtime
+- **No user input is ever passed to the protobufjs parser** in the CONTINUUM call graph
+
+So while the vulnerable code is **present** in the dependency tree, the **exposed attack surface** for our specific use is:
+- ❌ User-supplied protobuf via HTTP — not exposed
+- ❌ User-supplied `.proto` descriptors — not exposed
+- ⚠️ Model file substitution on disk — requires prior filesystem access (deeper compromise already)
+- ⚠️ Hugging Face download integrity — relies on HF's HTTPS + checksum guarantees
+
+**The DoS-class CVEs** (5 of 9) still apply per the earlier analysis: worst case is engine crash, restart-policy mitigates.
+
+**No upstream fix is currently available.** `@xenova/transformers` has not published a patched release. The audit's suggested `npm audit fix --force` would downgrade to v2.0.1 which lacks features V0.5 relies on. Forking the package is out of scope.
+
+### Operator decision required (P9)
+
+The CI gate (`npm audit --omit=dev --audit-level=high`) **WILL fail** on every push until one of these lands:
+
+| Path | Cost | Trade-off |
+|---|---|---|
+| **A · Accept** — flip the audit step to `continue-on-error: true` with documented mitigation | 1 commit | Gate becomes informational, not blocking. Operator-acknowledged risk acceptance with the surface analysis above. |
+| **B · Allowlist** — adopt `audit-ci` or `better-npm-audit` and silence these 9 specific advisories with explicit rationale | ~2 hours | Gate stays blocking; future NEW advisories still trip it; the specific 9 are signed off. |
+| **C · Patch by replacement** — swap `@xenova/transformers` for a native embedder (fastembed-rs / candle bindings) | days · breaks Journey 3 npm-install zero-config promise | Eliminates the vulnerable chain entirely. Big architectural shift. Same Path C we rejected in W23-1. |
+| **D · Wait** — keep the gate red, no new commits until upstream patches | unknown duration | Honest but unworkable for active development. |
+
+**No path chosen yet.** This document records the analysis. Operator picks.
+
+When `@xenova/transformers` publishes a fixed release, bump the pin, re-run `npm audit`, and these entries disappear without code change — whichever path was active.
 
 ---
 
