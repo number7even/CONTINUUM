@@ -21,6 +21,18 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
   (AI Developer, Business Operator, Solo Developer) with tier labels
   per component. ~100% real for Journey 3, ~50% for Journey 1,
   ~10% for Journey 2 — the canonical UX framing.
+- [`INTEGRATIONS/VIBELY-HANDOFF.md`](./INTEGRATIONS/VIBELY-HANDOFF.md) —
+  what CONTINUUM needs from the external Vibely team to integrate
+  Layer 2 (orchestration / SIR / Mercury dLLM). Contract proposal,
+  not committed code.
+- [`INTEGRATIONS/H-MARA-HANDOFF.md`](./INTEGRATIONS/H-MARA-HANDOFF.md) —
+  what CONTINUUM needs from the H-MARA team to integrate Layer 3
+  (MCTS reasoning, Proponent/Skeptic, witness verification). Includes
+  proposed 64-byte witness layout.
+- [`INTEGRATIONS/RVM-BUILD-MAP.md`](./INTEGRATIONS/RVM-BUILD-MAP.md) —
+  architecture + 4-phase build plan to take Layer 0 (RVM hypervisor)
+  from "source-only" → "first witness in production" WITHOUT breaking
+  Journey 3's zero-config `npm install` promise.
 - [`UI-SKILLS.md`](./UI-SKILLS.md) — operator-toolkit reference for the
   5 UI/interface-building skills (Impeccable, Taste Skill, Emil Design
   Eng, UI UX Pro Max, 21st.dev Magic MCP). Installed globally at
