@@ -272,7 +272,7 @@ partitions, or Vibely operator pointed at a stale instance.
 | **V1** | Vibely's `vibely.run` calls CONTINUUM's existing MCP surface with shared-secret auth. SIR stored as Observation. Single-tenant. | Vibely's CI green against a CONTINUUM Docker test container |
 | **V1.1** | JWT auth (CONTINUUM's W24-2 just shipped). Trace context. Callbacks. | E2E test: intent → SIR → verify-then-dissolve roundtrip |
 | **V2** | Multi-tenant via RuVector collections. Per-tenant rate limits. | V1.2 CONTINUUM ships; tenant isolation audit passes |
-| **V3** | H-MARA escalation wired. Cost caps. Witness verification. | H-MARA exits its 🔮 tier (separate dependency chain — see [`H-MARA-HANDOFF.md`](./H-MARA-HANDOFF.md)) |
+| **V3** | H-MARA escalation wired. Cost caps. Witness verification. | H-MARA exits its 🔮 tier (separate dependency chain — see [`H-MARA-BUILD-MAP.md`](./H-MARA-BUILD-MAP.md)) |
 
 ---
 
@@ -304,13 +304,13 @@ In exchange for the above:
   integration. The 1,109 t/s figure is the vendor claim, not a
   measurement.
 - **Cost caps for H-MARA escalation** require H-MARA to exist —
-  see [`H-MARA-HANDOFF.md`](./H-MARA-HANDOFF.md).
+  see [`H-MARA-BUILD-MAP.md`](./H-MARA-BUILD-MAP.md).
 
 ---
 
 ## See also
 
-- [`H-MARA-HANDOFF.md`](./H-MARA-HANDOFF.md) — Layer 3 integration boundary
+- [`H-MARA-BUILD-MAP.md`](./H-MARA-BUILD-MAP.md) — Layer 3 integration boundary
 - [`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md) — Layer 0 architecture + build plan
 - [`VOICECOSMOS.md`](./VOICECOSMOS.md) — per-customer pattern this doc inherits
 - [`../VISION/UNIFIED-ARCHITECTURE.md`](../VISION/UNIFIED-ARCHITECTURE.md) — 6-layer target architecture with tier labels

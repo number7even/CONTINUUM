@@ -21,7 +21,7 @@
 | 1 | RVM bare-metal kernel (`rvm-kernel`) | RVM team | 🟠 source-only at `~/Development/rvm`, `cargo check` green |
 | 2 | Coherence Engine (`rvm-coherence`, <10µs partition switch) | RVM team | 🔮 unmeasured |
 | 3 | Witness Engine (`rvm-witness`, 64-byte hash-chain) | RVM team | 🔮 no emitter |
-| 4 | Witness format spec (byte-exact layout) | **JOINT** RVM + H-MARA + CONTINUUM | 🟠 proposed in [`H-MARA-HANDOFF.md`](./H-MARA-HANDOFF.md) §Need #3 |
+| 4 | Witness format spec (byte-exact layout) | **JOINT** RVM + H-MARA + CONTINUUM | 🟠 proposed in [`H-MARA-BUILD-MAP.md`](./H-MARA-BUILD-MAP.md) §Need #3 |
 | 5 | RVM ↔ host transport (FFI? UDS? network?) | **JOINT** RVM + CONTINUUM | 🔮 not designed |
 | 6 | CONTINUUM-side witness verifier | CONTINUUM | 🔮 zero code (this doc proposes the design) |
 | 7 | Hash-chain mirror in CONTINUUM | CONTINUUM | 🔮 zero code |
@@ -103,7 +103,7 @@ forward.
 protocol.
 
 - [ ] RVM team confirms the witness layout proposed in
-      [`H-MARA-HANDOFF.md`](./H-MARA-HANDOFF.md) §Need #3 (or proposes
+      [`H-MARA-BUILD-MAP.md`](./H-MARA-BUILD-MAP.md) §Need #3 (or proposes
       changes)
 - [ ] RVM team specifies the wire protocol (we propose HTTP over UDS
       because it's the easiest for CONTINUUM to consume and easy for
@@ -176,7 +176,7 @@ quotas, RVM fleet management.
 
 ## Witness format — proposed byte layout
 
-Restating from [`H-MARA-HANDOFF.md`](./H-MARA-HANDOFF.md) §Need #3 for
+Restating from [`H-MARA-BUILD-MAP.md`](./H-MARA-BUILD-MAP.md) §Need #3 for
 single-file readability:
 
 ```
@@ -320,7 +320,7 @@ it before accepting the state transition.
 ## What it would take to start Phase R1 work in CONTINUUM
 
 - ✅ This document (delivered)
-- ✅ [`H-MARA-HANDOFF.md`](./H-MARA-HANDOFF.md) §Need #3 witness format proposal (delivered)
+- ✅ [`H-MARA-BUILD-MAP.md`](./H-MARA-BUILD-MAP.md) §Need #3 witness format proposal (delivered)
 - ⏳ RVM team review + counter-proposal or sign-off on the format
 - ⏳ RVM team commits to ship `rvm-bridge` (the HTTP/UDS adapter — Rust binary)
 - ⏳ Operator authorization for a CONTINUUM sprint slot focused on R1
@@ -331,7 +331,7 @@ None of these are in-flight. This is roadmap, not WIP.
 
 ## See also
 
-- [`H-MARA-HANDOFF.md`](./H-MARA-HANDOFF.md) — Layer 3 integration; witness format proposal cross-references this doc
+- [`H-MARA-BUILD-MAP.md`](./H-MARA-BUILD-MAP.md) — Layer 3 integration; witness format proposal cross-references this doc
 - [`VIBELY-HANDOFF.md`](./VIBELY-HANDOFF.md) — Layer 2 integration; escalation to H-MARA which eventually invokes RVM
 - [`../VISION/UNIFIED-ARCHITECTURE.md`](../VISION/UNIFIED-ARCHITECTURE.md) §"Layer 1 Physical: RVM" — current tier label (🔮 aspirational); this doc proposes how to move it toward 🟡 partial
 - GitHub Issue #19 — RVM integration tracking (source checkout, cargo-check status)

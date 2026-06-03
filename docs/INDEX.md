@@ -25,10 +25,12 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
   what CONTINUUM needs from the external Vibely team to integrate
   Layer 2 (orchestration / SIR / Mercury dLLM). Contract proposal,
   not committed code.
-- [`INTEGRATIONS/H-MARA-HANDOFF.md`](./INTEGRATIONS/H-MARA-HANDOFF.md) —
-  what CONTINUUM needs from the H-MARA team to integrate Layer 3
-  (MCTS reasoning, Proponent/Skeptic, witness verification). Includes
-  proposed 64-byte witness layout.
+- [`INTEGRATIONS/H-MARA-BUILD-MAP.md`](./INTEGRATIONS/H-MARA-BUILD-MAP.md) —
+  H-MARA is **internal** (we own the reasoning core; it operates
+  invisibly behind CONTINUUM). Architecture + 5-phase build plan
+  (H0 spec → H1 MVP stub → H2 real MCTS → H3 RVM Tier-2 Judge →
+  H4 advanced + H5 production). Hard-gated on RVM Phase R2 + local
+  inference. Not a SPRINT-W24 commitment — roadmap only.
 - [`INTEGRATIONS/RVM-BUILD-MAP.md`](./INTEGRATIONS/RVM-BUILD-MAP.md) —
   architecture + 4-phase build plan to take Layer 0 (RVM hypervisor)
   from "source-only" → "first witness in production" WITHOUT breaking
