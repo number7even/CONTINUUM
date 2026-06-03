@@ -109,6 +109,13 @@ VOLUME ["/data"]
 
 EXPOSE 7878
 
+# Docker / Fly / k8s liveness probe (W24-3).
+# /healthz returns 503 when storage backend is degraded so the orchestrator
+# can restart the container. start-period gives the storage probe + embedder
+# load time before the first check fires.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:7878/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 # tini reaps zombies + forwards SIGTERM cleanly to the Node child.
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "packages/mcp-server/dist/http.js"]

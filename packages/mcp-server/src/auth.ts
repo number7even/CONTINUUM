@@ -111,7 +111,7 @@ export function resolveAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthCon
  * (Docker HEALTHCHECK, Fly proxy, K8s liveness) call this without creds.
  * /readyz (W24-3) will also be added here when it lands.
  */
-const EXEMPT_PATHS = new Set<string>(['/healthz']);
+const EXEMPT_PATHS = new Set<string>(['/healthz', '/readyz']);
 
 /**
  * Build the Express middleware for the resolved config. Each call returns a

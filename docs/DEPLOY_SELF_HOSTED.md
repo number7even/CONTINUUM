@@ -275,9 +275,9 @@ If `/healthz` works from the public URL but `/sse` 504s or hangs, the proxy is b
 
 ## Process supervision
 
-Two layers, neither requires anything special inside the engine:
+Three layers, each independently useful:
 
-### Inside the container — `tini` as PID 1
+### Inside the container — `tini` as PID 1 + Docker HEALTHCHECK
 
 The engine's `Dockerfile` uses `tini` as the entrypoint:
 ```dockerfile
@@ -286,6 +286,27 @@ CMD ["node", "packages/mcp-server/dist/http.js"]
 ```
 
 `tini` reaps zombie processes and forwards SIGTERM cleanly to the Node child. If you `docker stop continuum-engine`, the engine gets ~10s to close SQLite + WAL cleanly, then SIGKILL.
+
+The Dockerfile also declares a **`HEALTHCHECK`** that hits `/healthz` every 30 seconds (5s timeout, 3 retries, 30s start-period grace for the embedder model to load). `/healthz` returns **503 when storage is degraded** — orchestrators (Docker, Fly, k8s, nomad) automatically restart the container on persistent failure. Inspect from the host:
+
+```bash
+docker inspect --format='{{.State.Health.Status}}' continuum-engine
+# starting | healthy | unhealthy
+docker inspect --format='{{json .State.Health}}' continuum-engine | jq
+```
+
+### Liveness vs readiness — `/healthz` vs `/readyz`
+
+Two endpoints, two signals:
+
+| Endpoint | Signal | Returns 200 when | Returns 503 when | Use for |
+|---|---|---|---|---|
+| `/healthz` | **liveness** | process responsive AND SQLite OK AND embedder warm | SQLite degraded, embedder failed | Docker HEALTHCHECK · k8s livenessProbe · Fly machine_check |
+| `/readyz` | **readiness** | first storage + embedder warm-up complete | startup not finished, or storage probe failed | k8s readinessProbe · load balancer route gate |
+
+`/readyz` exists specifically to **eliminate the cold-start race**: when a fresh container starts, MiniLM model load takes 3-5s. A client hitting `/sse` during that window would block. Orchestrators gate traffic on `/readyz` 200 to avoid this.
+
+Both endpoints carry the same enriched body shape (storage backend, sqlite/ruvector status, embedder flag, uptime) so monitoring dashboards can read either.
 
 ### Outside the container — restart policy
 

@@ -104,6 +104,13 @@ try {
     hres.status === 200 && hjson.ok === true && hjson.transport === 'http+sse',
     `status=${hres.status} body=${JSON.stringify(hjson)}`);
 
+  // ── (a2) /readyz no-auth, signals storage + embedder warm (W24-3) ──────
+  const rres = await fetch(`http://localhost:${PORT}/readyz`);
+  const rjson = await rres.json();
+  check('/readyz returns 200 with ready=true after storage probe',
+    rres.status === 200 && rjson.ready === true && rjson.storage?.sqlite_ok === true,
+    `status=${rres.status} body=${JSON.stringify(rjson)}`);
+
   // ── (b) /sse rejects unauthenticated ────────────────────────────────────
   const noauth = await fetch(`http://localhost:${PORT}/sse`);
   check('/sse rejects unauthenticated request',
