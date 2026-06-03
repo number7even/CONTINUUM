@@ -1,34 +1,48 @@
-# H-MARA ↔ CONTINUUM Integration Handoff
+# H-MARA Architecture + Build Map (internal)
 
 > **Bound by [The Nine](../../AGENTS.md) v0.1.0.**
 >
-> **Status:** H-MARA is the reasoning core that CONTINUUM (Layer 1)
-> escalates to via Vibely (Layer 2) when a DAG node needs deep
-> adversarial proof. This document defines what CONTINUUM needs from
-> the H-MARA team to integrate cleanly when H-MARA's MCTS arena is
-> ready to ship.
+> **Status:** H-MARA does **not** exist as a standalone brand or repo.
+> It is **the invisible, brutal reasoning core operating behind the
+> CONTINUUM product** — we own it, we build it. Zero code exists today
+> in any repo we have access to; this document maps the architecture
+> and phased build plan, parallel to [`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md).
 >
 > **Layer:** 3 — Reasoning Brain (per `VISION/UNIFIED-ARCHITECTURE.md`).
-> **Position:** Sits BELOW Vibely (receives escalated DAG nodes) and
-> ABOVE RVM (delegates Tier-2 detonation to bare-metal partitions).
+> **Position:** Sits BELOW Vibely (receives escalated DAG nodes —
+> Vibely is external, see [`VIBELY-HANDOFF.md`](./VIBELY-HANDOFF.md))
+> and ABOVE RVM (delegates Tier-2 detonation to bare-metal partitions
+> — we own RVM too, see [`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md)).
 > **Statelessness contract:** H-MARA writes nothing except via the
 > witness-receipt callback to CONTINUUM. No H-MARA-side memory.
+>
+> **NOT a SPRINT-W24 commitment.** This is V1.5+ / V2 horizon work,
+> gated on RVM Phase R2 (real partition detonation) + local inference
+> (Issue #3) being available. Per partner-clause #3 we do not start
+> Phase H1 until those gates clear. This doc is roadmap, not WIP.
 
 ---
 
-## TL;DR — what CONTINUUM needs from H-MARA
+## TL;DR — what we will build (and what gates each phase)
 
-| # | We need | Why |
-|---|---|---|
-| 1 | **REST/gRPC contract** for `POST /v1/hmara/execute-node` | So Vibely + CONTINUUM can submit MCTS jobs deterministically |
-| 2 | **MCP client commitment** — H-MARA reads CONTINUUM context via the 10 existing MCP tools, NOT a custom API | Single source of truth, no parallel retrieval path |
-| 3 | **Witness receipt format spec** — what's in the 64-byte hash, how to verify against our local chain | The "currency" of verify-then-dissolve |
-| 4 | **Search budget contract** — max nodes, max wall-time, max $-cost per submission | So operators don't get bankrupted by a runaway MCTS |
-| 5 | **Failure mode contract** — what does H-MARA return when it can't reach consensus? | Vibely + CONTINUUM need to handle inconclusive verdicts |
-| 6 | **DEC (De-Biasing Extraction Compiler) pipeline** — how PII flows through reasoning | Privacy invariant must survive the MCTS hop |
-| 7 | **Auth boundary** — how does H-MARA authenticate to CONTINUUM and vice versa? | mTLS? Shared JWT issuer? |
-| 8 | **Trace context propagation** — W3C traceparent in + out | End-to-end observability |
-| 9 | **Cost metering hooks** — per-node compute spend + per-tenant cap enforcement | Multi-tenant SaaS pricing later |
+| # | Component | Phase | Status today | Gate |
+|---|---|---|---|---|
+| 1 | `POST /v1/hmara/execute-node` HTTP entry | H1 | 🔮 zero code | Phase H0 spec finalized |
+| 2 | MCP client (H-MARA reads CONTINUUM via our 10 tools) | H1 | 🔮 | `@modelcontextprotocol/sdk` (already in stack) |
+| 3 | MCTS search engine (`hmara-core/src/mcts/`) | H2 | 🔮 | Local inference available (Issue #3) |
+| 4 | Proponent / Skeptic agent loop | H2 | 🔮 | Phase H1 complete |
+| 5 | Tier-1 Heuristic Critic (sub-2B value network) | H2 | 🔮 | Model selected + deployed |
+| 6 | Tier-2 Deterministic Judge (`hmara-core/src/judge/`) | H3 | 🔮 | **RVM-BUILD-MAP Phase R2** — real partition detonation |
+| 7 | 64-byte witness emission via RVM | H3 | 🔮 | `rvm-bridge` exposes witness API |
+| 8 | DEC pipeline (De-Biasing Extraction Compiler) | H4 | 🔮 | Phase H2 + bias-projection embedding model |
+| 9 | Latent-space recursion (zero-copy agent messages) | H4 | 🔮 | Local inference exposing hidden states |
+| 10 | Per-tenant cost metering hooks | H5 | 🔮 | CONTINUUM V2.0 multi-tenant (D-V2.2) |
+| 11 | Production traffic from Vibely DAGs | H5 | 🔮 | All above |
+
+**Hard dependency chain:** RVM Phase R2 → H-MARA Phase H3. Soft
+dependency: local inference (`ruvllm` per Issue #3) blocks Phase H4
+(latent-space recursion can't happen against cloud APIs that don't
+expose hidden states).
 
 ---
 
@@ -36,33 +50,35 @@
 
 ```
 ┌──────────────────────────────────┐
-│   Vibely (control plane)          │
-│   - DAG node with escalation_hint │
+│   Vibely (Layer 2, EXTERNAL)      │
+│   See VIBELY-HANDOFF.md           │
 └──────────┬───────────────────────┘
            │ POST /v1/hmara/execute-node
            │ + traceparent + tenant_id
            ▼
 ┌──────────────────────────────────┐
-│   H-MARA (reasoning core)         │
+│   H-MARA (this document, ours)    │
 │   - MCTS arena                    │
 │   - Proponent / Skeptic agents    │
 │   - Tier-1 Heuristic Critic       │
-│   - Tier-2 Deterministic Judge ──┼──┐
-│   - DEC pipeline                  │  │
-│   STATELESS — no DB, no cache     │  │
-└──────────┬───────────────────────┘  │
-           │ MCP calls (context retrieval) │
+│   - Tier-2 Deterministic Judge ──┐│
+│   - DEC pipeline                  ││
+│   STATELESS — no DB, no cache     ││
+└──────────┬───────────────────────┘│
+           │ MCP calls (context retrieval)
            │ via existing 10 tools         │
            ▼                                 │
 ┌──────────────────────────────────┐        │
-│   CONTINUUM (memory + ledger)     │        │
+│   CONTINUUM (Layer 1, exists today)│      │
+│   The memory + ledger plane       │        │
 └──────────────────────────────────┘        │
                                             │
                                             ▼
                               ┌──────────────────────────┐
-                              │   RVM (hypervisor)        │
+                              │   RVM (Layer 0, source-   │
+                              │   only, see RVM-BUILD-MAP)│
                               │   - <10µs partition       │
-                              │   - 64-byte witness       │
+                              │   - 64-byte witness        │
                               └──────────────────────────┘
 ```
 
@@ -71,7 +87,7 @@
 - Make routing decisions (Vibely's job)
 - Boot RVM partitions itself — it requests them via a well-defined RPC
 - Hold conversation memory or implement cache eviction policies
-- Speak to the public internet (air-gapped per the vision doc)
+- Speak to the public internet (air-gapped per the vision)
 
 **CONTINUUM does NOT:**
 - Run MCTS searches
@@ -81,28 +97,198 @@
 
 ---
 
-## Need #1 — `POST /v1/hmara/execute-node` contract
+## The architectural commitment to Journey 3
 
-The single entry point. Submitted by Vibely (or CONTINUUM directly
-for testing).
+**Journey 3 (Solo Developer) currently runs 100% real with zero
+native dependencies.** H-MARA integration MUST preserve this. Same
+non-negotiables as RVM:
+
+1. **H-MARA is opt-in.** Default verify mode stays `shell-exit-code`.
+   Only operators who explicitly run an H-MARA cluster get
+   adversarial-reasoning verification.
+2. **The `npm install` story is unchanged.** H-MARA lives in a
+   separate binary distribution — likely Rust crates in
+   `hmara-core/` (matching the vision doc's repo tree) + a sidecar
+   container — but never a native dep of `@continuum/*`.
+3. **No mandatory GPU.** Tier-1 critic needs a model; we ship a
+   CPU-only profile (slow but works) and a GPU-accelerated profile
+   (production). Operators pick at deploy time.
+
+If we can't preserve Journey 3, we don't integrate H-MARA. Same
+principle that drove V0.5 Path D last sprint, carried forward.
+
+---
+
+## Build plan — phased, gated
+
+### Phase H0 — Spec finalization (Weeks 1-2 of an authorized H-sprint)
+
+**Goal:** byte-exact agreement on the `POST /v1/hmara/execute-node`
+contract, the four-outcome model, and the witness format (joint with
+[`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md) §"Witness format" — they
+must match).
+
+Deliverables:
+- [ ] `docs/INTEGRATIONS/hmara-execute-node.openapi.yaml` (NEW) —
+      machine-readable OpenAPI 3.1 spec for the entry point
+- [ ] Witness format finalized in [`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md)
+      (currently a proposal)
+- [ ] Four-outcome enum locked: `verified` / `rejected` /
+      `inconclusive` / `budget_exceeded`
+- [ ] DEC pipeline output schema (what does a "de-biased intent"
+      look like as JSON?)
+
+**No code in CONTINUUM yet.** Just the spec.
+
+### Phase H1 — MVP arena against a local stub-RVM (Weeks 3-6)
+
+**Goal:** H-MARA receives an intent, retrieves context from CONTINUUM
+via MCP, runs an MCTS, returns a synthetic-witness verdict. RVM is
+stubbed — Tier-2 Judge just compiles + runs the code in a regular
+process and emits a fake 64-byte signature.
+
+Deliverables (in our control):
+- [ ] `hmara-core/` workspace bootstrapped (Rust, per the vision tree)
+- [ ] `hmara-core/src/api/` — Axum/Actix HTTP server implementing
+      `POST /v1/hmara/execute-node`
+- [ ] `hmara-core/src/mcp_client/` — MCP client using `mcp-rust-sdk`
+      or wrapping `@modelcontextprotocol/sdk` via subprocess RPC
+- [ ] `hmara-core/src/mcts/` — minimum viable Monte Carlo tree
+      search with UCT path selection, configurable budget
+- [ ] `hmara-core/src/judge/tier1_critic.rs` — heuristic scorer
+      stub (returns deterministic mock scores for testing)
+- [ ] `hmara-core/src/judge/tier2_judge_local.rs` — stub that
+      compiles + runs in a local process, emits fake witness
+- [ ] End-to-end fixture: submit a known-good intent + AST, observe
+      verdict + fake witness, CONTINUUM verifies signature against
+      a stubbed chain
+
+CONTINUUM side changes (minimal, in `packages/`):
+- [ ] `continuum_create_todo` accepts `verifyMode: 'hmara-witness'`
+- [ ] `continuum verify` routes witness-mode todos to a configured
+      H-MARA endpoint (or stub)
+- [ ] New env var `CONTINUUM_HMARA_URL` (unset = no H-MARA path)
+
+### Phase H2 — Real MCTS + Proponent/Skeptic agents (Weeks 7-12)
+
+**Goal:** Replace the deterministic stub MCTS with a working
+adversarial search. Proponent generates AST patches; Skeptic generates
+exploits; Tier-1 critic scores.
+
+Deliverables:
+- [ ] Tier-1 Heuristic Critic: pick a quantised value-network model
+      (candidates: distilled CodeBERT, sub-2B mistral-derived, or a
+      custom-trained scorer). Deploy via `ruvector`'s embedder or
+      similar runtime.
+- [ ] Proponent agent loop with proper LLM invocation (cloud API OK
+      at Phase H2 since latent-space recursion is H4)
+- [ ] Skeptic agent loop with adversarial-payload generation
+- [ ] UCT formula with cost penalty:
+      `UCT(s) = V(s) + w·√(ln N(p) / N(s)) - λ·C_compute(s)`
+- [ ] Exponential decay on node reward to prevent infinite-correction loops
+- [ ] Native symbolic output: agents emit `Python AST` or `JSON
+      schema` directly; invalid output → -1.0 reward
+- [ ] Search budget enforcement: max_mcts_nodes, max_wall_time_seconds,
+      max_compute_usd_cents
+
+### Phase H3 — Real RVM Tier-2 Judge (Weeks 13-16)
+
+**Goal:** Tier-2 Judge replaces the local-process stub with a real
+RVM partition detonation. This is the hard gate — requires
+[`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md) Phase R2 to be done.
+
+Deliverables:
+- [ ] `hmara-core/src/judge/tier2_judge_rvm.rs` — talks to
+      `rvm-bridge` (the Rust binary from RVM Phase R1)
+- [ ] Witness verification on H-MARA side BEFORE returning to
+      caller (we don't trust the bridge's word; we verify against
+      our local hash-chain mirror)
+- [ ] End-to-end: real vulnerable repo + real exploit + real RVM
+      sandbox + real witness emitted + CONTINUUM dissolves a real
+      todo
+
+### Phase H4 — Advanced features (Weeks 17-24+)
+
+The v0.2 H-MARA enhancement spec from `VISION/UNIFIED-ARCHITECTURE.md`
+lands here. Gated on local inference (Issue #3) for B1 + B5.
+
+- **B1 · Latent-Space Recursion (RecursiveMAS)** — agents pass hidden
+       states instead of text. 2.4x faster / 75% fewer tokens.
+       **Hard-gated on local inference** that exposes hidden states.
+- **B2 · Lazy Eval + cost-penalised UCT** (some of this in H2 already)
+- **B3 · Dynamic Mixture-of-Agents + TTC throttling** — multiple
+       proposer SLMs + one aggregator. **Soft-gated on a multi-
+       provider inference broker** (knapsack engine — currently 🔮).
+- **B4 · Zero-Compute Bypass** — cosine-similarity ≥0.96 against
+       historical verified MCTS paths → reuse the verified AST.
+       Soft-gated on a vector memory of verified paths (need H3
+       running long enough to accumulate).
+- **B5 · Hardened DEC** — Latent Constraint Extraction + Orthogonal
+       Bias Projection + Differential Privacy. Hard-gated on a
+       bias-projection embedding model.
+
+### Phase H5 — Production hardening (Weeks 25+)
+
+- Per-tenant cost metering hooks (CONTINUUM V2.0 dependency)
+- Multi-tenant partition scoping (RVM Phase R4 dependency)
+- Production traffic from Vibely DAGs (Vibely Phase V3 dependency)
+- SLO definition + on-call rotation
+- Cost telemetry surfaced via new MCP tool `continuum_get_tenant_compute_usage`
+
+---
+
+## Repo layout (when Phase H1 starts)
+
+Matching the vision doc's tree:
+
+```
+hmara-core/                        ← new Rust workspace, sibling to CONTINUUM
+├── Cargo.toml
+├── src/
+│   ├── api/                       ← HTTP server: POST /v1/hmara/execute-node
+│   ├── mcp_client/                ← MCP client wrapping the @continuum/* surface
+│   ├── mcts/                      ← UCT path selection + tree management
+│   ├── agents/
+│   │   ├── proponent.rs           ← Blue Team — generates AST patches
+│   │   └── skeptic.rs             ← Red Team — generates exploits
+│   ├── judge/
+│   │   ├── tier1_critic.rs        ← Heuristic value network
+│   │   └── tier2_judge.rs         ← Calls rvm-bridge for real detonation
+│   ├── dec/                       ← De-Biasing Extraction Compiler (H4)
+│   └── budget/                    ← max-nodes / max-wall-time / max-$ enforcement
+└── tests/
+    ├── synthetic_witness.rs       ← Phase H1 stub coverage
+    └── e2e_rvm.rs                 ← Phase H3 real-witness coverage
+```
+
+`hmara-core` lives either as **a sibling repo** or **a sibling
+directory tree in this monorepo** — that's a future decision. It is
+**not** part of the `packages/` npm workspace tree, so `npm install`
+for CONTINUUM operators is unaffected.
+
+---
+
+## API contract — `POST /v1/hmara/execute-node`
+
+Locked from H0; CONTINUUM submits to H-MARA via Vibely's DAG executor.
 
 **Request:**
 
 ```jsonc
-POST /v1/hmara/execute-node HTTP/1.1
+POST /v1/hmara/execute-node
 Authorization: Bearer <jwt with tenant claim>
 traceparent: 00-<trace_id>-<span_id>-01
 Content-Type: application/json
 
 {
   "node_id": "vibely-dag-node-uuid",         // for callback correlation
-  "tenant_id": "acme-corp",                   // for multi-tenant scoping
+  "tenant_id": "acme-corp",                   // multi-tenant scoping
   "intent": "Fix the SQL injection in users.go:142",
-  "context_query": {                           // how to retrieve context
+  "context_query": {
     "search_terms": ["users.go", "sql injection", "parameterized query"],
     "max_observations": 50
   },
-  "escalation_reason": "security",             // why this needs MCTS not Mercury
+  "escalation_reason": "security",
   "budget": {
     "max_mcts_nodes": 10000,
     "max_wall_time_seconds": 300,
@@ -113,7 +299,7 @@ Content-Type: application/json
 }
 ```
 
-**Response (immediate):**
+**Immediate response:**
 
 ```jsonc
 HTTP/1.1 202 Accepted
@@ -121,7 +307,7 @@ HTTP/1.1 202 Accepted
   "execution_id": "hmara-uuid",
   "estimated_wall_time_seconds": 180,
   "queue_position": 0,
-  "status_url": "https://hmara.example.com/v1/hmara/executions/<id>"
+  "status_url": "/v1/hmara/executions/<id>"
 }
 ```
 
@@ -147,113 +333,37 @@ X-HMARA-Signature: <hmac-sha256(callback_secret, body)>
 }
 ```
 
-We need the contract **versioned** so we can rev without breaking
-existing Vibely deployments.
-
 ---
 
-## Need #2 — H-MARA reads CONTINUUM via MCP, not a custom API
-
-Strong architectural commitment. H-MARA acts as an **MCP client** of
-CONTINUUM, using the same 10 tools every other client uses.
-
-When H-MARA's MCTS arena needs to look up prior commits, doc snippets,
-or related observations, it calls:
-
-- `continuum_search_docs` (Layer-1 keyword)
-- `continuum_timeline` (Layer-2 chronological window)
-- `continuum_get_observations` (Layer-3 full-fetch by ID)
-
-**Why:** This means the Progressive Disclosure moat (~10x token
-savings measured in W22-1) applies to H-MARA too. No parallel retrieval
-path to maintain.
-
-**What we need:** H-MARA's client library uses the standard MCP SDK
-(`@modelcontextprotocol/sdk`). No bespoke client. Authentication
-uses the same JWT or Bearer that the rest of the stack uses.
-
----
-
-## Need #3 — Witness receipt format
-
-The 64-byte witness is the only currency CONTINUUM accepts to dissolve
-a verify-bearing todo. We need:
-
-### Format spec
-
-```
-Offset  Size   Field
-------  -----  -----------------------------------------------------------
-0       4      Magic: "RVMW" (0x52 0x56 0x4D 0x57)
-4       2      Version: u16 little-endian (start at 0x0001)
-6       2      Witness type: u16 (1 = code-patch-verified)
-8       32     SHA-256 of the proven AST patch (canonical serialization)
-40      8      Timestamp: u64 little-endian Unix microseconds
-48      8      RVM partition ID: u64 LE (provenance for the detonation)
-56      8      Hash chain link: u64 LE (index into RVM's local hash chain)
-
-Total: 64 bytes.
-```
-
-(This is a **proposal**; the H-MARA + RVM teams own the actual layout.)
-
-### Verification
-
-CONTINUUM needs to verify a witness BEFORE dissolving a todo:
-
-1. Check magic + version
-2. Look up the partition ID in our local mirror of RVM's hash-chain
-   (need protocol for syncing this — see [`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md))
-3. Recompute the SHA-256 of the AST we have a copy of (the one the
-   callback returned in `ast_patch`)
-4. Compare against witness bytes 8..40
-5. If all match → dissolve todo, otherwise log + alert
-
-**What we need:** H-MARA team agrees on this exact layout (or
-counter-proposes). Then CONTINUUM ships verification in
-`continuum_update_todo` (gated by a `verifyMode: "witness"` field on
-the todo).
-
----
-
-## Need #4 — Search budget contract
-
-H-MARA can run a long time. We need operator-configurable caps:
-
-- `max_mcts_nodes` — hard ceiling on tree size
-- `max_wall_time_seconds` — wall clock cap
-- `max_compute_usd_cents` — money cap (real)
-- `max_gpu_seconds` — for fleet operators
-
-When any cap is hit, H-MARA must:
-1. Stop expanding the tree
-2. Backpropagate scores using the partial tree
-3. Return either the best partial result (`outcome: "inconclusive"`)
-   or a clean `outcome: "budget_exceeded"`
-4. NEVER block waiting on RVM if its detonation budget is exhausted
-
-**What we need:** H-MARA's MCTS implementation respects all four caps
-deterministically, and reports them in `mcts_stats`.
-
----
-
-## Need #5 — Failure mode contract
-
-Four legitimate outcomes (per the callback shape above):
+## Four-outcome contract
 
 | outcome | Meaning | CONTINUUM action |
 |---|---|---|
 | `verified` | Patch proven; witness valid | Verify witness; dissolve todo; record observation type `hmara_witness` |
-| `rejected` | Skeptic broke every Proponent patch | Update todo status to `blocked`; record observation type `hmara_rejected` with exploit list |
-| `inconclusive` | Variance didn't converge within budget | Update todo to `in_progress`; record observation `hmara_inconclusive` with best-partial-AST so a human can review |
-| `budget_exceeded` | Operator's cost cap hit before convergence | Update todo to `blocked`; record `hmara_budget_exceeded` with cap reached |
+| `rejected` | Skeptic broke every Proponent patch | Update todo status to `blocked`; record `hmara_rejected` with exploit list |
+| `inconclusive` | Variance didn't converge within budget | Update todo to `in_progress`; record `hmara_inconclusive` with best-partial-AST |
+| `budget_exceeded` | Cost cap hit before convergence | Update todo to `blocked`; record `hmara_budget_exceeded` |
 
-**What we need:** every callback uses one of these four enum values.
 No new outcome types added without a contract bump.
 
 ---
 
-## Need #6 — DEC pipeline contract
+## Statelessness commitment
+
+H-MARA holds **no persistent state**. After each `execute-node` call:
+
+- MCTS tree is discarded
+- Agent context is discarded
+- Search history is discarded
+
+The only persistent record is the observation H-MARA writes back to
+CONTINUUM via the callback (one of the four `hmara_*` types). This
+matches the v0.2 enhancement spec's "no redundant caching" rule from
+the consolidated vision document.
+
+---
+
+## DEC pipeline contract (Phase H4)
 
 H-MARA's De-Biasing Extraction Compiler runs BEFORE the MCTS sees
 the intent. It must:
@@ -265,115 +375,101 @@ the intent. It must:
    agents see them (synthetic proxies)
 5. Map proxies back to real values at the final output stage
 
-**What CONTINUUM needs:** since CONTINUUM's privacy filter runs at
-write-time (11 named patterns + entropy detector), the observations
-H-MARA reads are ALREADY scrubbed of named secrets. The DEC pipeline
-should treat CONTINUUM-sourced observations as "scrubbed at source"
-and focus on de-biasing + DP for un-scrubbed sources (user prompts,
-intermediate agent outputs).
+**CONTINUUM's privacy filter runs at write-time** (11 named patterns +
+optional entropy detector). Observations H-MARA reads are ALREADY
+scrubbed of named secrets. DEC focuses on de-biasing + DP for un-
+scrubbed sources (raw user prompts, intermediate agent outputs).
 
 ---
 
-## Need #7 — Auth boundary
+## CONTINUUM-side changes (when Phase H1 lands)
 
-Two directions, both must be defined:
+Minimal surface area, all gated by env var. Same opt-in pattern as
+the RVM bridge:
 
-### Vibely / CONTINUUM → H-MARA
-
-Bearer JWT (same OIDC issuer as the rest of the stack — Need #2 of
-[`VIBELY-HANDOFF.md`](./VIBELY-HANDOFF.md)). Claims:
-- `sub` — caller identity
-- `tenant` — for multi-tenant scoping
-- `scope` — `hmara:execute` for submission, `hmara:status` for read-only
-
-### H-MARA → CONTINUUM
-
-Same JWT, same issuer, claim `scope: continuum:read` (for context
-retrieval). H-MARA never writes directly — only via the witness
-callback to CONTINUUM.
-
-### H-MARA → RVM
-
-mTLS or in-host UDS. RVM is bare metal; H-MARA Tier-2 Judge talks to
-it via a well-defined RPC (see [`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md)).
-Out of CONTINUUM's scope to specify; H-MARA + RVM teams own it.
-
----
-
-## Need #8 — Trace context
-
-Every request and callback carries W3C `traceparent`. H-MARA's MCTS
-nodes each get a child span. CONTINUUM observations created from H-MARA
-verdicts carry the trace ID in their `refs[]` so we can correlate
-intent → MCTS → observations → todo dissolution end-to-end.
-
----
-
-## Need #9 — Cost metering hooks
-
-For the SaaS tier (V2.0), we need per-tenant compute caps. **What we
-need:**
-
-- H-MARA reports `compute_usd_cents` per execution
-- CONTINUUM aggregates per `tenant_id` over a rolling window
-- A new MCP tool `continuum_get_tenant_compute_usage` exposes this
-- Vibely's DAG planner reads this before submitting (Need #6 from
-  Vibely handoff)
-
-This is V2.0+ work — flagging it now so H-MARA's API ships the metering
-fields from V1.
-
----
-
-## Phased integration
-
-| Phase | What ships | Gate |
+| Change | File | Behavior |
 |---|---|---|
-| **V0** | This handoff + witness format finalized between teams | Both leads sign off |
-| **V1** | H-MARA exposes `POST /v1/hmara/execute-node` against a local mock RVM (no real bare-metal yet) | Submit a fixture intent, get a synthetic witness, CONTINUUM verifies + dissolves todo |
-| **V1.5** | Real RVM Tier-2 Judge integration. First real-hardware witness emitted | E2E test against actual `aarch64-unknown-none` build |
-| **V2** | Multi-tenant cost caps + DEC pipeline | Per-tenant usage report; differential-privacy audit |
-| **V3** | Production traffic from Vibely DAGs | SLO defined; on-call rotation |
+| Add `verifyMode: 'hmara-witness'` to `CreateTodoInput` | `packages/core/src/storage.ts` | Existing todos unaffected; opt-in per todo |
+| Route witness-mode todos to H-MARA endpoint | `packages/cli/src/index.ts` | `continuum verify` calls `CONTINUUM_HMARA_URL` if set |
+| Observation types `hmara_witness` / `hmara_rejected` / `hmara_inconclusive` / `hmara_budget_exceeded` | `packages/core/src/types.ts` | New SourceType enum values |
+| Env var `CONTINUUM_HMARA_URL` | (env) | Unset = no H-MARA path; set = available |
+| Env var `CONTINUUM_HMARA_AUTH_TOKEN` | (env) | Shared secret OR same OIDC JWT (W24-2) — operator chooses |
 
 ---
 
-## What CONTINUUM commits to provide
+## Cost / footprint estimates (honest)
 
-- **Stable MCP retrieval surface** for H-MARA's context queries (Layer-1/2/3 already in production)
-- **Privacy filter at write-time** so H-MARA receives pre-scrubbed observations
-- **Witness verification logic** wired into `continuum_update_todo` when the format is finalized
-- **`continuum_get_tenant_compute_usage` tool** (V2.0 — depends on multi-tenant collections)
-- **Observation types** for H-MARA outcomes: `hmara_witness`, `hmara_rejected`, `hmara_inconclusive`, `hmara_budget_exceeded`
-- **Trace ID propagation** in observation `refs[]`
+Speculative — based on the vision spec's claims, not measurements.
+
+| Component | Memory (per execution) | Wall time (per execution) | Notes |
+|---|---|---|---|
+| MCTS tree (10k nodes) | ~50MB | varies by budget | Discarded after each call |
+| Proponent + Skeptic LLM context | ~1-2GB GPU OR cloud API | seconds-to-minutes | Phase H2 |
+| Tier-1 quantised critic | ~500MB | <10ms per node | Phase H2 |
+| Tier-2 RVM detonation | <10µs partition + AST compile | seconds | Phase H3 |
+| DEC pipeline | minimal | <100ms | Phase H4 |
+| **Cluster size for production** | ~16GB GPU node per concurrent execution | — | Phase H5 capacity planning |
+
+---
+
+## What we are NOT building (P5 — the rule binds its keeper)
+
+- **No H-MARA work during SPRINT-W24.** Current sprint is HTTP polish
+  (W24-1 ✅, W24-2 ✅, W24-3 next).
+- **No bypass of the dependency chain.** Phase H3 cannot start until
+  RVM-BUILD-MAP Phase R2 is complete.
+- **No latent-space recursion** until local inference exposing hidden
+  states is available (Issue #3).
+- **No mandatory H-MARA dependency for CONTINUUM operators.** Journey
+  3's zero-config promise survives.
+- **No replacement of `continuum verify`.** H-MARA witness mode is
+  an additional path, not a replacement for shell-exit-code (which
+  has shipped and works today).
 
 ---
 
 ## Honest non-claims (P4)
 
-- **H-MARA does not exist as code in any repo we have access to.** This
-  handoff is preparatory — the spec lands first, the integration code
-  later. Zero lines committed.
-- **The witness format above is a proposal.** Real format owned jointly
-  by H-MARA + RVM teams.
-- **"Air-gapped MCTS in a stateless container" is the vision.** No
-  implementation in our org yet. Source for RVM exists (Issue #19); no
-  H-MARA source we know of.
-- **"Latent-space recursion / zero-copy agent communication" is hard-
-  blocked** on local inference (cloud APIs don't expose hidden states —
-  documented in Issue #3 and the v0.2 H-MARA enhancement section of
-  `VISION/UNIFIED-ARCHITECTURE.md`).
+- **Zero H-MARA code exists** in any repo we have access to today.
+  This entire document is roadmap.
+- **The Tier-1 critic model is unselected.** "sub-2B value network"
+  is a target size; the actual model is a Phase H2 decision.
+- **MCTS-over-LLM via cloud APIs is incoherent** for the latent-space
+  recursion path (B1) — documented in Issue #3 + `VISION/UNIFIED-
+  ARCHITECTURE.md`. Phase H2 uses cloud APIs with text messaging
+  between agents; Phase H4 requires local inference.
+- **<10µs partition switch is unmeasured** for the Tier-2 path —
+  inherits the same status from [`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md).
 - **Cost figures** (`compute_usd_cents`) presume a GPU fleet H-MARA
-  controls. Not in our infrastructure.
+  controls. Not in our infrastructure today.
+- **"Air-gapped" claim** is a target. Practical H-MARA Phase H2 will
+  call cloud APIs (Anthropic, OpenAI) for the Proponent/Skeptic
+  agents — air-gapping fully requires local inference (Phase H4).
+
+---
+
+## What it would take to start Phase H1 work
+
+- ✅ This build map (delivered)
+- ✅ [`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md) Phase R1 design (delivered)
+- ⏳ RVM Phase R2 complete (real partition detonation in QEMU)
+- ⏳ Local inference path identified (Issue #3 — `ruvllm` or similar)
+- ⏳ Operator authorization for an H-sprint (separate from current W24)
+- ⏳ Decision: same monorepo (sibling directory) or sibling repo
+- ⏳ GPU budget approved for Phase H2 (Tier-1 critic deployment)
+
+None are in-flight today. Strictly roadmap.
 
 ---
 
 ## See also
 
-- [`VIBELY-HANDOFF.md`](./VIBELY-HANDOFF.md) — Layer 2 integration (Vibely escalates to H-MARA)
-- [`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md) — Layer 0 — H-MARA's Tier-2 Judge runs there
+- [`VIBELY-HANDOFF.md`](./VIBELY-HANDOFF.md) — Layer 2 integration (Vibely IS external; escalates to H-MARA)
+- [`RVM-BUILD-MAP.md`](./RVM-BUILD-MAP.md) — Layer 0 (we own RVM too; H-MARA Phase H3 depends on RVM Phase R2)
 - [`../VISION/UNIFIED-ARCHITECTURE.md`](../VISION/UNIFIED-ARCHITECTURE.md) §"v0.2 H-MARA enhancements" — the 5-bucket spec already filed
 - [`../H-MARA-CONTINUUM/H-MARA-INTEGRATION-PLAN.md`](../H-MARA-CONTINUUM/H-MARA-INTEGRATION-PLAN.md) — earlier v0.1 planning doc
 - [`../V0.5-HYBRID.md`](../V0.5-HYBRID.md) — current memory layer H-MARA will read from
+- [`../UX-JOURNEYS.md`](../UX-JOURNEYS.md) §"Journey 3 (Solo Developer)" — the zero-config promise H-MARA integration MUST preserve
 
 ---
 
