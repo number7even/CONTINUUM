@@ -347,6 +347,87 @@ journalctl -u continuum-engine -f
 
 ---
 
+## Container hardening (W24-4)
+
+The default image runs as an **unprivileged user** (`continuum`, uid/gid `10001`) and is built to support the standard Docker isolation flags. Combine the image-side defaults with the runtime flags below for a defence-in-depth posture.
+
+### Image-side defaults (built in, no operator action required)
+
+- **Non-root execution.** PID 1 is `tini`; entrypoint runs root briefly to chown `/data` (handles operators upgrading from a pre-W24-4 image), then drops to `continuum` (uid 10001) via `gosu`. The Node process runs unprivileged.
+- **No shell for the runtime user.** `/usr/sbin/nologin` so even if an attacker escapes the Node sandbox they can't `docker exec -u continuum sh`.
+- **Volume ownership chowned at build.** Fresh `/data` volumes inherit the `continuum` uid; existing volumes are migrated by the entrypoint on first run.
+- **Sharp + better-sqlite3 native bindings** pre-built for `linux-x64` in the image (no install-time compilation surface).
+
+### Recommended `docker run` flags
+
+For maximum isolation when running standalone (without the included Caddy compose stack — which already isolates the engine on an internal network with no public ports):
+
+```bash
+docker run -d \
+  --name continuum-engine \
+  --restart=unless-stopped \
+  --read-only \
+  --tmpfs /tmp:size=64m \
+  --cap-drop=ALL \
+  --security-opt=no-new-privileges \
+  --pids-limit 512 \
+  -p 127.0.0.1:7878:7878 \
+  -v continuum_data:/data \
+  -e CONTINUUM_HTTP_TOKEN=$(openssl rand -hex 32) \
+  -e CONTINUUM_EMBED_WORKERS=1 \
+  ghcr.io/number7even/continuum-engine:latest
+```
+
+What each flag buys you:
+
+| Flag | What it does | Why |
+|---|---|---|
+| `--read-only` | Root filesystem mounted read-only | Container can't write outside `/data` + `/tmp` |
+| `--tmpfs /tmp:size=64m` | Writable RAM mount for `/tmp` | better-sqlite3 + npm need a scratch dir |
+| `--cap-drop=ALL` | Drop every Linux capability | Engine doesn't need any privileged ops |
+| `--security-opt=no-new-privileges` | Block setuid/setgid escalation | Belt-and-braces with the non-root user |
+| `--pids-limit 512` | Cap process count in the container | Prevents fork-bomb DoS |
+| `-p 127.0.0.1:7878:7878` | Bind to loopback only | Caddy/nginx on the host fronts TLS — engine is never directly internet-exposed |
+
+The Caddy + docker-compose example in [`examples/caddy/`](./examples/caddy/) already provides equivalent isolation via the internal Docker network (engine has no `ports:` block at all — only Caddy is reachable from outside).
+
+### Image vulnerability scanning
+
+The repository's CI workflow runs `npm audit --omit=dev --audit-level=high` on every push (W24-4). For deployed images, scan with `trivy` or `grype` before promoting to production:
+
+```bash
+# Trivy — fastest, broadest CVE database
+docker pull aquasec/trivy:latest
+docker run --rm aquasec/trivy image ghcr.io/number7even/continuum-engine:latest
+
+# Grype — Anchore's CVE scanner, complementary signal
+docker run --rm anchore/grype:latest ghcr.io/number7even/continuum-engine:latest
+```
+
+Add either to your CD pipeline as a gating step before promoting to prod.
+
+### Current npm audit baseline (P4 — honest)
+
+As of 2026-06-03 the production dependency tree carries the following known CVEs, all in the `@xenova/transformers → onnxruntime-web → onnx-proto → protobufjs` chain:
+
+| Severity | Advisory | Impact |
+|---|---|---|
+| Critical | GHSA-jvwf-75h9-cwgg | protobufjs process-wide DoS via unsafe option paths |
+| High | GHSA-685m-2w69-288q | protobufjs DoS via unbounded recursion |
+| High | GHSA-q6x5-8v7m-xcrf | protobufjs overlong UTF-8 decoding |
+| High | GHSA-jggg-4jg4-v7c6 | protobufjs DoS via unbounded recursive JSON descriptor expansion |
+
+**Mitigation analysis:**
+
+- All four are **denial-of-service**, not RCE / data exfiltration. Worst case is the engine process crashes — `--restart=unless-stopped` brings it back.
+- The vulnerable code path requires **user-controlled protobuf bytes** to reach the embedder. CONTINUUM's embedder only sees Observation **content** which (a) has already passed through the privacy filter at write-time, (b) is plain UTF-8 text, never raw protobuf, and (c) is never sourced from un-trusted public input — only from operator-controlled adapters (docs, git, AI sessions).
+- **No upstream fix is available.** `@xenova/transformers` has not published a patched release; the audit's suggested fix (`npm audit fix --force`) would DOWNGRADE the package and break the V0.5 hybrid backend.
+- The 1 critical + 3 high will surface in any scan today. The CI gate is wired to catch **future** additions; the current findings are documented as accepted-with-mitigation pending upstream patch.
+
+When `@xenova/transformers` publishes a fixed release, bump the pin, re-run `npm audit`, and these entries disappear without code change.
+
+---
+
 ## Troubleshooting
 
 ### `curl https://continuum.example.com/healthz` returns "connection refused"

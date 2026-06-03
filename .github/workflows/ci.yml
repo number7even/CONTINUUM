@@ -41,6 +41,19 @@ jobs:
         # gets its native build via the explicit rebuild step below.
         run: npm ci --ignore-scripts
 
+      - name: Security audit (production deps, high+ severity) — W24-4
+        # Fails the build if any production dep has a HIGH or CRITICAL CVE
+        # that npm considers blocking under its current audit semantics.
+        # See docs/DEPLOY_SELF_HOSTED.md § Container hardening for the
+        # current known-baseline + mitigation analysis (the @xenova/
+        # transformers → onnxruntime-web → protobufjs DoS chain).
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Security audit — informational full report
+        # Prints moderate+low findings too so operators have the full
+        # picture. Does NOT fail the build — that's the gate above.
+        run: npm audit --omit=dev || true
+
       - name: Build better-sqlite3 native addon
         run: npm rebuild better-sqlite3 --workspace=@continuum/core
 

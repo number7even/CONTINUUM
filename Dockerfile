@@ -73,12 +73,24 @@ RUN npm run build --workspace=@continuum/core \
 FROM node:20-bookworm-slim AS runtime
 
 # better-sqlite3 native addon links against glibc — already in node:20-slim.
-# Add tini as PID 1 for graceful SIGTERM handling (Fly sends SIGTERM on stop).
+# tini  — PID-1 init that reaps zombies and forwards SIGTERM cleanly.
+# gosu  — non-fork privilege-drop for the entrypoint (W24-4 hardening).
+# stat from coreutils ships in the base image.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tini \
+ && apt-get install -y --no-install-recommends tini gosu \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Container hardening (W24-4): create unprivileged user uid/gid 10001.
+# The runtime PROCESS runs as `continuum` (post-entrypoint drop).
+# /data is chowned at image-build so a fresh volume inherits the
+# ownership; the entrypoint also re-chowns at runtime for upgrade safety.
+RUN groupadd --system --gid 10001 continuum \
+ && useradd  --system --uid 10001 --gid continuum \
+              --home-dir /app --shell /usr/sbin/nologin continuum \
+ && mkdir -p /data \
+ && chown -R continuum:continuum /data
 
 # Copy node_modules + dist from builder. Skip source + tests + .next.
 # The npm workspaces symlinks under node_modules/@continuum/* point at
@@ -107,6 +119,15 @@ ENV CONTINUUM_PROJECT_ID=continuum
 # Persistent disk for SQLite + ruvector state.
 VOLUME ["/data"]
 
+# Copy the privilege-drop entrypoint AFTER ownership of /app is settled.
+COPY --chown=root:root entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Ensure /app is owned by `continuum` so the dropped process can read its
+# own dist files. Done last so all COPY layers above land as root, then
+# get rewritten in a single chown layer.
+RUN chown -R continuum:continuum /app
+
 EXPOSE 7878
 
 # Docker / Fly / k8s liveness probe (W24-3).
@@ -116,6 +137,8 @@ EXPOSE 7878
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:7878/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-# tini reaps zombies + forwards SIGTERM cleanly to the Node child.
-ENTRYPOINT ["/usr/bin/tini", "--"]
+# tini is PID 1 (reaps zombies + forwards SIGTERM) and execs entrypoint.sh.
+# entrypoint.sh runs as root just long enough to chown /data, then drops to
+# the unprivileged `continuum` user via gosu and execs CMD.
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]
 CMD ["node", "packages/mcp-server/dist/http.js"]
