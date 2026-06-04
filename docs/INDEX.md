@@ -13,10 +13,15 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
   sprint plan with G1 Path D revision history. Verify-the-moat + close
   Tier-A defects + V0.5 hybrid promotion. **All tickets closed**
   except #11 (CI gated on operator GH billing, out-of-band).
-- [`SPRINT-2026-W24.md`](./SPRINT-2026-W24.md) — **current sprint**
-  (2026-06-12 → 2026-06-26): V1.1 HTTP Polish — the OSS/Docker
-  Baseline. TLS + JWT + supervision + container hardening + clear
-  #18 FTS5 canary fixture.
+- [`SPRINT-2026-W24.md`](./SPRINT-2026-W24.md) — **closed** 2026-06-03
+  (snapshot `e3bd67a4`, 34/34 verify-green). V1.1 HTTP Polish —
+  OSS/Docker Baseline. TLS + JWT + supervision + container hardening
+  + #18 FTS5 canary fixture. All 5 deliverables shipped.
+- [`SPRINT-2026-W25.md`](./SPRINT-2026-W25.md) — **current sprint**
+  (2026-06-26 → 2026-07-03): single-objective throughput sprint —
+  push 10k Observations through V0.5 ingestion in <60s without
+  regressing recall@5 ≥0.85 or p95 <50ms. 8 tunable knobs T1-T8
+  enumerated with risk:impact order.
 - [`UX-JOURNEYS.md`](./UX-JOURNEYS.md) — the three customer journeys
   (AI Developer, Business Operator, Solo Developer) with tier labels
   per component. ~100% real for Journey 3, ~50% for Journey 1,
