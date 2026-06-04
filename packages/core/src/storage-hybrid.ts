@@ -89,11 +89,9 @@ interface VectorDbCtor {
   }): VectorDb;
 }
 
-// W23-1 Path A — embed in batches of 32 to amortise the forward-pass
-// overhead. Benchmark on 2026-06-01 showed sequential per-observation
-// embedding took 13ms × 10k = 136s; batching unlocks G1 (insertion
-// <60s) without changing the embedding model.
-const EMBED_BATCH_SIZE = 32;
+// W23-1 Path A — embed in batches to amortise the forward-pass overhead.
+// W25-1 T1 sweep — incrementally raise from W23-1's conservative 32.
+const EMBED_BATCH_SIZE = 128;
 // Quiet-period flush — if the buffer hasn't filled within this window,
 // emit it anyway so a single-observation insert doesn't sit forever.
 // 50ms is short enough to be invisible to operators but long enough
