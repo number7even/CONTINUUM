@@ -65,6 +65,14 @@ interface VectorDb {
     vector: Float32Array | number[];
     metadata?: Record<string, unknown>;
   }): Promise<string>;
+  // W25-1 T6 — bulk-insert primitive exposed by ruvector@0.2.25+.
+  // Probed signature: receives the records array, resolves to inserted IDs.
+  // Single native call replaces a Promise.all() of N round-trips.
+  insertBatch(entries: Array<{
+    id?: string;
+    vector: Float32Array | number[];
+    metadata?: Record<string, unknown>;
+  }>): Promise<string[]>;
   search(query: {
     vector: Float32Array | number[];
     k: number;
@@ -94,9 +102,15 @@ interface VectorDbCtor {
 const EMBED_BATCH_SIZE = 128;
 // Quiet-period flush — if the buffer hasn't filled within this window,
 // emit it anyway so a single-observation insert doesn't sit forever.
-// 50ms is short enough to be invisible to operators but long enough
-// to gather a useful batch during bursty inserts.
-const EMBED_BATCH_QUIET_MS = 50;
+//
+// W25-1 T4: raised from 50ms → 200ms. With EMBED_BATCH_SIZE=128 and
+// observed bulk-ingest cadence ~0.57ms/insert, buffer fills in ~73ms.
+// The old 50ms timer fired BEFORE fill, producing a steady stream of
+// ~88-element partial batches (10k inserts → ~113 batches instead of
+// the intended ~78). 200ms gives the buffer headroom to fill on the
+// bulk path while still bounding sparse single-insert latency under
+// quarter-second.
+const EMBED_BATCH_QUIET_MS = 200;
 
 export class HybridStorageBackend implements StorageBackend {
   private readonly sqlite: SQLiteStorageBackend;
@@ -182,13 +196,14 @@ export class HybridStorageBackend implements StorageBackend {
         // inline batch when CONTINUUM_EMBED_WORKERS=0.
         const vectors = await embedBatchParallel(batch.map(o => o.content));
         const db = await this.getVectorDb();
-        // RuVector's bulk-insert API is per-call insert today; batching
-        // the embed forward pass is the dominant cost, so this still
-        // wins. If RuVector adds db.insertMany later, swap here.
-        await Promise.all(
+        // W25-1 T6 — RuVector exposes insertBatch (single native call for
+        // the whole batch), much faster than Promise.all of per-vector
+        // inserts (each of which crossed the Node↔native boundary and
+        // contended on RuVector's internal write path).
+        await db.insertBatch(
           vectors.map((vec, i) => {
             const o = batch[i]!;
-            return db.insert({
+            return {
               id: o.id,
               vector: vec,
               metadata: {
@@ -196,7 +211,7 @@ export class HybridStorageBackend implements StorageBackend {
                 type: o.type,
                 timestamp: o.timestamp,
               },
-            });
+            };
           }),
         );
       } catch (err) {
@@ -448,12 +463,11 @@ export class HybridStorageBackend implements StorageBackend {
         );
         // Embed the batch through the worker pool (W23-1 Path B).
         const vectors = await embedBatchParallel(observations.map(o => o.content));
-        // Insert each. RuVector's insert API is per-call; the WIN from
-        // batching is the embedder forward pass, which already happened.
-        await Promise.all(
+        // W25-1 T6 — single insertBatch call (see ingestion path).
+        await db.insertBatch(
           vectors.map((vec, idx) => {
             const o = observations[idx]!;
-            return db.insert({
+            return {
               id: o.id,
               vector: vec,
               metadata: {
@@ -461,7 +475,7 @@ export class HybridStorageBackend implements StorageBackend {
                 type: o.type,
                 timestamp: o.timestamp,
               },
-            });
+            };
           }),
         );
         rebuilt += observations.length;
