@@ -17,11 +17,17 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
   (snapshot `e3bd67a4`, 34/34 verify-green). V1.1 HTTP Polish —
   OSS/Docker Baseline. TLS + JWT + supervision + container hardening
   + #18 FTS5 canary fixture. All 5 deliverables shipped.
-- [`SPRINT-2026-W25.md`](./SPRINT-2026-W25.md) — **current sprint**
-  (2026-06-26 → 2026-07-03): single-objective throughput sprint —
-  push 10k Observations through V0.5 ingestion in <60s without
-  regressing recall@5 ≥0.85 or p95 <50ms. 8 tunable knobs T1-T8
-  enumerated with risk:impact order.
+- [`SPRINT-2026-W25.md`](./SPRINT-2026-W25.md) — **closed** 2026-06-05
+  (snapshot `83faa040`, 35/35 verify-green). Single-objective
+  throughput sprint. Median 53.4s · 0.98 recall · 12-19ms p95. Two
+  knobs closed the gap: T1 (EMBED_BATCH_SIZE 32→128) + T6 (RuVector
+  `insertBatch`). T7 (quantized) discovered already-applied — P4 catch.
+- [`SPRINT-2026-W26.md`](./SPRINT-2026-W26.md) — **current sprint**
+  (2026-07-03 → 2026-07-17): V1 swarm aggregation. Replace linear
+  ingestion in the 3 existing adapters with ephemeral ruv-swarm agents
+  per source-cognitive topology (mesh/ring/hierarchical) +
+  Byzantine-majority voting at the CONTINUUM aggregation layer + strict
+  verify-then-dissolve. Journey 3 zero-config preserved.
 - [`UX-JOURNEYS.md`](./UX-JOURNEYS.md) — the three customer journeys
   (AI Developer, Business Operator, Solo Developer) with tier labels
   per component. ~100% real for Journey 3, ~50% for Journey 1,
