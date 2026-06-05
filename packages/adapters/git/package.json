@@ -14,7 +14,8 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@continuum/core": "0.0.1"
+    "@continuum/core": "0.0.1",
+    "ruv-swarm": "^1.0.20"
   },
   "license": "Apache-2.0",
   "author": "Riaan Kleynhans <riaan@number7even.com>",
