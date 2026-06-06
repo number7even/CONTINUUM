@@ -64,3 +64,14 @@ export {
   type ParseStateMdResult,
   type ParseStateMdToCheckpointResult,
 } from './state-md.js';
+
+// — Byzantine-majority voting primitive (W26-4 — for adapter swarms that
+// produce divergent observations). NOT used by adapter-git (deterministic);
+// used by adapter-docs / adapter-export where excerpt boundaries diverge.
+export {
+  byzantineVote,
+  type BFTCandidate,
+  type BFTWinner,
+  type BFTDissent,
+  type BFTVoteResult,
+} from './byzantine-vote.js';

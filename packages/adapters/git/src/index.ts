@@ -38,7 +38,8 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { openStorage, type StorageBackend } from '@continuum/core';
+import { openStorage } from '@continuum/core';
+import { ingestViaRingSwarm, probePostTerminate, type ParsedCommit } from './swarm.js';
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 
@@ -88,14 +89,8 @@ function parseArgs(argv: string[]): Args {
 // inside %b, so multi-line commit messages survive. Field separator is the
 // ASCII Unit Separator (\x1f) — guaranteed never to appear in commit text.
 
-interface ParsedCommit {
-  sha: string;
-  isoDate: string;
-  authorName: string;
-  authorEmail: string;
-  subject: string;
-  body: string;
-}
+// ParsedCommit type is re-exported from ./swarm.ts so the swarm-ingest
+// module and this file agree on shape.
 
 function readCommits(repoDir: string, maxCount: number): ParsedCommit[] {
   const buf = execFileSync(
@@ -140,49 +135,11 @@ function readCommits(repoDir: string, maxCount: number): ParsedCommit[] {
   return commits;
 }
 
-// ── Per-commit upsert ────────────────────────────────────────────────────────
-
-function commitToContent(c: ParsedCommit): string {
-  const body = c.body.trim();
-  return body ? `${c.subject}\n\n${body}` : c.subject;
-}
-
-function ingestCommit(
-  storage: StorageBackend,
-  c: ParsedCommit,
-  sourceId: string,
-  verbose: boolean,
-): { upserted: boolean; dropped: boolean } {
-  const content = commitToContent(c);
-  if (content.trim().length < 1) {
-    return { upserted: false, dropped: false };
-  }
-
-  const result = storage.upsertObservation({
-    id: c.sha,
-    sourceId,
-    type: 'commit',
-    content,
-    timestamp: c.isoDate,
-    refs: [],
-    metadata: {
-      adapter: '@continuum/adapter-git',
-      sha: c.sha,
-      author: c.authorName,
-      email: c.authorEmail,
-    },
-  });
-
-  if (result === null) {
-    if (verbose) console.log(`[git] dropped (privacy filter): ${c.sha.slice(0, 8)} ${c.subject}`);
-    return { upserted: false, dropped: true };
-  }
-
-  if (verbose) {
-    console.log(`[git] upsert ${c.sha.slice(0, 8)} ${c.subject}`);
-  }
-  return { upserted: true, dropped: false };
-}
+// ── Per-commit normalisation moved into ./swarm.ts (the swarm-ingest path).
+// Linear ingestCommit removed in W26-3; ingestViaRingSwarm now owns the
+// shard-and-upsert work. The behaviour is observably identical for a
+// single-shard run (one agent, one ring node), which keeps the existing
+// idempotent-SHA contract intact.
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -220,15 +177,21 @@ async function main() {
   const commits = readCommits(args.repoDir, args.maxCount);
   console.log(`[git] read ${commits.length} commit${commits.length === 1 ? '' : 's'} from git log`);
 
-  let upserted = 0;
-  let dropped = 0;
-  for (const c of commits) {
-    const r = ingestCommit(storage, c, sourceId, args.verbose);
-    if (r.upserted) upserted++;
-    if (r.dropped) dropped++;
-  }
+  // W26-3 — ephemeral ring-topology swarm. Spawns agents, shards
+  // chronologically, processes in parallel, commits via the
+  // W25-hardened storage path, dissolves on return (verify-then-
+  // dissolve guaranteed in a try/finally inside ingestViaRingSwarm).
+  const result = await ingestViaRingSwarm(commits, {
+    storage,
+    sourceId,
+    maxAgents: 3,
+    verbose: args.verbose,
+  });
 
-  console.log(`[git] sync complete: scanned=${commits.length} upserted=${upserted} dropped=${dropped}`);
+  console.log(
+    `[git] swarm=${result.swarmId} agents=${result.agentsSpawned} ` +
+      `shards=${result.shardsProcessed} upserted=${result.upserted} dropped=${result.dropped}`,
+  );
 
   storage.close();
 }
