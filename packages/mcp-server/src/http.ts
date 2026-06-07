@@ -43,7 +43,14 @@ import { buildServer, type ServerHandle } from './server.js';
 import { createAuthMiddleware, resolveAuthConfig } from './auth.js';
 
 const PORT = Number(process.env.CONTINUUM_HTTP_PORT ?? 7878);
-const DEFAULT_PROJECT = process.env.CONTINUUM_PROJECT_ID ?? 'default';
+
+// W27-4 — the tenant identifier used for the SERVER-SIDE readiness probe
+// (NOT for routing client requests). The readiness probe verifies the
+// storage subsystem can open SOMETHING — SQLite + ruvector + embedder all
+// warm — before the orchestrator routes traffic. It is intentionally
+// distinct from any client-supplied tenantId. Per-request routing comes
+// from req.continuum.tenantId (set by the auth middleware, W27-3).
+const READINESS_PROBE_TENANT = process.env.CONTINUUM_PROJECT_ID ?? 'default';
 
 // Resolve auth at startup so the server refuses to launch in an undecided
 // state. Throws if neither CONTINUUM_HTTP_TOKEN (shared-secret) NOR
@@ -74,19 +81,28 @@ interface Session {
 }
 const sessions = new Map<string, Session>();
 
-function resolveProjectId(req: Request): string {
-  const hdr = req.headers['x-continuum-project'];
-  if (typeof hdr === 'string' && hdr.trim()) return hdr.trim();
-  const q = req.query.project;
-  if (typeof q === 'string' && q.trim()) return q.trim();
-  return DEFAULT_PROJECT;
+// W27-4 — tenant resolution from the authenticated request. The auth
+// middleware (W27-3) already validated the JWT and X-Continuum-Project
+// header and set req.continuum.tenantId on every request that reaches
+// this handler. If it's missing here, the middleware chain has a hole —
+// fail closed rather than silently routing to a default tenant.
+function resolveTenantOrReject(req: Request, res: Response): string | null {
+  const tenantId = req.continuum?.tenantId;
+  if (typeof tenantId !== 'string' || tenantId.length === 0) {
+    res.status(400).json({
+      error: 'tenant not resolved — auth middleware did not set req.continuum.tenantId',
+    });
+    return null;
+  }
+  return tenantId;
 }
 
 // ── /sse  open a Server-Sent Events stream ───────────────────────────────────
 
 app.get('/sse', async (req: Request, res: Response) => {
-  const projectId = resolveProjectId(req);
-  const handle = buildServer(projectId);
+  const tenantId = resolveTenantOrReject(req, res);
+  if (tenantId === null) return; // 400 already written
+  const handle = buildServer(tenantId);
   // SSE transport writes its own headers + keep-alive; we hand it `res`.
   const transport = new SSEServerTransport('/messages', res);
   sessions.set(transport.sessionId, { transport, handle });
@@ -102,7 +118,7 @@ app.get('/sse', async (req: Request, res: Response) => {
   try {
     await handle.server.connect(transport);
     process.stderr.write(
-      `[continuum-http] sse session=${transport.sessionId.slice(0, 8)} project=${projectId}\n`,
+      `[continuum-http] sse session=${transport.sessionId.slice(0, 8)} tenant=${tenantId}\n`,
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -177,7 +193,7 @@ async function probeReadiness(): Promise<void> {
   readiness.errors = [];
   let probe: ReturnType<typeof openStorage> | null = null;
   try {
-    probe = openStorage(DEFAULT_PROJECT);
+    probe = openStorage(READINESS_PROBE_TENANT);
     // Cheap SQLite read — confirms file accessible + WAL mode OK.
     probe.listSnapshots(1);
     readiness.storage.sqlite_ok = true;
@@ -263,7 +279,7 @@ const httpServer = app.listen(PORT, () => {
       ? `Bearer[shared-secret,len=${authConfig.token.length}]`
       : `Bearer[jwt,iss=${authConfig.issuer},aud=${authConfig.audience}]`;
   process.stderr.write(
-    `[continuum-http] listening on :${PORT}  defaultProject=${DEFAULT_PROJECT}  auth=${authDesc}\n`,
+    `[continuum-http] listening on :${PORT}  readinessTenant=${READINESS_PROBE_TENANT}  auth=${authDesc}\n`,
   );
 });
 
