@@ -59,7 +59,11 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { openStorage, type StorageBackend } from '@continuum/core';
+import {
+  openStorage,
+  sanitiseTenantId,
+  type StorageBackend,
+} from '@continuum/core';
 
 import { TOOL_DEFINITIONS, dispatchTool } from './tools/index.js';
 import { RESOURCE_DEFINITIONS, readResource } from './resources/index.js';
@@ -68,18 +72,45 @@ import { PROMPTS, findPrompt } from './prompts/index.js';
 /** Handle returned by buildServer — pair the Server with its lifecycle. */
 export interface ServerHandle {
   server: Server;
-  projectId: string;
+  /** The tenant the server was bound to (after sanitisation). */
+  tenantId: string;
   storage: StorageBackend;
   close(): void;
 }
 
 /**
- * Construct a configured Continuum MCP Server bound to a per-call storage
- * instance. Caller is responsible for connecting it to a transport and
- * invoking `handle.close()` on shutdown.
+ * Construct a configured Continuum MCP Server bound to a per-call,
+ * TENANT-SCOPED storage instance.
+ *
+ * W27-2: the parameter semantically widens from "project name" to
+ * "tenant identifier." `openStorage(tenantId)` sanitises at the boundary
+ * — adversarial input throws here (caller maps to HTTP 400 on the
+ * HTTP/SSE path, exit 1 on CLI). Different `tenantId` arguments produce
+ * different `Server` instances bound to different filesystem paths;
+ * nothing is shared across tenants except read-only static config
+ * (tool definitions, prompt registry, resource registry).
+ *
+ * **Architectural invariant (W27-2 static grep gate):** no file under
+ * `packages/mcp-server/src/tools/` may call `openStorage` directly.
+ * Every tool handler reaches storage through the `ServerHandle.storage`
+ * passed in by this factory. Bypassing this rule means a tool could
+ * read/write a different tenant's data than the one the caller
+ * authenticated for — exactly the leak Path A is built to prevent.
+ *
+ * @throws Error('continuum: invalid tenant identifier') if the input
+ *         fails sanitiseTenantId.
  */
-export function buildServer(projectId: string): ServerHandle {
-  const storage: StorageBackend = openStorage(projectId);
+export function buildServer(tenantId: string): ServerHandle {
+  // Sanitise ONCE here so we can expose the canonical identifier on
+  // ServerHandle.tenantId (callers downstream — logging, request
+  // context, audit trails — see the same string that became the
+  // filesystem segment). openStorage also sanitises, so a bypass at
+  // either layer still throws. P2 multi-proof discipline.
+  const canonicalTenantId = sanitiseTenantId(tenantId);
+  if (canonicalTenantId === null) {
+    throw new Error('continuum: invalid tenant identifier');
+  }
+  const storage: StorageBackend = openStorage(canonicalTenantId);
 
   const server = new Server(
     {
@@ -131,7 +162,7 @@ export function buildServer(projectId: string): ServerHandle {
     // discriminated union with optional fields (_meta, task) that we don't
     // populate; our ResourceContents shape matches the contents-only branch
     // structurally but TS can't narrow the union for us.
-    const result = await readResource(request.params.uri, storage, projectId);
+    const result = await readResource(request.params.uri, storage, canonicalTenantId);
     return result as unknown as { contents: Array<{ uri: string; mimeType: string; text: string }> };
   });
 
@@ -161,7 +192,7 @@ export function buildServer(projectId: string): ServerHandle {
   // (./index.ts wires stdio; ./http.ts wires HTTP + SSE).
   return {
     server,
-    projectId,
+    tenantId: canonicalTenantId,
     storage,
     close() {
       storage.close();

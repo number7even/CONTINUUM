@@ -26,12 +26,37 @@
 import type { StorageBackend } from './storage.js';
 import { SQLiteStorageBackend } from './storage-sqlite.js';
 import { HybridStorageBackend } from './storage-hybrid.js';
+import { sanitiseTenantId } from './tenant.js';
 
-export function openStorage(projectId: string): StorageBackend {
+/**
+ * Open a tenant-scoped StorageBackend.
+ *
+ * The single public entry point for choosing the V0 vs V0.5 storage
+ * backend at runtime. As of W27-1 (V1.2 multi-tenant), the input is
+ * SANITISED at the boundary — adversarial input (path traversal, null
+ * bytes, control characters, etc) THROWS rather than returning a
+ * backend bound to a malformed filesystem path.
+ *
+ * Parameter semantics widened in W27-1: `tenantId` was previously
+ * called `projectId` and treated as "project name" — same routing
+ * mechanism, broader interpretation as "the verified tenant or local
+ * workspace identifier." Existing single-tenant callers passing
+ * lowercase alphanumeric project names (e.g. `vc-hospitality`,
+ * `continuum`) continue to work unchanged.
+ *
+ * @throws Error('continuum: invalid tenant identifier') if sanitisation
+ *         fails. Callers in the auth-validated HTTP/SSE chain should
+ *         map this to HTTP 400; CLI/stdio callers map to exit 1.
+ */
+export function openStorage(tenantId: string): StorageBackend {
+  const sanitised = sanitiseTenantId(tenantId);
+  if (sanitised === null) {
+    throw new Error('continuum: invalid tenant identifier');
+  }
   const backend = (process.env.CONTINUUM_STORAGE_BACKEND ?? 'hybrid').toLowerCase();
   if (backend === 'sqlite') {
-    return new SQLiteStorageBackend(projectId);
+    return new SQLiteStorageBackend(sanitised);
   }
   // hybrid (default) + 'ruvector' alias both → HybridStorageBackend
-  return new HybridStorageBackend(projectId);
+  return new HybridStorageBackend(sanitised);
 }

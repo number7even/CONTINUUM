@@ -75,3 +75,9 @@ export {
   type BFTDissent,
   type BFTVoteResult,
 } from './byzantine-vote.js';
+
+// — Multi-tenant filesystem-isolation gate (W27-1). Every untrusted
+// string that becomes a filesystem segment passes through these two
+// pure functions. The HTTP/SSE auth middleware (W27-3) maps `null` to
+// HTTP 400; stdio resolution falls back to CONTINUUM_PROJECT_ID env.
+export { sanitiseTenantId, tenantDataDir } from './tenant.js';
