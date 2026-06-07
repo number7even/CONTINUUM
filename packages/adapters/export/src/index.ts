@@ -31,6 +31,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
 import chokidar from 'chokidar';
 import {
   openStorage,
@@ -38,6 +39,7 @@ import {
   type Observation,
 } from '@continuum/core';
 import { parseJsonlLine, turnToObservation } from './parser.js';
+import { ingestViaHierarchicalSwarm, type TurnInput } from './swarm.js';
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 
@@ -91,6 +93,24 @@ function findClaudeSessionDir(claudeRoot: string, projectName: string): string |
 
 const offsets = new Map<string, number>();
 
+/** Derive a stable per-turn ID. Used for BFT inputId so multiple agents'
+ *  candidates for the same turn group together. The W25 storage path
+ *  generates its own UUID for the observation row — this is the BFT
+ *  vote key only, not the row ID. */
+function turnId(fileBasename: string, observation: Omit<Observation, 'id'>): string {
+  const h = createHash('sha256');
+  h.update(fileBasename);
+  h.update('\x1f');
+  h.update(observation.timestamp);
+  h.update('\x1f');
+  h.update(observation.content.slice(0, 256));
+  return h.digest('hex').slice(0, 16);
+}
+
+/** Linear file processor — the watch-mode and the offset bookkeeping path.
+ *  Used directly for live append (one-turn-at-a-time spawning a swarm is
+ *  absurd overhead). Backfill takes a different path that calls
+ *  collectBackfillTurns + ingestViaHierarchicalSwarm. */
 function processFile(
   storage: StorageBackend,
   filePath: string,
@@ -185,17 +205,53 @@ async function main() {
   console.log(`[export] storage=${storage.dataLocation()}`);
   console.log(`[export] mode=${args.mode}`);
 
-  // Initial backfill pass — read every existing .jsonl file from offset 0.
+  // W26-3-export — backfill path goes through the hierarchical-topology
+  // swarm. Watch mode (below) stays linear since spawning a swarm per
+  // live turn is absurd overhead.
   const initialFiles = readdirSync(sessionDir).filter(f => f.endsWith('.jsonl'));
-  let totalAdded = 0;
-  let totalDropped = 0;
+  const turns: TurnInput[] = [];
   for (const f of initialFiles) {
     const full = join(sessionDir, f);
-    const { added, dropped } = processFile(storage, full, sourceId, args.verbose);
-    totalAdded += added;
-    totalDropped += dropped;
+    let bytes: Buffer;
+    try {
+      bytes = readFileSync(full);
+    } catch {
+      continue;
+    }
+    const size = bytes.length;
+    offsets.set(full, size); // mark whole-file consumed for the watcher
+    const fileMtime = new Date(statSync(full).mtimeMs).toISOString();
+    const lines = bytes.toString('utf-8').split('\n').filter(l => l.trim());
+    for (const line of lines) {
+      const turn = parseJsonlLine(line, fileMtime);
+      if (!turn) continue;
+      const observation = turnToObservation(turn, sourceId);
+      const body = observation.content.trim();
+      turns.push({
+        id: turnId(f, observation),
+        fileBasename: f,
+        observation,
+        features: {
+          bodyLength: body.length,
+          isToolAcknowledgement: /^(ok|done|sure|got it)\.?$/i.test(body),
+          isMetaOnly: body.length < 4,
+        },
+      });
+    }
   }
-  console.log(`[export] backfill complete: ${totalAdded} observation${totalAdded === 1 ? '' : 's'} added from ${initialFiles.length} file${initialFiles.length === 1 ? '' : 's'}${totalDropped > 0 ? ` (${totalDropped} dropped by privacy filter)` : ''}`);
+
+  const result = await ingestViaHierarchicalSwarm(turns, {
+    storage,
+    sourceId,
+    maxAgents: 4,
+    verbose: args.verbose,
+  });
+  console.log(
+    `[export] backfill complete via swarm=${result.swarmId} agents=${result.agentsSpawned} ` +
+      `shards=${result.shardsProcessed} turns=${result.turnsScanned} upserted=${result.upserted} ` +
+      `voteFiltered=${result.voteFiltered} ` +
+      `BFT(unanimous=${result.unanimousIngest}, voted=${result.votedIngest}, noQuorum=${result.noQuorumIngest})`,
+  );
 
   if (args.mode === 'once') {
     storage.close();

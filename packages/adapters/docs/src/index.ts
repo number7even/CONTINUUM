@@ -35,7 +35,8 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { openStorage, type StorageBackend } from '@continuum/core';
+import { openStorage } from '@continuum/core';
+import { ingestViaMeshSwarm, type DocFile } from './swarm.js';
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 
@@ -106,58 +107,26 @@ function* walkMarkdownFiles(dir: string): Generator<string> {
   }
 }
 
-// ── Single-file ingest ───────────────────────────────────────────────────────
+// ── Per-file read (the swarm consumes the readied list) ─────────────────────
 
-function ingestFile(
-  storage: StorageBackend,
-  filePath: string,
-  docsDir: string,
-  sourceId: string,
-  verbose: boolean,
-): { upserted: boolean; dropped: boolean } {
+function readDocFile(filePath: string, docsDir: string): DocFile | null {
   let content: string;
   let mtime: string;
   try {
     content = readFileSync(filePath, 'utf-8');
     mtime = new Date(statSync(filePath).mtimeMs).toISOString();
-  } catch (err) {
-    if (verbose) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[docs] skip ${filePath}: ${msg}`);
-    }
-    return { upserted: false, dropped: false };
+  } catch {
+    return null;
   }
-
-  if (content.trim().length < 4) {
-    return { upserted: false, dropped: false };
-  }
-
-  const relativePath = relative(docsDir, filePath);
-  const id = pathToObservationId(relativePath);
-
-  const result = storage.upsertObservation({
-    id,
-    sourceId,
-    type: 'doc',
+  if (content.trim().length < 4) return null;
+  const relativePath = relative(docsDir, filePath).split(sep).join('/');
+  return {
+    absolutePath: filePath,
+    relativePath,
+    id: pathToObservationId(relativePath),
     content,
     timestamp: mtime,
-    refs: [],
-    metadata: {
-      adapter: '@continuum/adapter-docs',
-      path: relativePath.split(sep).join('/'),
-      bytes: content.length,
-    },
-  });
-
-  if (result === null) {
-    if (verbose) console.log(`[docs] dropped (privacy filter): ${relativePath}`);
-    return { upserted: false, dropped: true };
-  }
-
-  if (verbose) {
-    console.log(`[docs] upsert ${id.slice(0, 8)} ${relativePath} (${content.length} bytes)`);
-  }
-  return { upserted: true, dropped: false };
+  };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -184,19 +153,29 @@ async function main() {
   console.log(`[docs] storage=${storage.dataLocation()}`);
   console.log(`[docs] mode=${args.mode}`);
 
-  let scanned = 0;
-  let upserted = 0;
-  let dropped = 0;
-
+  // W26-2 — collect file list, then hand to the mesh-topology swarm.
+  // The swarm spawns N peer agents, runs each agent's title-extraction
+  // strategy in parallel, Byzantine-votes on the subjective title,
+  // upserts the canonical observation, and dissolves.
+  const docFiles: DocFile[] = [];
   for (const filePath of walkMarkdownFiles(args.docsDir)) {
-    scanned++;
-    const result = ingestFile(storage, filePath, args.docsDir, sourceId, args.verbose);
-    if (result.upserted) upserted++;
-    if (result.dropped) dropped++;
+    const file = readDocFile(filePath, args.docsDir);
+    if (file) docFiles.push(file);
   }
+  console.log(`[docs] scanned ${docFiles.length} markdown file${docFiles.length === 1 ? '' : 's'}`);
+
+  const result = await ingestViaMeshSwarm(docFiles, {
+    storage,
+    sourceId,
+    docsDir: args.docsDir,
+    maxAgents: 3,
+    verbose: args.verbose,
+  });
 
   console.log(
-    `[docs] sync complete: scanned=${scanned} upserted=${upserted} dropped=${dropped}`,
+    `[docs] swarm=${result.swarmId} agents=${result.agentsSpawned} shards=${result.shardsProcessed} ` +
+      `upserted=${result.upserted} dropped=${result.dropped} ` +
+      `BFT(unanimous=${result.unanimousTitles}, voted=${result.votedTitles}, noQuorum=${result.noQuorumTitles})`,
   );
 
   storage.close();
