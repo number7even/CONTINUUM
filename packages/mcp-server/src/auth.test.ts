@@ -44,13 +44,23 @@ interface MockRes {
   json(body: unknown): MockRes;
 }
 
-function mockReq(opts: { authorization?: string; path?: string } = {}): {
+function mockReq(opts: {
+  authorization?: string;
+  path?: string;
+  /** Extra headers, e.g. { 'x-continuum-project': 'alpha' }. Express
+   *  normalises header names to lowercase — the middleware reads them
+   *  in lowercase form, so tests should pass them that way too. */
+  headers?: Record<string, string>;
+} = {}): {
   headers: Record<string, string>;
   path: string;
   user?: unknown;
+  continuum?: unknown;
 } {
+  const headers: Record<string, string> = { ...(opts.headers ?? {}) };
+  if (opts.authorization) headers.authorization = opts.authorization;
   return {
-    headers: opts.authorization ? { authorization: opts.authorization } : {},
+    headers,
     path: opts.path ?? '/sse',
   };
 }
@@ -381,4 +391,275 @@ test('jwt: custom tenant claim extracts to req.user.tenant', async () => {
   } finally {
     await issuer.close();
   }
+});
+
+// ── W27-3: tenant routing via req.continuum ───────────────────────────────────
+//
+// Seven new cases (16 existing → 23 total) covering:
+//   1. JWT claim + matching X-Continuum-Project header → req.continuum set
+//   2. JWT claim + mismatched header → 403 with structured body
+//   3. JWT claim + no header → req.continuum.tenantId = claim
+//   4. JWT mode with no tenant claim → 400
+//   5. JWT claim contains '../' (path traversal) → 400
+//   6. Shared-secret + CONTINUUM_PROJECT_ID set → req.continuum.tenantId = env
+//   7. stdio bypass — structural assertion that the stdio entry point
+//      does NOT import the auth module (mechanical proof that
+//      CONTINUUM_PROJECT_ID stays the workspace identifier on the
+//      Journey 3 zero-config path).
+//
+// Tests preserve req.user behavior — the existing 16 cases still pass.
+
+test('W27-3: jwt mode + matching X-Continuum-Project header → req.continuum.tenantId set', async () => {
+  const issuer = await startMockIssuer();
+  try {
+    const token = await issueToken(
+      issuer.privateKey,
+      issuer.issuer,
+      'continuum-api',
+      { tenant: 'alpha' },
+    );
+    const req = mockReq({
+      authorization: `Bearer ${token}`,
+      headers: { 'x-continuum-project': 'alpha' },
+    });
+    const { res, nextCalled } = await runMiddleware(
+      {
+        mode: 'jwt',
+        issuer: issuer.issuer,
+        audience: 'continuum-api',
+        tenantClaim: 'tenant',
+      },
+      req,
+    );
+    assert.equal(res.statusCode, null);
+    assert.equal(nextCalled, true);
+    const ctx = req.continuum as { tenantId: string };
+    assert.equal(ctx.tenantId, 'alpha');
+  } finally {
+    await issuer.close();
+  }
+});
+
+test('W27-3: jwt mode + matching header (different case) still passes — sanitiser case-folds', async () => {
+  // Sub-case of #1: case-folding through sanitiseTenantId means
+  // header='ALPHA' and claim='alpha' compare EQUAL after sanitisation.
+  // Prevents bypass where attacker tweaks case to evade the gate.
+  const issuer = await startMockIssuer();
+  try {
+    const token = await issueToken(
+      issuer.privateKey,
+      issuer.issuer,
+      'continuum-api',
+      { tenant: 'alpha' },
+    );
+    const req = mockReq({
+      authorization: `Bearer ${token}`,
+      headers: { 'x-continuum-project': 'ALPHA' },
+    });
+    const { res, nextCalled } = await runMiddleware(
+      {
+        mode: 'jwt',
+        issuer: issuer.issuer,
+        audience: 'continuum-api',
+        tenantClaim: 'tenant',
+      },
+      req,
+    );
+    assert.equal(res.statusCode, null, `expected pass, got ${res.statusCode} ${JSON.stringify(res.body)}`);
+    assert.equal(nextCalled, true);
+    const ctx = req.continuum as { tenantId: string };
+    assert.equal(ctx.tenantId, 'alpha');
+  } finally {
+    await issuer.close();
+  }
+});
+
+test('W27-3: jwt mode + MISMATCHED X-Continuum-Project header → 403 structured body', async () => {
+  const issuer = await startMockIssuer();
+  try {
+    const token = await issueToken(
+      issuer.privateKey,
+      issuer.issuer,
+      'continuum-api',
+      { tenant: 'alpha' },
+    );
+    const req = mockReq({
+      authorization: `Bearer ${token}`,
+      headers: { 'x-continuum-project': 'bravo' },
+    });
+    const { res, nextCalled } = await runMiddleware(
+      {
+        mode: 'jwt',
+        issuer: issuer.issuer,
+        audience: 'continuum-api',
+        tenantClaim: 'tenant',
+      },
+      req,
+    );
+    assert.equal(res.statusCode, 403);
+    assert.equal(nextCalled, false);
+    const body = res.body as {
+      error: string;
+      expected: string;
+      asserted: string;
+    };
+    assert.equal(body.error, 'tenant-claim-mismatch');
+    assert.equal(body.expected, 'alpha');
+    assert.equal(body.asserted, 'bravo');
+    // Crucially: req.continuum must NOT be set on a rejected request.
+    assert.equal(req.continuum, undefined);
+  } finally {
+    await issuer.close();
+  }
+});
+
+test('W27-3: jwt mode + valid claim + NO header → req.continuum.tenantId = claim', async () => {
+  const issuer = await startMockIssuer();
+  try {
+    const token = await issueToken(
+      issuer.privateKey,
+      issuer.issuer,
+      'continuum-api',
+      { tenant: 'alpha' },
+    );
+    const req = mockReq({ authorization: `Bearer ${token}` });
+    const { res, nextCalled } = await runMiddleware(
+      {
+        mode: 'jwt',
+        issuer: issuer.issuer,
+        audience: 'continuum-api',
+        tenantClaim: 'tenant',
+      },
+      req,
+    );
+    assert.equal(res.statusCode, null);
+    assert.equal(nextCalled, true);
+    const ctx = req.continuum as { tenantId: string };
+    assert.equal(ctx.tenantId, 'alpha');
+  } finally {
+    await issuer.close();
+  }
+});
+
+test('W27-3: jwt mode + token with NO tenant claim → 400', async () => {
+  const issuer = await startMockIssuer();
+  try {
+    // Issue a token where the tenant claim is explicitly empty/absent.
+    // SignJWT with no `tenant` claim — issueToken's default sets it,
+    // so we override with empty-string-coerced-to-undefined-shape.
+    const { SignJWT } = await import('jose');
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: 'RS256', kid: 'test-key-1' })
+      .setIssuer(issuer.issuer)
+      .setAudience('continuum-api')
+      .setSubject('user-noclaim')
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(issuer.privateKey);
+    const req = mockReq({ authorization: `Bearer ${token}` });
+    const { res, nextCalled } = await runMiddleware(
+      {
+        mode: 'jwt',
+        issuer: issuer.issuer,
+        audience: 'continuum-api',
+        tenantClaim: 'tenant',
+      },
+      req,
+    );
+    assert.equal(res.statusCode, 400);
+    assert.equal(nextCalled, false);
+    const body = res.body as { error: string };
+    assert.match(body.error, /tenant claim missing/);
+  } finally {
+    await issuer.close();
+  }
+});
+
+test('W27-3: jwt mode + claim contains "../" → 400 (sanitiseTenantId rejects)', async () => {
+  const issuer = await startMockIssuer();
+  try {
+    const token = await issueToken(
+      issuer.privateKey,
+      issuer.issuer,
+      'continuum-api',
+      { tenant: '../etc/passwd' },
+    );
+    const req = mockReq({ authorization: `Bearer ${token}` });
+    const { res, nextCalled } = await runMiddleware(
+      {
+        mode: 'jwt',
+        issuer: issuer.issuer,
+        audience: 'continuum-api',
+        tenantClaim: 'tenant',
+      },
+      req,
+    );
+    assert.equal(res.statusCode, 400);
+    assert.equal(nextCalled, false);
+    const body = res.body as { error: string };
+    assert.match(body.error, /tenant claim invalid/);
+    // req.continuum stays undefined on a rejected request.
+    assert.equal(req.continuum, undefined);
+  } finally {
+    await issuer.close();
+  }
+});
+
+test('W27-3: shared-secret mode + CONTINUUM_PROJECT_ID set → req.continuum.tenantId = env', async () => {
+  const original = process.env.CONTINUUM_PROJECT_ID;
+  process.env.CONTINUUM_PROJECT_ID = 'shared-tenant-x';
+  try {
+    const { res, nextCalled } = await runMiddleware(
+      { mode: 'shared-secret', token: 'topsecret' },
+      mockReq({ authorization: 'Bearer topsecret' }),
+    );
+    assert.equal(nextCalled, true);
+    assert.equal(res.statusCode, null);
+    // The test runMiddleware doesn't return req — re-check via direct
+    // middleware invocation so we can inspect req.continuum.
+    const req = mockReq({ authorization: 'Bearer topsecret' });
+    const middleware = createAuthMiddleware({ mode: 'shared-secret', token: 'topsecret' });
+    let n = false;
+    await (middleware as unknown as (r: unknown, s: unknown, next: () => void) => Promise<void> | void)(
+      req,
+      mockRes(),
+      () => {
+        n = true;
+      },
+    );
+    assert.equal(n, true);
+    const ctx = req.continuum as { tenantId: string };
+    assert.equal(ctx.tenantId, 'shared-tenant-x');
+  } finally {
+    if (original === undefined) delete process.env.CONTINUUM_PROJECT_ID;
+    else process.env.CONTINUUM_PROJECT_ID = original;
+  }
+});
+
+// ── stdio bypass — Journey 3 zero-config preservation ─────────────────────────
+//
+// Mechanical proof, NOT honor system. The stdio entry point
+// (packages/mcp-server/src/index.ts) MUST NOT import the auth module.
+// If it did, future drift could subject the local CLI workflow to
+// JWT verification — breaking the Journey 3 promise.
+//
+// Read the SOURCE .ts (not the dist .js) so the rule catches drift
+// before it lands in dist.
+
+test('W27-3 stdio bypass: src/index.ts does NOT import auth module', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { resolve } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const __dirname = fileURLToPath(new URL('.', import.meta.url));
+  const stdioEntry = resolve(__dirname, '..', 'src', 'index.ts');
+  const body = readFileSync(stdioEntry, 'utf-8');
+  // No `from './auth.js'` (or '.auth' / '.auth.ts'), no
+  // `createAuthMiddleware`, no `resolveAuthConfig`.
+  assert.doesNotMatch(
+    body,
+    /\bfrom\s+['"]\.\/auth(?:\.js|\.ts)?['"]/,
+    'src/index.ts (stdio) must not import auth — Journey 3 zero-config bypass',
+  );
+  assert.doesNotMatch(body, /createAuthMiddleware/);
+  assert.doesNotMatch(body, /resolveAuthConfig/);
 });

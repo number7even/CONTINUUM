@@ -40,6 +40,7 @@
  */
 import type { Request, RequestHandler } from 'express';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { sanitiseTenantId } from '@continuum/core';
 
 // ── Public types ───────────────────────────────────────────────────────────
 
@@ -68,13 +69,34 @@ export interface AuthenticatedUser {
   claims: Record<string, unknown>;
 }
 
-// Augment Express's Request so `req.user` is typed in handlers + tests.
+/**
+ * Per-request CONTINUUM routing context attached by the auth middleware
+ * (W27-3). Downstream code reaches the storage backend via
+ * `buildServer(req.continuum.tenantId)` — never via `process.env` or a
+ * raw header. The tenantId here is ALWAYS the sanitised, canonical
+ * form, so the value that flows into the filesystem path is the same
+ * value an audit log records.
+ */
+export interface ContinuumContext {
+  /** Sanitised tenant identifier. Always matches sanitiseTenantId(input). */
+  tenantId: string;
+}
+
+// Augment Express's Request so `req.user` + `req.continuum` are typed in
+// handlers + tests.
 declare module 'express-serve-static-core' {
   // eslint-disable-next-line @typescript-eslint/no-shadow
   interface Request {
     user?: AuthenticatedUser;
+    continuum?: ContinuumContext;
   }
 }
+
+/** Header carrying the asserted tenant from the client side. Compared
+ *  against the verified JWT claim in JWT mode; used as a hint in
+ *  shared-secret mode when no env default is set. Express normalises
+ *  header names to lowercase. */
+const TENANT_HEADER = 'x-continuum-project';
 
 // ── Config resolution from env ─────────────────────────────────────────────
 
@@ -136,6 +158,40 @@ function createSharedSecretMiddleware(config: SharedSecretConfig): RequestHandle
       res.status(401).json({ error: 'unauthorized' });
       return;
     }
+    // W27-3 shared-secret tenant resolution. Operator chooses between
+    // env-default (engine bound to one tenant via CONTINUUM_PROJECT_ID
+    // at startup) and per-request header (operator allows clients to
+    // assert their workspace by leaving the env unset). When env IS
+    // set, it WINS — most restrictive interpretation; legacy single-
+    // tenant OSS deploys keep working unchanged.
+    const envProject = process.env.CONTINUUM_PROJECT_ID;
+    if (envProject !== undefined && envProject.trim() !== '') {
+      const sanitised = sanitiseTenantId(envProject);
+      if (sanitised === null) {
+        res.status(500).json({
+          error: 'server misconfigured: CONTINUUM_PROJECT_ID is not a valid tenant id',
+        });
+        return;
+      }
+      (req as Request).continuum = { tenantId: sanitised };
+      next();
+      return;
+    }
+    const headerProject = req.headers[TENANT_HEADER];
+    if (typeof headerProject === 'string' && headerProject.trim() !== '') {
+      const sanitised = sanitiseTenantId(headerProject);
+      if (sanitised === null) {
+        res.status(400).json({
+          error: 'invalid X-Continuum-Project header',
+          asserted: headerProject,
+        });
+        return;
+      }
+      (req as Request).continuum = { tenantId: sanitised };
+    }
+    // No env, no header → req.continuum stays undefined. Backwards-
+    // compatible with the V1 single-tenant workflow where the server
+    // process was implicitly bound to one workspace.
     next();
   };
 }
@@ -180,6 +236,40 @@ function createJwtMiddleware(config: JwtConfig): RequestHandler {
         tenant,
         claims: payload as Record<string, unknown>,
       };
+      // W27-3 — tenant routing for JWT mode.
+      //
+      //   1. The claim MUST be present and sanitisable. Tokens without
+      //      a usable tenant claim → 400 (not 401 — the auth itself
+      //      passed; the request just doesn't tell us which tenant to
+      //      route to).
+      //   2. If X-Continuum-Project header is present, the sanitised
+      //      header MUST equal the sanitised claim. Mismatch → 403 with
+      //      structured body so clients can debug (expected/asserted).
+      //   3. Pass: set req.continuum.tenantId to the sanitised CLAIM
+      //      (never the raw header — the issuer's signed claim is the
+      //      source of truth).
+      if (tenant === undefined) {
+        res.status(400).json({ error: 'tenant claim missing' });
+        return;
+      }
+      const claimSanitised = sanitiseTenantId(tenant);
+      if (claimSanitised === null) {
+        res.status(400).json({ error: 'tenant claim invalid' });
+        return;
+      }
+      const headerProject = req.headers[TENANT_HEADER];
+      if (typeof headerProject === 'string' && headerProject.trim() !== '') {
+        const headerSanitised = sanitiseTenantId(headerProject);
+        if (headerSanitised === null || headerSanitised !== claimSanitised) {
+          res.status(403).json({
+            error: 'tenant-claim-mismatch',
+            expected: claimSanitised,
+            asserted: headerProject,
+          });
+          return;
+        }
+      }
+      (req as Request).continuum = { tenantId: claimSanitised };
       next();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
