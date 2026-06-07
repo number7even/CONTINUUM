@@ -22,12 +22,18 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
   throughput sprint. Median 53.4s · 0.98 recall · 12-19ms p95. Two
   knobs closed the gap: T1 (EMBED_BATCH_SIZE 32→128) + T6 (RuVector
   `insertBatch`). T7 (quantized) discovered already-applied — P4 catch.
-- [`SPRINT-2026-W26.md`](./SPRINT-2026-W26.md) — **current sprint**
-  (2026-07-03 → 2026-07-17): V1 swarm aggregation. Replace linear
-  ingestion in the 3 existing adapters with ephemeral ruv-swarm agents
-  per source-cognitive topology (mesh/ring/hierarchical) +
-  Byzantine-majority voting at the CONTINUUM aggregation layer + strict
-  verify-then-dissolve. Journey 3 zero-config preserved.
+- [`SPRINT-2026-W26.md`](./SPRINT-2026-W26.md) — **closed** 2026-06-07
+  (snapshot `5670d816`, 41/41 verify-green). V1 swarm aggregation —
+  ring (git) + mesh (docs) + hierarchical (export) topologies +
+  byzantineVote() primitive + verify-then-dissolve mechanical. All
+  four W26 deliverables shipped. Zero orphan processes.
+- [`SPRINT-W27.md`](./SPRINT-W27.md) — **current sprint**
+  (2026-07-17 → 2026-07-31): V1.2 multi-tenant native scaling
+  (Path A · filesystem-isolated tenants). Per-tenant
+  `~/.continuum/<tenantId>/` storage routing + JWT-claim/header
+  validation with hard reject on mismatch + 5 layered mechanical
+  isolation proofs. ruvector@0.2.25 does NOT ship native Collections
+  (P4 catch — see § probe findings). Journey 3 stdio preserved.
 - [`UX-JOURNEYS.md`](./UX-JOURNEYS.md) — the three customer journeys
   (AI Developer, Business Operator, Solo Developer) with tier labels
   per component. ~100% real for Journey 3, ~50% for Journey 1,
