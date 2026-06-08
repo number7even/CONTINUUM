@@ -75,7 +75,20 @@ export interface ServerHandle {
   /** The tenant the server was bound to (after sanitisation). */
   tenantId: string;
   storage: StorageBackend;
+  /** Close the Server; close the storage too IFF this handle owns it
+   *  (i.e. opts.storage was not passed to buildServer). When the
+   *  caller passes a borrowed storage (e.g. from TenantRegistry), the
+   *  registry owns the storage lifecycle and close() is a no-op on
+   *  storage. */
   close(): void;
+}
+
+/** Options for buildServer. When `storage` is provided, the caller
+ *  RETAINS ownership of the storage lifecycle — close() on the handle
+ *  will NOT close the storage. Used by the W27-5 TenantRegistry which
+ *  caches StorageBackend instances across multiple sessions. */
+export interface BuildServerOptions {
+  storage?: StorageBackend;
 }
 
 /**
@@ -100,7 +113,10 @@ export interface ServerHandle {
  * @throws Error('continuum: invalid tenant identifier') if the input
  *         fails sanitiseTenantId.
  */
-export function buildServer(tenantId: string): ServerHandle {
+export function buildServer(
+  tenantId: string,
+  opts: BuildServerOptions = {},
+): ServerHandle {
   // Sanitise ONCE here so we can expose the canonical identifier on
   // ServerHandle.tenantId (callers downstream — logging, request
   // context, audit trails — see the same string that became the
@@ -110,7 +126,12 @@ export function buildServer(tenantId: string): ServerHandle {
   if (canonicalTenantId === null) {
     throw new Error('continuum: invalid tenant identifier');
   }
-  const storage: StorageBackend = openStorage(canonicalTenantId);
+  // W27-5: borrowed-storage path. When the caller passes opts.storage,
+  // we treat it as a lease — close() on the returned handle won't
+  // touch it. Used by TenantRegistry to share one open backend across
+  // multiple concurrent /sse sessions for the same tenant.
+  const ownsStorage = opts.storage === undefined;
+  const storage: StorageBackend = opts.storage ?? openStorage(canonicalTenantId);
 
   const server = new Server(
     {
@@ -195,7 +216,10 @@ export function buildServer(tenantId: string): ServerHandle {
     tenantId: canonicalTenantId,
     storage,
     close() {
-      storage.close();
+      // W27-5: only close storage if buildServer opened it. When the
+      // caller passed opts.storage (TenantRegistry path), the registry
+      // owns the lifecycle.
+      if (ownsStorage) storage.close();
     },
   };
 }

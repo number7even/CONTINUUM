@@ -41,6 +41,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { openStorage } from '@continuum/core';
 import { buildServer, type ServerHandle } from './server.js';
 import { createAuthMiddleware, resolveAuthConfig } from './auth.js';
+import { TenantRegistry, defaultTenantRegistryConfig } from './tenant-registry.js';
 
 const PORT = Number(process.env.CONTINUUM_HTTP_PORT ?? 7878);
 
@@ -78,8 +79,20 @@ app.use(createAuthMiddleware(authConfig));
 interface Session {
   transport: SSEServerTransport;
   handle: ServerHandle;
+  /** Tenant ID — needed to release the registry lease on socket close. */
+  tenantId: string;
 }
 const sessions = new Map<string, Session>();
+
+// W27-5 — central LRU cache of per-tenant StorageBackend instances. Bounds
+// memory under multi-tenant traffic; idle backends evicted after timeout;
+// LRU-evicted when cache full. Empirical baseline from
+// scripts/burst-test-w27-5.mjs (2026-06-08): 10 concurrent backends settle
+// at ~97 MB total, dominated by the shared embedder/worker pool — per-tenant
+// marginal cost is near-zero. Default cap of 32 fits comfortably in the
+// 512 MB Fly ceiling.
+const tenantRegistry = new TenantRegistry(defaultTenantRegistryConfig());
+tenantRegistry.start();
 
 // W27-4 — tenant resolution from the authenticated request. The auth
 // middleware (W27-3) already validated the JWT and X-Continuum-Project
@@ -102,15 +115,33 @@ function resolveTenantOrReject(req: Request, res: Response): string | null {
 app.get('/sse', async (req: Request, res: Response) => {
   const tenantId = resolveTenantOrReject(req, res);
   if (tenantId === null) return; // 400 already written
-  const handle = buildServer(tenantId);
+
+  // W27-5 — acquire a shared storage backend from the LRU registry.
+  // Multiple concurrent sessions for the same tenant share one open
+  // backend; the registry refcount ensures it stays alive while ANY
+  // session holds it, and becomes evictable when the last session closes.
+  let storage;
+  try {
+    storage = tenantRegistry.acquire(tenantId);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Capacity-exhausted errors map to 503; sanitisation errors to 400.
+    const status = /capacity exhausted/.test(msg) ? 503 : 400;
+    res.status(status).json({ error: msg });
+    return;
+  }
+  // buildServer with opts.storage — the handle's close() WON'T close
+  // the storage; we release back to the registry below.
+  const handle = buildServer(tenantId, { storage });
   // SSE transport writes its own headers + keep-alive; we hand it `res`.
   const transport = new SSEServerTransport('/messages', res);
-  sessions.set(transport.sessionId, { transport, handle });
+  sessions.set(transport.sessionId, { transport, handle, tenantId });
 
   res.on('close', () => {
     const s = sessions.get(transport.sessionId);
     if (s) {
-      s.handle.close();
+      s.handle.close(); // Server only; storage stays in the registry
+      tenantRegistry.release(s.tenantId);
       sessions.delete(transport.sessionId);
     }
   });
@@ -124,6 +155,7 @@ app.get('/sse', async (req: Request, res: Response) => {
     const msg = err instanceof Error ? err.message : String(err);
     process.stderr.write(`[continuum-http] sse connect failed: ${msg}\n`);
     handle.close();
+    tenantRegistry.release(tenantId);
     sessions.delete(transport.sessionId);
   }
 });
@@ -239,6 +271,12 @@ setInterval(() => void probeReadiness(), 5 * 60 * 1000).unref();
 
 app.get('/healthz', (_req: Request, res: Response): void => {
   const healthy = readiness.storage.sqlite_ok && readiness.embedder_ok;
+  // W27-5 — surface tenant registry stats so operators can see cache
+  // pressure, eviction rates, and live tenant fan-out at a glance.
+  const tenantStats = tenantRegistry.stats();
+  // Process memory — quick visual on whether we're approaching the
+  // 512 MB Fly ceiling. RSS is the relevant figure for OOM kills.
+  const mem = process.memoryUsage();
   const body = {
     ok: healthy,
     version: '0.0.1',
@@ -250,6 +288,12 @@ app.get('/healthz', (_req: Request, res: Response): void => {
     ready: readiness.ready,
     started_at: readiness.startedAt,
     last_probed_at: readiness.lastProbedAt,
+    tenants: tenantStats,
+    memory_mb: {
+      rss: Math.round(mem.rss / 1024 / 1024),
+      heap_used: Math.round(mem.heapUsed / 1024 / 1024),
+      heap_total: Math.round(mem.heapTotal / 1024 / 1024),
+    },
   };
   res.status(healthy ? 200 : 503).json(body);
 });
@@ -287,6 +331,8 @@ const shutdown = (): void => {
   process.stderr.write('[continuum-http] shutting down…\n');
   for (const s of sessions.values()) s.handle.close();
   sessions.clear();
+  // W27-5 — close every cached tenant backend in one pass.
+  tenantRegistry.stop();
   httpServer.close(() => process.exit(0));
 };
 process.on('SIGINT', shutdown);
