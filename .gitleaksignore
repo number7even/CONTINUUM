@@ -1,0 +1,16 @@
+# .gitleaksignore — allowlisted fingerprints for the P3-T2 pre-public-flip scan.
+#
+# All 6 entries are SYNTHETIC test fixtures, verified 2026-06-12:
+#   - scripts/privacy-smoke.mjs — fake secrets (AWS docs example key,
+#     jwt.io demo token, AbCdEf... placeholder patterns) that exist
+#     PRECISELY to prove the privacy filter scrubs them.
+#   - scripts/verify-w27-isolation.mjs — tenant witness sentinels
+#     (WIT_ALPHA_* etc.) for the W27 cross-tenant isolation proofs.
+# No real credential has ever been committed to this repository.
+
+d6a8746863b54a2c1e654b22b0032e0d9389b4b2:scripts/verify-w27-isolation.mjs:generic-api-key:49
+d6a8746863b54a2c1e654b22b0032e0d9389b4b2:scripts/verify-w27-isolation.mjs:generic-api-key:50
+74751b2352204296926b991b8a98184485856681:scripts/privacy-smoke.mjs:generic-api-key:52
+74751b2352204296926b991b8a98184485856681:scripts/privacy-smoke.mjs:jwt:57
+74751b2352204296926b991b8a98184485856681:scripts/privacy-smoke.mjs:slack-legacy-bot-token:61
+74751b2352204296926b991b8a98184485856681:scripts/privacy-smoke.mjs:stripe-access-token:64
