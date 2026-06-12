@@ -48,8 +48,9 @@ RUN npm init -y > /dev/null && \
 
 COPY probe.mjs .
 COPY probe-minimal.mjs .
+COPY probe-scenario-b.mjs .
 
-# Minimal probe — measures ONE dolt sql-server's RSS, ONE query latency
-# pair, and the on-disk layout. Full probe hung in scenario A so we get
-# definitive measurements from the smaller scope and extrapolate.
-CMD ["node", "/probe/probe-minimal.mjs"]
+# Scenario B focused probe — the only remaining unanswered axis after
+# the previous runs. Audits per-DB directory layout + du -sh + rm -rf
+# isolation + memory-flat growth.
+CMD ["node", "/probe/probe-scenario-b.mjs"]
