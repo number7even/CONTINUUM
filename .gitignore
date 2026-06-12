@@ -58,3 +58,6 @@ temp/
 # Operator-side exports (large PDFs / one-off artifacts at repo root).
 # Added 2026-06-02 after CI/CONTINUUM.pdf (19MB) appeared in `git status`.
 CI/
+
+# Parked H-MARA integration research (PDFs of AI conversations) — not for the public repo.
+docs/H-MARA-CONTINUUM/

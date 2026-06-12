@@ -1,0 +1,4 @@
+# npm publish status — 2026-06-12 (corrected capture)
+@continuum/core -> npm error code E404
+@continuum/cli -> npm error code E404
+@continuum/mcp-server -> npm error code E404

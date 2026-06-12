@@ -1,7 +1,7 @@
 {
   "name": "@continuum/cli",
   "version": "0.0.1",
-  "description": "Continuum CLI — `continuum init / start / status` for new operators.",
+  "description": "Continuum CLI — continuum init / start / serve / status / import-state for new operators.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,5 +24,11 @@
     "type": "git",
     "url": "git+https://github.com/number7even/CONTINUUM.git",
     "directory": "packages/cli"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

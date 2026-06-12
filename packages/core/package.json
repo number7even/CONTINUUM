@@ -42,5 +42,11 @@
     "type": "git",
     "url": "git+https://github.com/number7even/CONTINUUM.git",
     "directory": "packages/core"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

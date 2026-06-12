@@ -1,7 +1,7 @@
 {
   "name": "@continuum/mcp-server",
   "version": "0.0.1",
-  "description": "Continuum MCP server — exposes 7 tools + 4 Resources + 2 Prompts to AI clients over stdio (local) or HTTP/SSE (remote / hosted).",
+  "description": "Continuum MCP server — exposes 10 tools + 4 Resources + 2 Prompts to AI clients over stdio (local) or HTTP/SSE (remote / hosted).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -31,5 +31,11 @@
     "type": "git",
     "url": "git+https://github.com/number7even/CONTINUUM.git",
     "directory": "packages/mcp-server"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

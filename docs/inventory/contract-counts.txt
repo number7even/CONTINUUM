@@ -1,0 +1,1 @@
+tools=10 resources=4 prompts=2
