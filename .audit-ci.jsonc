@@ -1,38 +1,34 @@
 // audit-ci configuration — gates CI on production-deps npm audit (W24-4).
 //
-// Per the operator-authorized Path B from SPRINT-2026-W24:
-//   - The `--audit-level=high` gate stays strict for FUTURE vulnerabilities.
-//   - The 9 specific protobufjs-chain advisories below are EXPLICITLY
-//     allowlisted with per-advisory rationale because the vulnerable
-//     codepath is not exercised by attacker-controlled input in
-//     CONTINUUM's specific use of @xenova/transformers.
+// HISTORY:
+//   2026-06-03 (W24-4, Path B): 9 protobufjs-chain advisories (4 code-exec,
+//     5 DoS) were allowlisted with per-advisory rationale because
+//     @xenova/transformers → onnxruntime-web → onnx-proto pinned
+//     protobufjs@6.x and no patched release existed upstream.
+//   2026-06-12 (pre-V1-launch audit gate): a root-level npm `overrides`
+//     pin now forces protobufjs@^7.5.3 across the tree (see package.json).
+//     Verified end-to-end on protobufjs 7.6.4:
+//       - `npm run build` — all workspaces compile clean
+//       - `npm test` — 120/120 pass, 0 failures
+//       - `scripts/ruvector-smoke.mjs` — live ONNX model load + MiniLM
+//         embedding + vector search all pass (the one runtime path that
+//         actually exercises the protobufjs parser)
+//     All 9 GHSA allowlist entries were therefore REMOVED. audit-ci itself
+//     confirmed they no longer match ("Consider not allowlisting…").
 //
-// Surface-area analysis (full version in docs/DEPLOY_SELF_HOSTED.md
-// § "Current npm audit baseline"):
-//
-//   @xenova/transformers → onnxruntime-web → onnx-proto → protobufjs
-//
-//   The protobufjs parser is invoked only when loading ONNX model files
-//   (.onnx). Model files are downloaded once from Hugging Face, cached
-//   at ~/.cache/huggingface/, and never re-parsed from a user-controlled
-//   source at runtime. CONTINUUM never passes user input — or any
-//   network-received bytes — to the protobufjs parser. The RCE / DoS
-//   codepaths are PRESENT in the dependency tree but NOT EXPOSED by
-//   CONTINUUM's call graph.
-//
-//   When @xenova/transformers publishes a release that pins a patched
-//   protobufjs (none available as of 2026-06-03), bump the pin, run
-//   `npm audit`, and remove the corresponding GHSA entries from this
-//   file. The audit gate will turn green automatically.
+//   If a future dependency bump reintroduces a protobufjs@6 copy, the
+//   strict gate below will fail CI — that is intentional. Fix the tree,
+//   don't re-allowlist, unless an operator-authorized surface-area
+//   analysis (like the original W24-4 one in docs/DEPLOY_SELF_HOSTED.md
+//   § "Current npm audit baseline") justifies it.
 //
 // Run locally: npm run audit
 // CI: triggered by .github/workflows/ci.yml on every push.
 {
   "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
 
-  // Strict baseline — any high or critical advisory NOT in the allowlist
-  // below fails the gate. Moderate + low are informational (printed but
-  // not blocking).
+  // Strict baseline — any high or critical advisory fails the gate.
+  // Moderate + low are informational (printed but not blocking).
   "high": true,
 
   // Production dependencies only. Dev deps (typescript, audit-ci itself,
@@ -43,30 +39,7 @@
   "report-type": "full",
   "output-format": "text",
 
-  // Path-aware allowlist: each entry is a GHSA ID. audit-ci silences
-  // matching advisories from the gate while still surfacing them in
-  // informational output. Per-advisory rationale lives in the comments
-  // above each entry — operator-readable, version-controlled.
-  "allowlist": [
-    // ─── @xenova/transformers → onnxruntime-web → onnx-proto → protobufjs
-    // ─── Code-execution-class CVEs ────────────────────────────────────
-    // Reachable only if attacker controls protobuf bytes passed to the
-    // parser. CONTINUUM never does this — parser only sees HF-cached
-    // .onnx model files (downloaded once, integrity-checked by HF's
-    // HTTPS chain). Not exposed by any public CONTINUUM API surface.
-    "GHSA-xq3m-2v4x-88gg", // protobufjs arbitrary code execution
-    "GHSA-66ff-xgx4-vchm", // protobufjs code injection through bytes field defaults
-    "GHSA-fx83-v9x8-x52w", // protobufjs prototype injection in generated message constructors
-    "GHSA-75px-5xx7-5xc7", // protobufjs code generation gadget after prototype pollution
-
-    // ─── DoS-class CVEs ───────────────────────────────────────────────
-    // Worst case is engine process crash. The Docker HEALTHCHECK +
-    // --restart=unless-stopped policy (W24-3 + W24-4) brings the
-    // container back automatically. Acceptable degradation profile.
-    "GHSA-2pr8-phx7-x9h3", // protobufjs DoS from crafted field names in generated code
-    "GHSA-jvwf-75h9-cwgg", // protobufjs process-wide DoS via unsafe option paths
-    "GHSA-685m-2w69-288q", // protobufjs DoS via unbounded recursion
-    "GHSA-q6x5-8v7m-xcrf", // protobufjs overlong UTF-8 decoding
-    "GHSA-jggg-4jg4-v7c6"  // protobufjs DoS via unbounded recursive JSON descriptor expansion
-  ]
+  // Empty as of 2026-06-12 — the protobufjs@7 override cleared all
+  // previously-allowlisted advisories. Keep it empty.
+  "allowlist": []
 }
