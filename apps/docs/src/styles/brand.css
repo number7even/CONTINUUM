@@ -1,0 +1,82 @@
+/**
+ * Continuum brand palette → Starlight theme.
+ *
+ *   Inkwell        #2C3639   deepest ground
+ *   Lunar Eclipse  #3F4E4F   dark accent / panels
+ *   Creme Brulee   #A27B5B   warm brand accent (links, focus)
+ *   Au Lait        #DCD7C9   cream / light ground
+ *
+ * First pass — set the system. The $impeccable typeset/colorize/harden
+ * passes refine contrast ratios, motion, and rhythm on top of this.
+ */
+
+:root {
+  --ink: #2c3639;
+  --lunar: #3f4e4f;
+  --creme: #a27b5b;
+  --creme-bright: #c79a73;
+  --aulait: #dcd7c9;
+
+  /* Accent ramp = Creme Brulee */
+  --sl-color-accent-low: #2c2620;
+  --sl-color-accent: #a27b5b;
+  --sl-color-accent-high: #e4cdb5;
+
+  /* Dark theme (default) — Inkwell ground, Au Lait ink */
+  --sl-color-white: #f4f1ea;
+  --sl-color-gray-1: #e6e1d6;
+  --sl-color-gray-2: #c3beb2;
+  --sl-color-gray-3: #8f928b;
+  --sl-color-gray-4: #5b6360;
+  --sl-color-gray-5: #3f4e4f;
+  --sl-color-gray-6: #2c3639;
+  --sl-color-black: #20282a;
+
+  --sl-color-bg-nav: #242d2f;
+  --sl-color-bg-sidebar: #222b2d;
+  --sl-color-hairline-shade: #344042;
+}
+
+/* Light theme — Au Lait ground, Inkwell ink */
+:root[data-theme='light'] {
+  --sl-color-accent-low: #ece3d6;
+  --sl-color-accent: #8a6647;
+  --sl-color-accent-high: #2c3639;
+
+  --sl-color-white: #2c3639;
+  --sl-color-gray-1: #3f4e4f;
+  --sl-color-gray-2: #4d5856;
+  --sl-color-gray-3: #6f746f;
+  --sl-color-gray-4: #9b988d;
+  --sl-color-gray-5: #cdc7ba;
+  --sl-color-gray-6: #e7e1d6;
+  --sl-color-gray-7: #f3efe7;
+  --sl-color-black: #dcd7c9;
+
+  --sl-color-bg-nav: #e7e1d6;
+  --sl-color-bg-sidebar: #efe9df;
+  --sl-color-hairline-shade: #d6cfc0;
+}
+
+/* Hero title — Au Lait → Creme Brulee wash */
+.hero h1 {
+  background: linear-gradient(118deg, var(--aulait) 10%, var(--creme-bright) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.02em;
+}
+.hero .tagline {
+  color: var(--sl-color-gray-2);
+}
+
+/* Primary CTA in brand accent */
+.hero .actions a[data-variant='primary'] {
+  background: var(--creme);
+  border-color: var(--creme);
+  color: #1d2426;
+}
+.hero .actions a[data-variant='primary']:hover {
+  background: var(--creme-bright);
+  border-color: var(--creme-bright);
+}

@@ -1,0 +1,63 @@
+---
+title: Continuum
+description: Persistent, verifiable memory for AI coding assistants — an open-source MCP engine that refuses to mark work done until a shell command proves it.
+template: splash
+hero:
+  tagline: The only AI memory layer that refuses to mark work done until a shell command proves it.
+  actions:
+    - text: Read the Architecture
+      link: /architecture/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/number7even/CONTINUUM
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## A memory layer that earns its claims
+
+Continuum is an open-source [Model Context Protocol](https://modelcontextprotocol.io)
+engine that gives AI coding assistants a persistent, verifiable memory of a
+project — its state, its decisions, its history — across every session.
+
+Its moat is a discipline, not a feature: **work is not "done" until a shell
+command exits 0 to prove it.**
+
+<CardGrid stagger>
+  <Card title="Verify-then-dissolve" icon="approve-check">
+    Every checkpoint carries a `verifyCommand`. State that can't be re-proven
+    by a green shell exit is never marked complete — it's a witness, not a claim.
+  </Card>
+  <Card title="Progressive disclosure" icon="seti:db">
+    A 3-layer retrieval surface (search → timeline → full-fetch) delivers
+    roughly 10× token savings over grep-and-read context loading.
+  </Card>
+  <Card title="Local-first, swappable" icon="laptop">
+    SQLite + FTS5 today, RuVector vector search next — behind one
+    `StorageBackend` seam. Your history stays on your machine by default.
+  </Card>
+  <Card title="Privacy at the write" icon="seti:lock">
+    A secret-scrubbing filter sits on the single write choke-point, redacting
+    known credential patterns before anything is persisted.
+  </Card>
+</CardGrid>
+
+## Start here
+
+<CardGrid>
+  <Card title="Overview" icon="open-book">
+    What Continuum is, who it helps, and how it works from your terminal.
+    [Read the overview →](/overview/)
+  </Card>
+  <Card title="Architecture" icon="puzzle">
+    The engineering source of truth — storage seam, MCP surface, decisions.
+    [Read the architecture →](/architecture/)
+  </Card>
+  <Card title="North Star Build Plan" icon="rocket">
+    The gated, phase-by-phase roadmap to the V1 OSS launch and beyond.
+    [Read the plan →](/build-plan/)
+  </Card>
+</CardGrid>

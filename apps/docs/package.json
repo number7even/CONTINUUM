@@ -1,0 +1,17 @@
+{
+  "name": "@continuum/docs",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Continuum public docs + landing site (Astro Starlight) — served at the www.continuum.rest apex. MD8 deliverable.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "clean": "rm -rf dist .astro"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.40.0",
+    "astro": "^6.4.8"
+  }
+}
