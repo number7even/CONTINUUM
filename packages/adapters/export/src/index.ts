@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @continuum/adapter-export
+ * @number7even/continuum-adapter-export
  *
  * Tails Claude session JSONL transcripts in ~/.claude/projects/ and writes
  * each turn into the Continuum DB as an Observation.
@@ -37,7 +37,7 @@ import {
   openStorage,
   type StorageBackend,
   type Observation,
-} from '@continuum/core';
+} from '@number7even/continuum-core';
 import { parseJsonlLine, turnToObservation } from './parser.js';
 import { ingestViaHierarchicalSwarm, type TurnInput } from './swarm.js';
 
@@ -190,7 +190,7 @@ async function main() {
   const args = parseArgs(process.argv);
   const storage = openStorage(args.project);
   const sourceId = `export:${args.project}`;
-  storage.upsertSource(sourceId, 'export', { adapter: '@continuum/adapter-export', version: '0.0.1' });
+  storage.upsertSource(sourceId, 'export', { adapter: '@number7even/continuum-adapter-export', version: '0.0.1' });
 
   const sessionDir = findClaudeSessionDir(args.claudeDir, args.project);
   if (!sessionDir) {

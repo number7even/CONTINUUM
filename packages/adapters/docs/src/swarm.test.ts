@@ -18,7 +18,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { SQLiteStorageBackend } from '@continuum/core';
+import { SQLiteStorageBackend } from '@number7even/continuum-core';
 import {
   ingestViaMeshSwarm,
   partitionForMesh,

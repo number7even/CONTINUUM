@@ -24,8 +24,8 @@
  */
 // @ts-expect-error — ruv-swarm/src/index-enhanced.js has no published .d.ts
 import { RuvSwarm } from 'ruv-swarm/src/index-enhanced.js';
-import { byzantineVote, type StorageBackend } from '@continuum/core';
-import type { BFTCandidate } from '@continuum/core';
+import { byzantineVote, type StorageBackend } from '@number7even/continuum-core';
+import type { BFTCandidate } from '@number7even/continuum-core';
 
 export interface DocsSwarmConfig {
   storage: StorageBackend;
@@ -249,7 +249,7 @@ export async function ingestViaMeshSwarm(
             timestamp: file.timestamp,
             refs: [],
             metadata: {
-              adapter: '@continuum/adapter-docs',
+              adapter: '@number7even/continuum-adapter-docs',
               path: file.relativePath,
               bytes: file.content.length,
               title,

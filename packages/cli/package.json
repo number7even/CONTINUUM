@@ -1,5 +1,5 @@
 {
-  "name": "@continuum/cli",
+  "name": "@number7even/continuum-cli",
   "version": "0.0.1",
   "description": "Continuum CLI — continuum init / start / serve / status / import-state for new operators.",
   "type": "module",
@@ -15,8 +15,8 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@continuum/core": "0.0.1",
-    "@continuum/mcp-server": "0.0.1"
+    "@number7even/continuum-core": "0.0.1",
+    "@number7even/continuum-mcp-server": "0.0.1"
   },
   "license": "Apache-2.0",
   "author": "Riaan Kleynhans <riaan@number7even.com>",

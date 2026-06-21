@@ -40,7 +40,7 @@
  *
  * IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans
  */
-import { openStorage, type StorageBackend } from '@continuum/core';
+import { openStorage, type StorageBackend } from '@number7even/continuum-core';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -161,7 +161,7 @@ export class TenantRegistry {
    * exactly once for every successful acquire().
    *
    * @throws Error('continuum: invalid tenant identifier') if openStorage
-   *         rejects the input (sanitisation gate in @continuum/core).
+   *         rejects the input (sanitisation gate in @number7even/continuum-core).
    */
   acquire(tenantId: string): StorageBackend {
     if (this.closed) {

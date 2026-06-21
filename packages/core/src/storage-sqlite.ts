@@ -4,7 +4,7 @@
  * Wraps a better-sqlite3 Database with the FTS5-indexed observations table.
  * All domain operations delegate to the existing module-level helpers in
  * checkpoint.ts / observation.ts / todo.ts — those modules are now private
- * implementation details of this backend; consumers of @continuum/core talk
+ * implementation details of this backend; consumers of @number7even/continuum-core talk
  * to the StorageBackend interface only.
  *
  * V0.5+ adds RuVectorStorageBackend as a drop-in replacement. The factory
@@ -272,4 +272,4 @@ export class SQLiteStorageBackend implements StorageBackend {
 // openStorage() factory moved to ./factory.ts as of V0.5 so the hybrid
 // backend (which has heavy ruvector + @xenova/transformers deps) can
 // be selected via env var without forcing those deps to load when
-// sqlite-only operators import @continuum/core.
+// sqlite-only operators import @number7even/continuum-core.

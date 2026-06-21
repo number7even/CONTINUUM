@@ -38,7 +38,7 @@
  */
 import express, { type Request, type Response } from 'express';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { openStorage } from '@continuum/core';
+import { openStorage } from '@number7even/continuum-core';
 import { buildServer, type ServerHandle } from './server.js';
 import { createAuthMiddleware, resolveAuthConfig } from './auth.js';
 import { TenantRegistry, defaultTenantRegistryConfig } from './tenant-registry.js';

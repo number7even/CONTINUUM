@@ -1,5 +1,5 @@
 {
-  "name": "@continuum/mcp-server",
+  "name": "@number7even/continuum-mcp-server",
   "version": "0.0.1",
   "description": "Continuum MCP server — exposes 10 tools + 4 Resources + 2 Prompts to AI clients over stdio (local) or HTTP/SSE (remote / hosted).",
   "type": "module",
@@ -17,7 +17,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@continuum/core": "0.0.1",
+    "@number7even/continuum-core": "0.0.1",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "express": "^4.21.0",
     "jose": "^5.9.6"

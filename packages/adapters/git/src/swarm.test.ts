@@ -25,7 +25,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SQLiteStorageBackend } from '@continuum/core';
+import { SQLiteStorageBackend } from '@number7even/continuum-core';
 import {
   chronologicalShards,
   ingestViaRingSwarm,

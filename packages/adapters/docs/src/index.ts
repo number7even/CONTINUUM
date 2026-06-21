@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @continuum/adapter-docs
+ * @number7even/continuum-adapter-docs
  *
  * Ingests local markdown documentation into the Continuum observation index.
  * Each file becomes one Observation with `type='doc'` and a deterministic ID
@@ -35,7 +35,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { openStorage } from '@continuum/core';
+import { openStorage } from '@number7even/continuum-core';
 import { ingestViaMeshSwarm, type DocFile } from './swarm.js';
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ async function main() {
   const storage = openStorage(args.project);
   const sourceId = `docs:${args.project}`;
   storage.upsertSource(sourceId, 'docs', {
-    adapter: '@continuum/adapter-docs',
+    adapter: '@number7even/continuum-adapter-docs',
     version: '0.0.1',
     docsDir: args.docsDir,
   });

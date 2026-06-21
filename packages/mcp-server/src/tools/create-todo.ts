@@ -3,7 +3,7 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
-import type { CreateTodoInput } from '@continuum/core';
+import type { CreateTodoInput } from '@number7even/continuum-core';
 import type { ToolDefinition, ToolHandler } from '../tool-types.js';
 
 export const createTodoTool: ToolDefinition = {

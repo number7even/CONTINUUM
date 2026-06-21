@@ -1,5 +1,5 @@
 {
-  "name": "@continuum/adapter-export",
+  "name": "@number7even/continuum-adapter-export",
   "version": "0.0.1",
   "description": "Continuum export adapter — tails Claude session JSONL transcripts and writes turn observations into the Continuum DB.",
   "type": "module",
@@ -15,7 +15,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@continuum/core": "0.0.1",
+    "@number7even/continuum-core": "0.0.1",
     "chokidar": "^4.0.0",
     "ruv-swarm": "^1.0.20"
   },

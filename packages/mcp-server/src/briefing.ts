@@ -12,7 +12,7 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
-import type { StateEntry, StorageBackend } from '@continuum/core';
+import type { StateEntry, StorageBackend } from '@number7even/continuum-core';
 
 /**
  * Resolve the briefing window length in hours.

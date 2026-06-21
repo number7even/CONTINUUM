@@ -10,7 +10,7 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
-import type { StorageBackend } from '@continuum/core';
+import type { StorageBackend } from '@number7even/continuum-core';
 import type { ToolDefinition, ToolHandler, ToolResult } from '../tool-types.js';
 
 import { recordCheckpointTool, handleRecordCheckpoint } from './record-checkpoint.js';

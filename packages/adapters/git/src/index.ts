@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @continuum/adapter-git
+ * @number7even/continuum-adapter-git
  *
  * Ingests git commits into the Continuum observation index. One Observation
  * per commit with `type='commit'` and the raw 40-char SHA as the stable ID —
@@ -38,7 +38,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { openStorage } from '@continuum/core';
+import { openStorage } from '@number7even/continuum-core';
 import { ingestViaRingSwarm, probePostTerminate, type ParsedCommit } from './swarm.js';
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ async function main() {
   const storage = openStorage(args.project);
   const sourceId = `git:${args.project}`;
   storage.upsertSource(sourceId, 'git', {
-    adapter: '@continuum/adapter-git',
+    adapter: '@number7even/continuum-adapter-git',
     version: '0.0.1',
     repoDir: args.repoDir,
   });

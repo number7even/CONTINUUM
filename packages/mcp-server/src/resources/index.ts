@@ -10,7 +10,7 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
-import type { StorageBackend } from '@continuum/core';
+import type { StorageBackend } from '@number7even/continuum-core';
 import type { ResourceContents, ResourceDefinition, ResourceReader } from '../tool-types.js';
 
 import { OPEN_TODOS_URI, openTodosResource, readOpenTodos } from './open-todos.js';

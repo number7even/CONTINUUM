@@ -13,7 +13,7 @@
  *
  * The parser is tolerant — extracts what it can, skips what it can't.
  */
-import type { Observation } from '@continuum/core';
+import type { Observation } from '@number7even/continuum-core';
 
 export interface ParsedTurn {
   /** ISO-8601 timestamp. Falls back to file mtime if not in the line. */

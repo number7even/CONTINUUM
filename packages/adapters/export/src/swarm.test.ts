@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SQLiteStorageBackend, type Observation } from '@continuum/core';
+import { SQLiteStorageBackend, type Observation } from '@number7even/continuum-core';
 import {
   hierarchicalShards,
   ingestViaHierarchicalSwarm,
@@ -36,7 +36,7 @@ function fakeTurn(
     content: body,
     timestamp: new Date(2026, 0, 1 + i, 12).toISOString(),
     refs: [],
-    metadata: { adapter: '@continuum/adapter-export' },
+    metadata: { adapter: '@number7even/continuum-adapter-export' },
   };
   return {
     id: `turn-${String(i).padStart(4, '0')}`,

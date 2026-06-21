@@ -26,7 +26,7 @@
  */
 // @ts-expect-error — ruv-swarm/src/index-enhanced.js has no published .d.ts
 import { RuvSwarm } from 'ruv-swarm/src/index-enhanced.js';
-import type { StorageBackend } from '@continuum/core';
+import type { StorageBackend } from '@number7even/continuum-core';
 
 export interface SwarmIngestConfig {
   storage: StorageBackend;
@@ -112,7 +112,7 @@ function normaliseShardToObservations(
     timestamp: c.isoDate,
     refs: [],
     metadata: {
-      adapter: '@continuum/adapter-git',
+      adapter: '@number7even/continuum-adapter-git',
       sha: c.sha,
       author: c.authorName,
       email: c.authorEmail,

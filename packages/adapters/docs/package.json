@@ -1,5 +1,5 @@
 {
-  "name": "@continuum/adapter-docs",
+  "name": "@number7even/continuum-adapter-docs",
   "version": "0.0.1",
   "description": "Continuum docs adapter — ingests local /docs markdown into the Continuum observation index. Idempotent stable IDs per file path.",
   "type": "module",
@@ -15,7 +15,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@continuum/core": "0.0.1",
+    "@number7even/continuum-core": "0.0.1",
     "ruv-swarm": "^1.0.20"
   },
   "license": "Apache-2.0",

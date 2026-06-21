@@ -1,5 +1,5 @@
 /**
- * @continuum/core — public API surface.
+ * @number7even/continuum-core — public API surface.
  *
  * V0 ships:
  *   - Types (Observation, StateSnapshot, Todo, Digest, SearchHit, …)
@@ -8,7 +8,7 @@
  *   - openStorage(projectId) factory — single swap point for V0.5 RuVector
  *   - Pure helpers (privacyFilter)
  *
- * Consumers of @continuum/core SHOULD NOT touch better-sqlite3 directly —
+ * Consumers of @number7even/continuum-core SHOULD NOT touch better-sqlite3 directly —
  * always go through openStorage()/StorageBackend so the V0.5 RuVector swap
  * is a single-line change at the factory.
  *

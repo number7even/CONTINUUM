@@ -28,8 +28,8 @@
  */
 // @ts-expect-error — ruv-swarm/src/index-enhanced.js has no published .d.ts
 import { RuvSwarm } from 'ruv-swarm/src/index-enhanced.js';
-import { byzantineVote, type StorageBackend, type Observation } from '@continuum/core';
-import type { BFTCandidate } from '@continuum/core';
+import { byzantineVote, type StorageBackend, type Observation } from '@number7even/continuum-core';
+import type { BFTCandidate } from '@number7even/continuum-core';
 
 export interface ExportSwarmConfig {
   storage: StorageBackend;

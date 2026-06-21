@@ -63,7 +63,7 @@ import {
   openStorage,
   sanitiseTenantId,
   type StorageBackend,
-} from '@continuum/core';
+} from '@number7even/continuum-core';
 
 import { TOOL_DEFINITIONS, dispatchTool } from './tools/index.js';
 import { RESOURCE_DEFINITIONS, readResource } from './resources/index.js';

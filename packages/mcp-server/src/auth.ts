@@ -40,7 +40,7 @@
  */
 import type { Request, RequestHandler } from 'express';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
-import { sanitiseTenantId } from '@continuum/core';
+import { sanitiseTenantId } from '@number7even/continuum-core';
 
 // ── Public types ───────────────────────────────────────────────────────────
 

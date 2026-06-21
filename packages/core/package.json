@@ -1,5 +1,5 @@
 {
-  "name": "@continuum/core",
+  "name": "@number7even/continuum-core",
   "version": "0.0.1",
   "description": "Continuum core — data types, SQLite schema, checkpoint engine, observation indexer",
   "type": "module",

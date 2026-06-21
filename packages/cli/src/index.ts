@@ -31,7 +31,7 @@ import {
   openStorage,
   parseStateMdToCheckpoint,
   type StorageBackend,
-} from '@continuum/core';
+} from '@number7even/continuum-core';
 
 // ── Argv parsing ──────────────────────────────────────────────────────────────
 
@@ -234,16 +234,16 @@ function commandInit(projectId: string, stateMdOverride: string | undefined): vo
 
   // Find the MCP server binary so the registration snippet is copy-paste ready.
   // Resolve through node's module resolution rather than guessing paths — this
-  // makes the printed snippet correct whether @continuum/mcp-server was
+  // makes the printed snippet correct whether @number7even/continuum-mcp-server was
   // installed via npx, npm install -g, or as a workspace dep.
   let mcpServerBinPath: string;
   try {
     // Resolve the package's main entry; the bin file in dist/index.js sits
     // next to it (the package.json `bin` field points there).
-    const main = import.meta.resolve('@continuum/mcp-server');
+    const main = import.meta.resolve('@number7even/continuum-mcp-server');
     mcpServerBinPath = new URL(main).pathname;
   } catch {
-    mcpServerBinPath = '<install-@continuum/mcp-server-first>';
+    mcpServerBinPath = '<install-@number7even/continuum-mcp-server-first>';
   }
 
   const mcpSnippet = {
@@ -352,7 +352,7 @@ function commandStatus(projectId: string): void {
 // ── continuum adapter <name> [--watch] ────────────────────────────────────────
 //
 // Issue #16 / W23-5. Operator-facing wrapper over the two existing adapter
-// binaries (@continuum/adapter-docs, @continuum/adapter-git). Two modes:
+// binaries (@number7even/continuum-adapter-docs, @number7even/continuum-adapter-git). Two modes:
 //
 //   continuum adapter docs                — run once, exit
 //   continuum adapter docs --watch        — run once, then watch + debounce
@@ -407,7 +407,7 @@ function parseAdapterArgs(argv: string[]): { name: AdapterName | undefined; opts
 }
 
 function resolveAdapterBin(name: AdapterName): string {
-  const pkg = `@continuum/adapter-${name}`;
+  const pkg = `@number7even/continuum-adapter-${name}`;
   try {
     return fileURLToPath(import.meta.resolve(pkg));
   } catch (err) {
@@ -529,7 +529,7 @@ function commandAdapter(projectId: string): void {
 
 async function commandReindex(projectId: string): Promise<void> {
   process.env.CONTINUUM_STORAGE_BACKEND = 'hybrid';
-  const { HybridStorageBackend } = await import('@continuum/core');
+  const { HybridStorageBackend } = await import('@number7even/continuum-core');
   const storage = new HybridStorageBackend(projectId);
 
   process.stdout.write(
@@ -593,7 +593,7 @@ async function commandMigrate(projectId: string): Promise<void> {
   // operator roll back the whole project-dir state if anything in the
   // hybrid backend's index-building goes sideways.
   process.env.CONTINUUM_STORAGE_BACKEND = 'sqlite';
-  const { openStorage } = await import('@continuum/core');
+  const { openStorage } = await import('@number7even/continuum-core');
   const probe = openStorage(projectId);
   const sqlitePath = probe.dataLocation();
   probe.close();
@@ -618,7 +618,7 @@ async function commandMigrate(projectId: string): Promise<void> {
 
   // Now open hybrid and rebuild the vector store from the SQLite ground-truth.
   process.env.CONTINUUM_STORAGE_BACKEND = 'hybrid';
-  const { HybridStorageBackend } = await import('@continuum/core');
+  const { HybridStorageBackend } = await import('@number7even/continuum-core');
   const storage = new HybridStorageBackend(projectId);
   process.stdout.write(`  vector store: ${storage.vectorDataLocation()}\n`);
 
@@ -787,7 +787,7 @@ async function commandStart(projectId: string): Promise<void> {
 
   // Import the MCP server module — it auto-connects to stdio via top-level
   // await. The process stays alive on stdin reads after the import resolves.
-  await import('@continuum/mcp-server');
+  await import('@number7even/continuum-mcp-server');
 }
 
 // ── continuum serve (V1 HTTP/SSE) ────────────────────────────────────────────
@@ -803,7 +803,7 @@ async function commandServe(projectId: string): Promise<void> {
   process.env.CONTINUUM_PROJECT_ID = projectId;
   // The http.ts module is the bin entry — importing it boots Express +
   // SSEServerTransport and listens on $CONTINUUM_HTTP_PORT (default 7878).
-  await import('@continuum/mcp-server/dist/http.js');
+  await import('@number7even/continuum-mcp-server/dist/http.js');
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
