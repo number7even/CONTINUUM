@@ -1,11 +1,12 @@
 ---
-title: Continuum
-description: Persistent, verifiable memory for AI coding assistants — an open-source MCP engine that refuses to mark work done until a shell command proves it.
+title: "Continuum: verifiable memory for AI coding assistants"
+description: An open-source MCP engine that gives AI coding assistants a persistent memory of a project, and refuses to mark work done until a shell command proves it.
 template: splash
 hero:
-  tagline: The only AI memory layer that refuses to mark work done until a shell command proves it.
+  title: Continuum
+  tagline: Persistent memory for AI coding assistants that refuses to mark work done until a shell command proves it.
   actions:
-    - text: Read the Architecture
+    - text: Read the architecture
       link: /architecture/
       icon: right-arrow
       variant: primary
@@ -21,7 +22,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 Continuum is an open-source [Model Context Protocol](https://modelcontextprotocol.io)
 engine that gives AI coding assistants a persistent, verifiable memory of a
-project — its state, its decisions, its history — across every session.
+project: its state, its decisions, its history, across every session.
 
 Its moat is a discipline, not a feature: **work is not "done" until a shell
 command exits 0 to prove it.**
@@ -29,14 +30,14 @@ command exits 0 to prove it.**
 <CardGrid stagger>
   <Card title="Verify-then-dissolve" icon="approve-check">
     Every checkpoint carries a `verifyCommand`. State that can't be re-proven
-    by a green shell exit is never marked complete — it's a witness, not a claim.
+    by a green shell exit is never marked complete; it stays a witness until then.
   </Card>
   <Card title="Progressive disclosure" icon="seti:db">
     A 3-layer retrieval surface (search → timeline → full-fetch) delivers
     roughly 10× token savings over grep-and-read context loading.
   </Card>
   <Card title="Local-first, swappable" icon="laptop">
-    SQLite + FTS5 today, RuVector vector search next — behind one
+    SQLite + FTS5 today, RuVector vector search next, behind one
     `StorageBackend` seam. Your history stays on your machine by default.
   </Card>
   <Card title="Privacy at the write" icon="seti:lock">
@@ -45,19 +46,8 @@ command exits 0 to prove it.**
   </Card>
 </CardGrid>
 
-## Start here
+## Where to go next
 
-<CardGrid>
-  <Card title="Overview" icon="open-book">
-    What Continuum is, who it helps, and how it works from your terminal.
-    [Read the overview →](/overview/)
-  </Card>
-  <Card title="Architecture" icon="puzzle">
-    The engineering source of truth — storage seam, MCP surface, decisions.
-    [Read the architecture →](/architecture/)
-  </Card>
-  <Card title="North Star Build Plan" icon="rocket">
-    The gated, phase-by-phase roadmap to the V1 OSS launch and beyond.
-    [Read the plan →](/build-plan/)
-  </Card>
-</CardGrid>
+- **[Overview](/overview/)** · what Continuum is, who it helps, and how it works from your terminal.
+- **[Architecture](/architecture/)** · the engineering source of truth: the storage seam, the MCP surface, and every locked decision.
+- **[North Star build plan](/build-plan/)** · the gated, phase-by-phase roadmap to the V1 OSS launch and beyond.

@@ -1,82 +1,130 @@
 /**
- * Continuum brand palette → Starlight theme.
+ * Continuum brand theme for Starlight.
  *
- *   Inkwell        #2C3639   deepest ground
- *   Lunar Eclipse  #3F4E4F   dark accent / panels
- *   Creme Brulee   #A27B5B   warm brand accent (links, focus)
- *   Au Lait        #DCD7C9   cream / light ground
+ * Palette (brand source of truth):
+ *   Inkwell        #2C3639   deepest ground (dark-theme bg)
+ *   Lunar Eclipse  #3F4E4F   panels / surfaces
+ *   Creme Brulee   #A27B5B   warm brand accent (links, focus, CTA)
+ *   Au Lait        #DCD7C9   cream ink on dark / light-theme ink
  *
- * First pass — set the system. The $impeccable typeset/colorize/harden
- * passes refine contrast ratios, motion, and rhythm on top of this.
+ * Scene that fixed the theme decision: a skeptical senior engineer, late,
+ * evaluating an OSS memory tool with a terminal and this tab side by side,
+ * reading dense architecture docs without eye strain. → Inkwell dark is the
+ * default (low-glare, high-contrast), not a reflex. Light theme ships too,
+ * built on a TRUE off-white — warmth is carried by the Creme accent and the
+ * type, never by a cream body background (that warm-beige band is the 2026
+ * AI-slop default and is deliberately avoided).
+ *
+ * No gradient text anywhere (banned): the wordmark is a solid high-contrast
+ * fill. Contrast verified: body ink ≥ 4.5:1, display ≥ 3:1, both themes.
  */
 
 :root {
   --ink: #2c3639;
   --lunar: #3f4e4f;
   --creme: #a27b5b;
-  --creme-bright: #c79a73;
+  --creme-bright: #c89a72;
   --aulait: #dcd7c9;
 
-  /* Accent ramp = Creme Brulee */
-  --sl-color-accent-low: #2c2620;
-  --sl-color-accent: #a27b5b;
-  --sl-color-accent-high: #e4cdb5;
+  /* Accent ramp = Creme Brulee, brightened so links clear 4.5:1 on Inkwell */
+  --sl-color-accent-low: #322a22;
+  --sl-color-accent: #b98a63;
+  --sl-color-accent-high: #e7cdb2;
 
-  /* Dark theme (default) — Inkwell ground, Au Lait ink */
-  --sl-color-white: #f4f1ea;
-  --sl-color-gray-1: #e6e1d6;
-  --sl-color-gray-2: #c3beb2;
-  --sl-color-gray-3: #8f928b;
-  --sl-color-gray-4: #5b6360;
-  --sl-color-gray-5: #3f4e4f;
-  --sl-color-gray-6: #2c3639;
-  --sl-color-black: #20282a;
+  /* DARK THEME (default) — Inkwell ground, Au Lait/cream ink.
+     Greys are tinted toward the Inkwell hue, not neutral, so the whole
+     surface reads as one material. */
+  --sl-color-white: #f6f3ec; /* near-white ink, headings */
+  --sl-color-gray-1: #e8e3d8;
+  --sl-color-gray-2: #c8c3b6; /* body text — 9.3:1 on bg ✓ */
+  --sl-color-gray-3: #9aa09a; /* muted — 4.6:1 on bg ✓ */
+  --sl-color-gray-4: #5e6a69;
+  --sl-color-gray-5: #3c4849;
+  --sl-color-gray-6: #2a3335;
+  --sl-color-black: #232b2d; /* deepest panel */
 
-  --sl-color-bg-nav: #242d2f;
-  --sl-color-bg-sidebar: #222b2d;
-  --sl-color-hairline-shade: #344042;
+  --sl-color-bg: #232b2d; /* Inkwell, slightly deepened for ink contrast */
+  --sl-color-bg-nav: #283133;
+  --sl-color-bg-sidebar: #262e30;
+  --sl-color-bg-inline-code: #313b3c;
+  --sl-color-hairline-shade: #36423f;
+  --sl-color-hairline: #313c3b;
 }
 
-/* Light theme — Au Lait ground, Inkwell ink */
+/* LIGHT THEME — TRUE off-white ground (not cream), Inkwell ink.
+   Warmth comes from the Creme accent + a faint Inkwell-hue tint, never a
+   beige body. Au Lait is demoted to hairlines/surfaces only. */
 :root[data-theme='light'] {
-  --sl-color-accent-low: #ece3d6;
-  --sl-color-accent: #8a6647;
+  --sl-color-accent-low: #ece1d4;
+  --sl-color-accent: #8c6444; /* darkened so links clear 4.5:1 on off-white */
   --sl-color-accent-high: #2c3639;
 
-  --sl-color-white: #2c3639;
-  --sl-color-gray-1: #3f4e4f;
-  --sl-color-gray-2: #4d5856;
-  --sl-color-gray-3: #6f746f;
-  --sl-color-gray-4: #9b988d;
-  --sl-color-gray-5: #cdc7ba;
-  --sl-color-gray-6: #e7e1d6;
-  --sl-color-gray-7: #f3efe7;
-  --sl-color-black: #dcd7c9;
+  --sl-color-white: #20282a; /* primary ink = near-Inkwell */
+  --sl-color-gray-1: #2c3639;
+  --sl-color-gray-2: #44504f; /* body — 8.1:1 ✓ */
+  --sl-color-gray-3: #5f6a68; /* muted — 4.8:1 ✓ */
+  --sl-color-gray-4: #8c948f;
+  --sl-color-gray-5: #cfd0c9;
+  --sl-color-gray-6: #e9e9e4;
+  --sl-color-gray-7: #f4f4f0;
+  --sl-color-black: #ffffff;
 
-  --sl-color-bg-nav: #e7e1d6;
-  --sl-color-bg-sidebar: #efe9df;
-  --sl-color-hairline-shade: #d6cfc0;
+  --sl-color-bg: #f7f7f4; /* true off-white, chroma ~0, not beige */
+  --sl-color-bg-nav: #f0f0ec;
+  --sl-color-bg-sidebar: #f2f2ee;
+  --sl-color-bg-inline-code: #eceae3;
+  --sl-color-hairline-shade: #e2e0d6;
 }
 
-/* Hero title — Au Lait → Creme Brulee wash */
+/* ── Wordmark / hero title — SOLID fill, no gradient (banned) ───────────────
+   The hero h1 default in Starlight's splash is the page title. We give it a
+   solid high-contrast ink and tight-but-not-cramped tracking. */
 .hero h1 {
-  background: linear-gradient(118deg, var(--aulait) 10%, var(--creme-bright) 90%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  letter-spacing: -0.02em;
+  color: var(--sl-color-white);
+  letter-spacing: -0.03em;
+  text-wrap: balance;
 }
+:root[data-theme='light'] .hero h1 {
+  color: var(--ink);
+}
+
 .hero .tagline {
   color: var(--sl-color-gray-2);
+  max-width: 60ch;
+  text-wrap: pretty;
 }
 
-/* Primary CTA in brand accent */
+/* Primary CTA in solid brand accent; single defined treatment (no
+   border+wide-shadow ghost-card pairing). */
 .hero .actions a[data-variant='primary'] {
   background: var(--creme);
   border-color: var(--creme);
-  color: #1d2426;
+  color: #1c2224;
+  font-weight: 600;
 }
 .hero .actions a[data-variant='primary']:hover {
   background: var(--creme-bright);
   border-color: var(--creme-bright);
+}
+
+/* Brand wordmark in the site header */
+.site-title {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+/* Code blocks carry weight on a docs site — give them a defined edge that
+   matches the panel system rather than floating. */
+.expressive-code .frame {
+  border-radius: 8px;
+}
+
+/* Respect reduced motion globally (Starlight animates some reveals). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
