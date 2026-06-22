@@ -9,6 +9,15 @@
         "https://gitmcp.io/docs"
       ],
       "env": {}
+    },
+    "headroom": {
+      "type": "stdio",
+      "command": "/Users/emporiumcollection/Library/Python/3.11/bin/headroom",
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "env": {}
     }
   }
 }
