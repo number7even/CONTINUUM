@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "git-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://gitmcp.io/docs"
+      ],
+      "env": {}
+    }
+  }
+}
