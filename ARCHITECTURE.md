@@ -379,6 +379,22 @@ continuum_record_checkpoint(reason: string)     → StateSnapshot
 
 ## 6. Deployment
 
+> **⚠️ ASPIRATIONAL — not the shipped runtime (P6-T2 reconciliation, 2026-06-22).**
+> The Worker Service on `http://localhost:37778`, the Bun-managed background
+> daemon, the source-polling loop, and the Chroma index described in this
+> section were the **original V0 design and were never built**. They are kept
+> here as design intent, not shipped reality.
+>
+> **What actually ships in V1:** the MCP server runs in-process over **direct
+> stdio** (`continuum start`) or **HTTP/SSE** (`continuum serve`) — no separate
+> worker daemon, no port 37778, no Chroma. Storage is **SQLite + FTS5** today
+> (`StorageBackend` seam; RuVector hybrid is opt-in via
+> `CONTINUUM_STORAGE_BACKEND=hybrid`). Indexing, checkpoints, and todos run
+> synchronously inside the MCP request path. There is no `continuum stop` and
+> no `continuum mcp` command; the real CLI is
+> `init / start / serve / status / import-state` (§ see README and
+> `packages/cli`). Treat the diagram below as the historical plan.
+
 Continuum requires a **persistent background process** for asynchronous work
 (source polling, embedding generation, checkpoint scheduling, LLM-assisted
 digest composition). Following claude-mem's verified pattern, the Worker
