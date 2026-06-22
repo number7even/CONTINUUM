@@ -147,18 +147,69 @@ critical path.
 5. **Doubt-Driven Development** — Fable Brain Kit + Agent Skills; agents verify
    claims/metrics/asset quality **before spending ad budget**.
 
-**7-layer build order (ingestion → sales):**
-- **L2 Ingestion** — `last30days-skill` + OKF crawler scrape real engagement
-  (Reddit/TikTok/Polymarket), score trends with the "Fun Judge".
-- **L3–L4 Synthesis** — "Addictive Storytelling" loop (Vercel AI SDK); Asset
-  Agent over WebSocket → bare-metal **ComfyUI** GPU cluster, synced to
-  **ElevenLabs** ms timestamps.
-- **L5–L7 Distribution & Sales** — **FFmpeg/Remotion** programmatic assembly;
-  15-agent hierarchical mesh for media buying (`claude-ads`); **AiToEarn** intent
-  mining for real-time lead capture.
+**7-layer build order (full component spec, captured 2026-06-22):**
+
+- **L1 Developer Control Plane & Orchestration** — the OS + local command center.
+  - **Supacode** — native macOS terminal command center (libghostty + mise) for
+    managing/monitoring multi-agent terminal instances.
+  - **ECC (Extensible Claude Code)** — core Agent OS; `ccg-workflow` runtime for
+    multi-LLM orchestration.
+  - **Compound Engineering Plugin** — enforces 80/20 (heavy plan, fast execute);
+    `/ce-strategy` writes a durable `STRATEGY.md` memory so agents don't repeat
+    mistakes.
+  - **MetaHarness** — mints repo-aware harnesses with governance + the
+    `@metaharness/router` (dynamic cheap-model routing).
+- **L2 Social Intelligence & Ingestion (the Brain)** — hunt viral topics first.
+  - **last30days-skill (v3)** — scrapes real engagement (Reddit upvotes, X likes,
+    YouTube transcripts, TikTok, Polymarket odds); "pre-research brain" resolves
+    *where* to search before firing APIs; "Fun Judge" scores wit/virality.
+  - **Agent-Reach** — unhindered-access layer; uses local browser cookies to
+    bypass API fees / 403s / login walls (Reddit, X, Xiaohongshu). ⚠ ToS/ethics
+    review required before any use.
+- **L3 Scripting, SEO & Content Generation.**
+  - **Addictive Storytelling (AI Director)** — Vercel AI SDK aligns dialogue to
+    scene prompts; structure: Stakes → Big Question → Head Fake → Rehook.
+  - **claude-blog** — 5-Gate Delivery Contract; a Judge agent scores against a
+    100-pt rubric, iterating up to 3× until ≥90.
+  - **claude-seo / OKF-Native SEO** — up to 15 parallel specialists for
+    Google / GEO / Schema.org. *(claude-seo already installed in this env.)*
+- **L4 Headless Asset Synthesis (video factory floor)** — decoupled async queues.
+  - **Headless GPU Swarm (ComfyUI)** — Asset Agent overwrites JSON workflow
+    templates with prompts, fires over WebSocket to a bare-metal GPU cluster.
+  - **ElevenLabs** — narration + exact ms byte-marker timestamps for frame-sync.
+  - **ian-xiaohei-illustrations** — 16:9 minimalist white-bg metaphor visuals
+    (black "Xiaohei" character, sparse Chinese annotations).
+- **L5 Programmatic Assembly & Organic Syndication.**
+  - **FFmpeg / Remotion** — programmatic edit bay: concatenation, audio ducking,
+    subtitle burn-in via ElevenLabs timestamps.
+  - **Hermes AI Video Judge** — watches the final render, scores /10, recursively
+    commands edits until pacing/visual bugs clear.
+  - **Vigola** — cron clipper; hunts viral hooks in long-form → 9:16 shorts.
+  - **AiToEarn** — central publisher (MCP + relay); 10+ platforms at once;
+    optimizes for the YouTube algorithm (carousels/quizzes to the Community Tab).
+- **L6 Paid Amplification & Performance Marketing.**
+  - **AI Marketing Swarms** — 15-agent hierarchical mesh for 24/7 cross-platform
+    media buying; fraud spotting, real-time bids, creative-fatigue prediction,
+    winning-creative "DNA" mutation. ⚠ real-money actions: hard verify-then-spend.
+  - **claude-ads** — auditor skill; 10–15 min deep-dives on Google/Meta/TikTok →
+    prioritized action plans + 0–100 health scores.
+- **L7 Lead Conversion & Sales Pipeline.**
+  - **AiToEarn Intent Mining** — Engagement Agent monitors comments in real time,
+    detects buy-intent signals, deploys LLM smart replies to capture leads.
+  - **MetaHarness Pods** — `vertical:sales` + `vertical:crm` pods autonomously
+    follow up, nurture, and close inbound prospects.
+
+**Architectural integration standards (every AMF component must comply):**
+MCP + ECC for agent comms · Redis/BullMQ Pub/Sub with a single append-only JSON
+state doc (no blocking sequential calls) · OKF Markdown+YAML for all
+heuristics/rules (no hardcoded Python) · `@metaharness/router` for model routing
+(no hardcoded frontier models) · Fable Brain Kit + Agent Skills behavioral
+baseline (Doubt-Driven Development).
 
 **Gate (AMF, internal):** every spend action carries a `verifyCommand`-equivalent
-witness before budget is committed — verify-then-spend.
+witness before budget is committed — verify-then-spend. ⚠ Components touching
+real money (L6 swarms) or platform ToS (L2 Agent-Reach) require explicit operator
+sign-off before any live run.
 
 ---
 
