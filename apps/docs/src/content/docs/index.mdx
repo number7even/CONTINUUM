@@ -33,8 +33,10 @@ command exits 0 to prove it.**
     by a green shell exit is never marked complete; it stays a witness until then.
   </Card>
   <Card title="Progressive disclosure" icon="seti:db">
-    A 3-layer retrieval surface (search → timeline → full-fetch) delivers
-    roughly 10× token savings over grep-and-read context loading.
+    A 3-layer retrieval surface (search → timeline → full-fetch) cuts retrieval
+    tokens by a measured **~2.85×** (up to 5.3× when an answer needs a single
+    record), benchmarked on this repo's own history. Reproduce it:
+    `node scripts/benchmark-token-savings.mjs`.
   </Card>
   <Card title="Local-first, swappable" icon="laptop">
     SQLite + FTS5 today, RuVector vector search next, behind one

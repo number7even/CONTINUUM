@@ -27,7 +27,7 @@
 > (installed at `~/.claude/plugins/marketplaces/thedotmack/`):
 > §3 — 5 lifecycle hook listeners replace generic source-change trigger.
 > §4 — Hybrid SQLite-FTS5 + Chroma interaction made explicit.
-> §5 — Progressive Disclosure (3-layer MCP tools) replaces flat search tools — ~10x token savings.
+> §5 — Progressive Disclosure (3-layer MCP tools) replaces flat search tools — a measured ~2.85x token reduction (P6-T4 benchmark).
 > §6 — Background Worker Service added as V0 component (Bun/Node HTTP).
 > §8 — `<private>` elevated from convention to **core invariant**, enforced at Aggregator.
 > §14 — D2 (Chroma) and D7 (claude-mem as adapter) locked.
@@ -283,7 +283,7 @@ fetch full content selectively via `continuum_get_observations(ids[])` — see �
 
 Naive flat retrieval (`search_docs(...) → Observation[]` with full text) blows
 the context window. claude-mem's verified solution is a **3-layer workflow**
-that filters by IDs before fetching content, yielding ~10x token savings.
+that filters by IDs before fetching content, yielding a measured ~2.85x token reduction (P6-T4 benchmark).
 Continuum adopts the same pattern across all 5 aggregated sources.
 
 ### Layer 1 — Search (compact index, ~50–100 tokens/result)

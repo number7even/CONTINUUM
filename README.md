@@ -94,8 +94,9 @@ Claude to use a token-efficient 3-layer workflow:
 - **Layer 3 (`continuum_get_observations`)** — Claude fetches the full text
   only for the specific records it actually needs.
 
-**How it helps:** progressive disclosure yields **~10x token savings** while
-giving the AI perfect historical recall.
+**How it helps:** progressive disclosure cuts retrieval tokens by a measured
+**~2.85x** (up to 5.3x when an answer needs a single record), benchmarked on
+this repo's own git history. Reproduce: `node scripts/benchmark-token-savings.mjs`.
 
 ### 5. Session end — writing the checkpoint
 

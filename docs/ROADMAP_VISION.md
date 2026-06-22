@@ -95,8 +95,9 @@ tenant-isolation proofs pass on Postgres.
 - **Headroom** — token compression downstream of the shell (tool outputs, logs,
   RAG chunks). Up to ~92% savings on heavy tasks, **reversible (CCR)** so the LLM
   can pull unshortened data back when precision is needed. **High-ROI, low-risk,
-  independent** → pulled forward to run alongside Phase 1. Directly fortifies the
-  ~10× token-efficiency claim. 🅿️
+  independent** → pulled forward to run alongside Phase 1. Compounds the
+  measured ~2.85× Progressive-Disclosure saving (P6-T4) with shell-output
+  compression. 🅿️
 - **ECC (Extensible Claude Code)** — agents/skills + expanded hook event types.
   Adopt as tooling. 🅿️
 - **AgentShield** — `/security-scan` static analysis on hooks/prompts before
