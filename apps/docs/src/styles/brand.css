@@ -119,6 +119,107 @@
   border-radius: 8px;
 }
 
+/* ── Landing-page sections (splash) ────────────────────────────────────────── */
+
+/* Lede — the opening statement under the hero. Larger than body, calm. */
+.lede {
+  font-size: 1.3rem;
+  line-height: 1.55;
+  max-width: 60ch;
+  color: var(--sl-color-gray-1);
+  margin: 1rem 0 2.5rem;
+  text-wrap: pretty;
+}
+.lede em {
+  color: var(--creme-bright);
+  font-style: italic;
+}
+:root[data-theme='light'] .lede em {
+  color: var(--creme);
+}
+
+/* Customer ladder — three rungs, leading numerals instead of identical cards. */
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-width: 62ch;
+  margin: 1.5rem 0;
+}
+.ladder-step {
+  display: flex;
+  gap: 1.25rem;
+  align-items: baseline;
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--sl-color-hairline);
+}
+.ladder-step:last-child {
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+.ladder-rung {
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  font-size: 0.95rem;
+  color: var(--creme);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  padding-top: 0.15rem;
+}
+.ladder-step h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+.ladder-step p {
+  margin: 0;
+  color: var(--sl-color-gray-2);
+}
+
+/* Five sources — compact labelled rows, not a card grid. */
+.sources {
+  display: grid;
+  gap: 0.6rem;
+  max-width: 64ch;
+  margin: 1.5rem 0;
+}
+.source {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.7rem 1rem;
+  background: var(--sl-color-bg-sidebar);
+  border-radius: 8px;
+  color: var(--sl-color-gray-2);
+  font-size: 0.95rem;
+}
+.source span {
+  font-weight: 600;
+  color: var(--creme-bright);
+  letter-spacing: 0.01em;
+}
+:root[data-theme='light'] .source span {
+  color: var(--creme);
+}
+
+/* Proof note — quiet, honest aside under the differentiators. */
+.proof-note {
+  max-width: 64ch;
+  margin: 1.5rem 0 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--sl-color-hairline);
+  background: var(--sl-color-accent-low);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  color: var(--sl-color-gray-2);
+  line-height: 1.5;
+}
+
+@media (max-width: 30rem) {
+  .source {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+}
+
 /* Respect reduced motion globally (Starlight animates some reveals). */
 @media (prefers-reduced-motion: reduce) {
   *,

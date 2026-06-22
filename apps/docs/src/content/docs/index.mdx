@@ -6,8 +6,8 @@ hero:
   title: Continuum
   tagline: Persistent memory for AI coding assistants that refuses to mark work done until a shell command proves it.
   actions:
-    - text: Read the architecture
-      link: /architecture/
+    - text: Get started
+      link: /overview/
       icon: right-arrow
       variant: primary
     - text: View on GitHub
@@ -16,40 +16,128 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
 
-## A memory layer that earns its claims
+<div class="lede">
+Every developer who works with an AI coding assistant has said it: <em>"I told
+you about this last week."</em> The assistant starts every session blank, and you
+spend the first twenty minutes re-explaining the project. Continuum is the memory
+layer that ends that, and it earns every claim it makes by proving it with a shell
+command.
+</div>
 
-Continuum is an open-source [Model Context Protocol](https://modelcontextprotocol.io)
-engine that gives AI coding assistants a persistent, verifiable memory of a
-project: its state, its decisions, its history, across every session.
+## Who it helps
 
-Its moat is a discipline, not a feature: **work is not "done" until a shell
-command exits 0 to prove it.**
+Continuum is for **solo founders, small teams, consultants, and AI-assisted
+builders** who work in Claude Code, Cursor, or Claude Desktop and lose hours each
+session re-establishing context. It serves three customers from one engine, and
+the engine is identical across all three; only the configuration changes.
 
-<CardGrid stagger>
+<div class="ladder">
+  <div class="ladder-step">
+    <span class="ladder-rung">01</span>
+    <div>
+      <h3>Dogfood</h3>
+      <p>The VoiceCosmos dev team runs it on its own work every day. If it does not
+      hold up for us, it does not ship.</p>
+    </div>
+  </div>
+  <div class="ladder-step">
+    <span class="ladder-rung">02</span>
+    <div>
+      <h3>Independent developers</h3>
+      <p>The open-source release, and a hosted option, for solo builders and small
+      teams who want persistent project memory without standing up infrastructure.</p>
+    </div>
+  </div>
+  <div class="ladder-step">
+    <span class="ladder-rung">03</span>
+    <div>
+      <h3>Tenant-scoped enterprise</h3>
+      <p>The same engine embedded per tenant, such as the ARIA Voice OS for hotels.
+      Isolated data, shared discipline.</p>
+    </div>
+  </div>
+</div>
+
+## What it is
+
+Continuum is a persistent intelligence layer and [Model Context
+Protocol](https://modelcontextprotocol.io) server: the hippocampus for an AI
+system. It continuously aggregates five sources of project truth into one
+verifiable memory database.
+
+<div class="sources">
+  <div class="source"><span>Docs</span> Local documentation in your project, indexed for retrieval.</div>
+  <div class="source"><span>Memory</span> Observations carried forward from past AI sessions.</div>
+  <div class="source"><span>Feedback</span> Human-in-the-loop corrections and rewards.</div>
+  <div class="source"><span>Git</span> Version-control history, one observation per commit.</div>
+  <div class="source"><span>Transcripts</span> Full AI session logs, privacy-filtered on write.</div>
+</div>
+
+## How it helps
+
+<CardGrid>
   <Card title="Verify-then-dissolve" icon="approve-check">
-    Every checkpoint carries a `verifyCommand`. State that can't be re-proven
-    by a green shell exit is never marked complete; it stays a witness until then.
+    The defining discipline. A task in the live todo pipeline is not marked done
+    until its `verifyCommand` exits 0. No green shell exit, no completion. The
+    only AI memory layer that refuses to take its own word for it.
   </Card>
-  <Card title="Progressive disclosure" icon="seti:db">
-    A 3-layer retrieval surface (search → timeline → full-fetch) cuts retrieval
-    tokens by a measured **~2.85×** (up to 5.3× when an answer needs a single
-    record), benchmarked on this repo's own history. Reproduce it:
-    `node scripts/benchmark-token-savings.mjs`.
+  <Card title="A measured ~2.85x fewer tokens" icon="seti:db">
+    Instead of dumping a codebase into context, the AI works through 3-layer
+    Progressive Disclosure: a cheap search index, then chronological timeline,
+    then full content only for the records it explicitly asks for. Benchmarked on
+    this repo's own history, reproducible with one command (not a marketing number).
   </Card>
-  <Card title="Local-first, swappable" icon="laptop">
-    SQLite + FTS5 today, RuVector vector search next, behind one
-    `StorageBackend` seam. Your history stays on your machine by default.
+  <Card title="Zero cold starts" icon="rocket">
+    At session start the AI reads one briefing resource and immediately knows the
+    current state, open commitments, and what shipped yesterday. No re-explaining.
   </Card>
-  <Card title="Privacy at the write" icon="seti:lock">
-    A secret-scrubbing filter sits on the single write choke-point, redacting
-    known credential patterns before anything is persisted.
+  <Card title="Local-first and private" icon="laptop">
+    SQLite + FTS5 today, RuVector vector search next, behind one `StorageBackend`
+    seam. A secret-scrubbing filter sits on the single write path. Your history
+    stays on your machine by default.
   </Card>
 </CardGrid>
 
-## Where to go next
+<div class="proof-note">
+The ~2.85x figure is the measured aggregate from
+<code>scripts/benchmark-token-savings.mjs</code> (up to 5.3x when an answer needs a
+single record). We publish the number the benchmark produces, not the number we
+wish it produced. Run it yourself.
+</div>
 
-- **[Overview](/overview/)** · what Continuum is, who it helps, and how it works from your terminal.
-- **[Architecture](/architecture/)** · the engineering source of truth: the storage seam, the MCP surface, and every locked decision.
-- **[North Star build plan](/build-plan/)** · the gated, phase-by-phase roadmap to the V1 OSS launch and beyond.
+## The end-to-end journey
+
+<Steps>
+
+1. **Initialize.** One command scaffolds the database, no external configuration:
+   ```bash
+   npx @number7even/continuum-cli init
+   ```
+
+2. **Warm start.** The next session opens against `continuum://session/briefing`.
+   The AI knows the product state, open todos, and yesterday's progress before you
+   type a word.
+
+3. **Token-efficient collaboration.** While working, the AI queries the 5-source
+   memory through `continuum_search_docs` → `continuum_timeline` →
+   `continuum_get_observations`, paying full token cost only for what it needs.
+
+4. **Proof-driven execution.** When the AI claims a task is finished, Continuum
+   runs the task's `verifyCommand`. It is marked complete only if the command
+   passes.
+
+5. **State sealing.** At session end the engine writes an append-only, hash-sealed
+   checkpoint, so today's architectural decisions can be queried as fact tomorrow.
+
+</Steps>
+
+## Start here
+
+<CardGrid>
+  <LinkCard title="Overview" href="/overview/" description="What Continuum is and how it works from your terminal." />
+  <LinkCard title="Architecture" href="/architecture/" description="The engineering source of truth: storage seam, MCP surface, locked decisions." />
+  <LinkCard title="Build plan" href="/build-plan/" description="The gated, phase-by-phase roadmap to the V1 launch and beyond." />
+  <LinkCard title="Install from npm" href="https://www.npmjs.com/package/@number7even/continuum-cli" description="@number7even/continuum-cli — the published CLI." />
+</CardGrid>
