@@ -1,5 +1,5 @@
 {
-  "name": "@continuum/console",
+  "name": "@number7even/continuum-console",
   "version": "0.0.1",
   "private": true,
   "description": "Continuum Operator Console — Next.js frontend that talks to a CONTINUUM HTTP/SSE engine over the V1 transport. Deploys on Vercel.",

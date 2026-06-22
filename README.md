@@ -143,7 +143,31 @@ See [ROADMAP §15](./ARCHITECTURE.md#15-roadmap-post-v0) for full timeline.
 
 ---
 
-## Quick start (V0)
+## Quick start (install from npm)
+
+The CLI is published on npm. The packages are scoped to `@number7even/continuum-*`:
+
+```bash
+# Install the CLI globally (provides the `continuum` command)
+npm install -g @number7even/continuum-cli
+
+# Initialize a project DB + print the MCP registration snippet, then run the server
+continuum init
+continuum start
+```
+
+Or run it without installing:
+
+```bash
+npx @number7even/continuum-cli init
+npx @number7even/continuum-cli start
+```
+
+Published packages: [`@number7even/continuum-core`](https://www.npmjs.com/package/@number7even/continuum-core) ·
+[`@number7even/continuum-mcp-server`](https://www.npmjs.com/package/@number7even/continuum-mcp-server) ·
+[`@number7even/continuum-cli`](https://www.npmjs.com/package/@number7even/continuum-cli).
+
+## Quick start (from source)
 
 ```bash
 # 1. Clone + build
@@ -171,7 +195,8 @@ cp .mcp.json.example /path/to/your-project/.mcp.json
 #    Use continuum_record_checkpoint with reason + active[] to seed.
 ```
 
-A full CLI (`npx continuum init / start / status`) lands in V0 polish.
+The full CLI is shipped: `continuum init / start / serve / status / import-state`
+(via `npm install -g @number7even/continuum-cli`, or `npx @number7even/continuum-cli`).
 
 After install, Claude Code (and any MCP-aware client) sees the new tools:
 

@@ -8,7 +8,7 @@ welcome responsible disclosure.
 ## Supported versions
 
 Continuum is **pre-1.0 and under rapid iteration**. Only the latest `main`
-(and the latest published `@continuum/*` packages, once released to npm) receive
+(and the latest published `@number7even/continuum-*` packages, once released to npm) receive
 security fixes. There are no backports to older commits or versions.
 
 | Version | Supported |

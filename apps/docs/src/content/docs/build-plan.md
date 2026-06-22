@@ -3,6 +3,16 @@ title: "North Star Build Plan"
 description: "The gated, phase-by-phase roadmap to the V1 OSS launch and beyond."
 ---
 
+:::note[Published package names]
+This plan was authored before launch and refers to the packages as `@continuum/*`.
+At publish time the `@continuum` npm scope turned out to be owned by another
+account, so V1 shipped under the **`@number7even/continuum-*`** scope:
+[`@number7even/continuum-core`](https://www.npmjs.com/package/@number7even/continuum-core),
+[`@number7even/continuum-mcp-server`](https://www.npmjs.com/package/@number7even/continuum-mcp-server),
+[`@number7even/continuum-cli`](https://www.npmjs.com/package/@number7even/continuum-cli).
+The plan text below is kept as the historical record.
+:::
+
 <!--
   ULTRA_NORTH_STAR_BUILD_PLAN.md
   Generated 2026-06-12 by Claude (Opus 4.8, 1M context) per
