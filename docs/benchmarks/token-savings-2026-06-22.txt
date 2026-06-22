@@ -1,0 +1,24 @@
+CONTINUUM — Progressive Disclosure token-savings benchmark (P6-T4)
+========================================================================
+Corpus: 101 real git-commit observations from this repo.
+Tokenizer: tiktoken o200k_base (ratio is tokenizer-robust).
+Naive = full body of all FTS5 matches. Progressive = Layer-1 compact
+hits (all matches) + Layer-3 full body for top-K. K reported 1/3/5.
+
+  StorageBackend           hits=10  naive= 10176t  prog@K3= 3838t  savings=2.65x
+  tenant isolation         hits=10  naive= 12105t  prog@K3= 4516t  savings=2.68x
+  privacy filter           hits=14  naive= 13118t  prog@K3= 3241t  savings=4.05x
+  checkpoint               hits=20  naive= 15658t  prog@K3= 4423t  savings=3.54x
+  publish npm              hits= 3  naive=  1043t  prog@K3= 1364t  savings=0.76x
+  MCP server               hits=20  naive= 17331t  prog@K3= 6021t  savings=2.88x
+  protobufjs               hits= 5  naive=  4400t  prog@K3= 2746t  savings=1.60x
+  progressive disclosure   hits= 9  naive=  9532t  prog@K3= 3089t  savings=3.09x
+
+------------------------------------------------------------------------
+AGGREGATE (sum of tokens across all queries):
+  K=1:  naive=83363t  progressive=15673t  →  5.32x token reduction (81.2% fewer)
+  K=3:  naive=83363t  progressive=29238t  →  2.85x token reduction (64.9% fewer)
+  K=5:  naive=83363t  progressive=41658t  →  2.00x token reduction (50.0% fewer)
+
+The honest headline figure is the K=3 aggregate above.
+Reproduce: node scripts/benchmark-token-savings.mjs
