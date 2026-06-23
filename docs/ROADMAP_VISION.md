@@ -213,9 +213,13 @@ real money (L6 swarms) or platform ToS (L2 Agent-Reach) require explicit operato
 sign-off before any live run.
 
 **AMF build decisions (operator, 2026-06-23):**
-- **Voice synthesis: open-source, NOT ElevenLabs.** Use `rapidaai/voice-ai`
-  + `OpenBMB/VoxCPM` for narration + word-timestamps. Removes a paid-API
-  dependency from L4.
+- **Voice — SUPERSEDED (ZeroEdit, later same day): HUMAN voice, no AI TTS.**
+  ZeroEdit mandates a real creator voice recording (QuickTime) routed through
+  the **Auphonic API** for studio enhancement + word-timestamp extraction, to
+  protect YouTube monetisation and avoid "AI slop". This **reverses** the
+  earlier-same-day `rapidaai/voice-ai` + `VoxCPM` AI-voice decision (kept here
+  as the iteration log per append-only honesty). L4 audio = human rec + Auphonic,
+  NOT AI synthesis. ⚠ Auphonic is a paid API (operator account/key).
 - **GPU/Hetzner:** operator is procuring bare-metal RTX (Hetzner). L4 ComfyUI
   video render unblocks when it lands.
 - **Ghost (L5 owned-media):** MIT self-host. Needs a domain + Stripe key
@@ -227,8 +231,20 @@ sign-off before any live run.
 - **Strategic priority:** the content engine (L2→L5 producing path) is the
   **main GTM**. Build order favours getting topic→script→render working over
   L6/L7 monetisation.
-- **amf.continuum.rest:** control-room shell SHIPPED (5-tab Headless Hive,
-  illustrative state). First real backend = L2 Zone-1 trend ingestion.
+- **amf.continuum.rest:** control-room shell SHIPPED (5-tab Headless Hive).
+  Zone-1 (The Brain) is LIVE on real public sources (HN + Lobsters); zones
+  2–5 remain labelled scaffold.
+- **ZeroEdit pipeline (new components, 2026-06-23):** the AMF producing path
+  adopts the "ZeroEdit" methodology (reverse-engineer competitor channels →
+  validate outlier demand → human voice + AI visuals → ~$0.30–0.60/min).
+  New named tools to integrate: **HyperFrames** (`heygen-com/hyperframes`,
+  `npx skills add` — agentic HTML/CSS/GSAP video renderer, replaces manual
+  Higsfield CLI) at L5; **Auphonic** at L4 (audio); **Pod-Geni RAWPITCH**
+  advisory marketplace as the L7 monetisation endpoint (paid 45-min advisory
+  sessions, not just ad revenue). Orchestration stack named: Supacode (L1
+  terminal), ECC + MetaHarness + Compound-Engineering (`/ce-strategy` →
+  STRATEGY.md), Redis/BullMQ queue, `@metaharness/router`. All still gated /
+  parked behind GPU + paid accounts + the orchestration build.
 
 ---
 

@@ -156,6 +156,35 @@ export default function HeadlessHive() {
     loadTrends();
   }, []);
 
+  // L3 — AI Director: turn a live trend into a real script.
+  const [job, setJob] = useState<{ topic: string; text: string; status: 'streaming' | 'done' | 'error'; error?: string } | null>(null);
+
+  async function sendToFactory(trend: LiveTrend, idx: number) {
+    setSent((s) => ({ ...s, [idx]: true }));
+    setJob({ topic: trend.topic, text: '', status: 'streaming' });
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: trend.topic, format: 'video-script', angle: 'developer / builder audience' }),
+      });
+      if (!res.ok || !res.body) {
+        const msg = await res.text().catch(() => res.statusText);
+        throw new Error(res.status === 503 ? 'ANTHROPIC_API_KEY not set on this deployment — set it in Vercel env to enable the AI Director.' : msg);
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        setJob((j) => (j ? { ...j, text: j.text + dec.decode(value, { stream: true }) } : j));
+      }
+      setJob((j) => (j ? { ...j, status: 'done' } : j));
+    } catch (e) {
+      setJob((j) => (j ? { ...j, status: 'error', error: e instanceof Error ? e.message : String(e) } : j));
+    }
+  }
+
   return (
     <main style={{ maxWidth: 1560, margin: '0 auto', padding: '1.25rem 1.5rem 3rem' }}>
       {/* top bar */}
@@ -237,8 +266,8 @@ export default function HeadlessHive() {
                       <Sig label="comments" val={'💬' + t.comments.toLocaleString()} />
                       <Sig label="age" val={t.ageHours + 'h'} />
                     </div>
-                    <button onClick={() => setSent((s) => ({ ...s, [i]: true }))} disabled={sent[i]} style={{ padding: '0.5rem 1rem', borderRadius: 7, border: 'none', background: sent[i] ? '#3a4446' : CREME, color: sent[i] ? MUTED : '#1c2224', fontWeight: 600, fontSize: '0.85rem', cursor: sent[i] ? 'default' : 'pointer' }}>
-                      {sent[i] ? 'Queued to factory →' : 'Send to factory'}
+                    <button onClick={() => sendToFactory(t, i)} style={{ padding: '0.5rem 1rem', borderRadius: 7, border: 'none', background: CREME, color: '#1c2224', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
+                      Send to factory · script it →
                     </button>
                   </article>
                 ))}
@@ -367,6 +396,33 @@ export default function HeadlessHive() {
           </div>
         )}
       </div>
+
+      {/* L3 — AI Director slide-over: the generated script */}
+      {job && (
+        <div onClick={() => setJob(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', justifyContent: 'flex-end' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(640px, 92vw)', background: INK, borderLeft: `1px solid ${HAIR}`, height: '100%', overflow: 'auto', padding: '1.5rem 1.75rem', boxShadow: '-20px 0 60px rgba(0,0,0,0.4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.4rem' }}>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: CREME, fontFamily: 'ui-monospace, monospace' }}>L3 · AI Director · video script</div>
+                <h2 style={{ margin: '0.25rem 0 0', fontSize: '1.05rem', color: TEXT }}>{job.topic}</h2>
+              </div>
+              <button onClick={() => setJob(null)} style={{ background: 'none', border: `1px solid ${HAIR}`, borderRadius: 6, color: BODY, padding: '0.3rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+            </div>
+            <div style={{ fontSize: '0.74rem', color: MUTED, marginBottom: '1rem' }}>
+              {job.status === 'streaming' && <span><Dot c={AMBER} /> AI Director writing (Stakes → Big Question → Head Fake → Rehook)…</span>}
+              {job.status === 'done' && <span><Dot c={GREEN} /> draft complete · next: claude-blog 5-gate QC (not wired)</span>}
+              {job.status === 'error' && <span><Dot c={RED} /> generation failed</span>}
+            </div>
+            {job.status === 'error' ? (
+              <div style={{ background: '#3a1010', border: `1px solid ${RED}55`, borderRadius: 8, padding: '0.9rem 1.1rem', color: RED, fontSize: '0.88rem' }}>{job.error}</div>
+            ) : (
+              <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'inherit', fontSize: '0.95rem', lineHeight: 1.6, color: TEXT, margin: 0 }}>
+                {job.text}{job.status === 'streaming' && <span style={{ color: CREME_HI }}>▍</span>}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
