@@ -111,11 +111,11 @@ export default async function Home() {
 
   return (
     <main style={{ maxWidth: 960, margin: '0 auto' }}>
-      <header style={{ borderBottom: '1px solid #2a2f36', paddingBottom: '1rem' }}>
+      <header style={{ borderBottom: '1px solid #36423f', paddingBottom: '1rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.75rem' }}>Continuum Console</h1>
-        <p style={{ margin: '0.5rem 0 0', color: '#8b939b' }}>
+        <p style={{ margin: '0.5rem 0 0', color: '#9aa09a' }}>
           V1 HTTP/SSE transport — operator view ·{' '}
-          <a href="/chat" style={{ color: '#9ad2ff' }}>
+          <a href="/chat" style={{ color: '#c89a72' }}>
             open chat → watch Progressive Disclosure in action
           </a>
         </p>
@@ -125,7 +125,7 @@ export default async function Home() {
       {result.ok === false && <ErrorView result={result} />}
       {result.ok === true && <OkView result={result} />}
 
-      <footer style={{ marginTop: '3rem', color: '#5f6770', fontSize: '0.85rem' }}>
+      <footer style={{ marginTop: '3rem', color: '#6b736d', fontSize: '0.85rem' }}>
         Server-rendered at request time. Vercel project; Continuum engine
         runs separately (long-running daemon, native bindings).
       </footer>
@@ -163,7 +163,7 @@ function ErrorView({ result }: { result: ErrResult }) {
       {result.detail && (
         <pre
           style={{
-            background: '#14181c',
+            background: '#2a3335',
             padding: '1rem',
             borderRadius: 6,
             overflowX: 'auto',
@@ -173,7 +173,7 @@ function ErrorView({ result }: { result: ErrResult }) {
           {result.detail}
         </pre>
       )}
-      <p style={{ color: '#8b939b' }}>
+      <p style={{ color: '#9aa09a' }}>
         Check that <code>continuum serve</code> is running and reachable
         at the configured URL with the Bearer token.
       </p>
@@ -185,7 +185,7 @@ function OkView({ result }: { result: OkResult }) {
   return (
     <section style={{ marginTop: '2rem' }}>
       <h2 style={{ color: '#7ddf64' }}>Connected</h2>
-      <p style={{ color: '#8b939b' }}>
+      <p style={{ color: '#9aa09a' }}>
         <code>{result.url}</code>
         {result.projectId && (
           <>
@@ -223,7 +223,7 @@ function Registry({
 }) {
   return (
     <div style={{ marginTop: '2rem' }}>
-      <h3 style={{ borderBottom: '1px solid #2a2f36', paddingBottom: '0.5rem' }}>
+      <h3 style={{ borderBottom: '1px solid #36423f', paddingBottom: '0.5rem' }}>
         {title}
       </h3>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -232,14 +232,14 @@ function Registry({
             key={item.key}
             style={{
               padding: '0.75rem 0',
-              borderBottom: '1px solid #1a1e23',
+              borderBottom: '1px solid #313c3b',
             }}
           >
-            <div style={{ fontFamily: 'ui-monospace, monospace', color: '#9ad2ff' }}>
+            <div style={{ fontFamily: 'ui-monospace, monospace', color: '#c89a72' }}>
               {item.key}
             </div>
             {item.body && (
-              <div style={{ color: '#8b939b', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+              <div style={{ color: '#9aa09a', fontSize: '0.9rem', marginTop: '0.25rem' }}>
                 {item.body}
               </div>
             )}

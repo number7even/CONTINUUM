@@ -211,11 +211,11 @@ export default function ChatPage() {
 
   return (
     <main style={{ maxWidth: 960, margin: '0 auto', paddingBottom: '6rem' }}>
-      <header style={{ borderBottom: '1px solid #2a2f36', paddingBottom: '1rem' }}>
+      <header style={{ borderBottom: '1px solid #36423f', paddingBottom: '1rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.75rem' }}>Continuum Chat</h1>
-        <p style={{ margin: '0.5rem 0 0', color: '#8b939b' }}>
+        <p style={{ margin: '0.5rem 0 0', color: '#9aa09a' }}>
           Progressive Disclosure (Layer 1 → 2 → 3) in action · Sonnet 4.6 ·{' '}
-          <a href="/" style={{ color: '#9ad2ff' }}>
+          <a href="/" style={{ color: '#c89a72' }}>
             operator dashboard
           </a>
         </p>
@@ -225,9 +225,9 @@ export default function ChatPage() {
         {messages.length === 0 && (
           <div
             style={{
-              color: '#5f6770',
+              color: '#6b736d',
               padding: '3rem 0',
-              borderBottom: '1px solid #1a1e23',
+              borderBottom: '1px solid #313c3b',
             }}
           >
             <p style={{ margin: 0 }}>
@@ -249,12 +249,12 @@ export default function ChatPage() {
             key={m.id}
             style={{
               padding: '1.25rem 0',
-              borderBottom: '1px solid #1a1e23',
+              borderBottom: '1px solid #313c3b',
             }}
           >
             <div
               style={{
-                color: '#8b939b',
+                color: '#9aa09a',
                 fontSize: '0.85rem',
                 marginBottom: '0.5rem',
                 textTransform: 'uppercase',
@@ -277,7 +277,7 @@ export default function ChatPage() {
                 style={{
                   whiteSpace: 'pre-wrap',
                   lineHeight: 1.55,
-                  color: '#e6e8eb',
+                  color: '#f6f3ec',
                 }}
               >
                 {m.text}
@@ -316,9 +316,9 @@ export default function ChatPage() {
           margin: '0 auto',
           display: 'flex',
           gap: '0.5rem',
-          background: '#0b0d10',
+          background: '#232b2d',
           padding: '0.75rem',
-          border: '1px solid #2a2f36',
+          border: '1px solid #36423f',
           borderRadius: 8,
         }}
       >
@@ -332,9 +332,9 @@ export default function ChatPage() {
           style={{
             flex: 1,
             padding: '0.75rem 1rem',
-            background: '#14181c',
-            color: '#e6e8eb',
-            border: '1px solid #2a2f36',
+            background: '#2a3335',
+            color: '#f6f3ec',
+            border: '1px solid #36423f',
             borderRadius: 6,
             fontSize: '1rem',
             outline: 'none',
@@ -345,8 +345,8 @@ export default function ChatPage() {
           disabled={isStreaming || !input.trim()}
           style={{
             padding: '0.75rem 1.5rem',
-            background: isStreaming || !input.trim() ? '#1a1e23' : '#9ad2ff',
-            color: isStreaming || !input.trim() ? '#5f6770' : '#0b0d10',
+            background: isStreaming || !input.trim() ? '#313c3b' : '#c89a72',
+            color: isStreaming || !input.trim() ? '#6b736d' : '#232b2d',
             border: 'none',
             borderRadius: 6,
             cursor: isStreaming || !input.trim() ? 'not-allowed' : 'pointer',
@@ -369,7 +369,7 @@ function ToolCard({ ti }: { ti: ToolInvocation }) {
       style={{
         margin: '0.5rem 0',
         padding: '0.75rem',
-        background: '#0e1216',
+        background: '#283133',
         border: `1px solid ${stateColor}`,
         borderRadius: 6,
         fontFamily: 'ui-monospace, monospace',
@@ -378,25 +378,25 @@ function ToolCard({ ti }: { ti: ToolInvocation }) {
     >
       <div style={{ color: stateColor, marginBottom: '0.25rem' }}>
         {ti.state === 'complete' ? '✓' : ti.state === 'error' ? '✗' : '…'}{' '}
-        <span style={{ color: '#9ad2ff' }}>{label}</span>{' '}
-        <span style={{ color: '#5f6770', fontSize: '0.75rem' }}>({ti.toolName})</span>
+        <span style={{ color: '#c89a72' }}>{label}</span>{' '}
+        <span style={{ color: '#6b736d', fontSize: '0.75rem' }}>({ti.toolName})</span>
       </div>
       <details>
         <summary
           style={{
             cursor: 'pointer',
-            color: '#8b939b',
+            color: '#9aa09a',
             fontSize: '0.75rem',
           }}
         >
           args + result
         </summary>
         <div style={{ marginTop: '0.5rem' }}>
-          <div style={{ color: '#5f6770', fontSize: '0.7rem' }}>args:</div>
+          <div style={{ color: '#6b736d', fontSize: '0.7rem' }}>args:</div>
           <pre
             style={{
               margin: 0,
-              color: '#e6e8eb',
+              color: '#f6f3ec',
               fontSize: '0.7rem',
               maxHeight: 200,
               overflow: 'auto',
@@ -407,14 +407,14 @@ function ToolCard({ ti }: { ti: ToolInvocation }) {
           {ti.result !== undefined && (
             <>
               <div
-                style={{ color: '#5f6770', fontSize: '0.7rem', marginTop: '0.5rem' }}
+                style={{ color: '#6b736d', fontSize: '0.7rem', marginTop: '0.5rem' }}
               >
                 result:
               </div>
               <pre
                 style={{
                   margin: 0,
-                  color: '#e6e8eb',
+                  color: '#f6f3ec',
                   fontSize: '0.7rem',
                   maxHeight: 300,
                   overflow: 'auto',
@@ -441,21 +441,21 @@ function UsageBar({ usage, costUsd }: { usage: UsageBlock; costUsd: number }) {
         bottom: '5.5rem',
         margin: '1rem 0',
         padding: '0.6rem 0.9rem',
-        background: '#0e1216',
-        border: '1px solid #2a2f36',
+        background: '#283133',
+        border: '1px solid #36423f',
         borderRadius: 6,
         fontFamily: 'ui-monospace, monospace',
         fontSize: '0.8rem',
         display: 'flex',
         gap: '1.5rem',
         flexWrap: 'wrap',
-        color: '#8b939b',
+        color: '#9aa09a',
       }}
     >
       <span>
         Session:{' '}
-        <span style={{ color: '#9ad2ff' }}>{inputT.toLocaleString()}</span> in /{' '}
-        <span style={{ color: '#9ad2ff' }}>{outputT.toLocaleString()}</span> out
+        <span style={{ color: '#c89a72' }}>{inputT.toLocaleString()}</span> in /{' '}
+        <span style={{ color: '#c89a72' }}>{outputT.toLocaleString()}</span> out
       </span>
       {usage.cachedInputTokens ? (
         <span>
@@ -471,7 +471,7 @@ function UsageBar({ usage, costUsd }: { usage: UsageBlock; costUsd: number }) {
           ${costUsd.toFixed(4)}
         </span>
       </span>
-      <span style={{ marginLeft: 'auto', color: '#5f6770', fontSize: '0.7rem' }}>
+      <span style={{ marginLeft: 'auto', color: '#6b736d', fontSize: '0.7rem' }}>
         Progressive Disclosure: Layer 1 → 2 → 3 instead of full grep+Read
       </span>
     </div>

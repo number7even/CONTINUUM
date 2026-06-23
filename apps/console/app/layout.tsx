@@ -17,8 +17,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           margin: 0,
           padding: '2rem',
-          background: '#0b0d10',
-          color: '#e6e8eb',
+          background: '#232b2d',
+          color: '#f6f3ec',
           lineHeight: 1.5,
         }}
       >
