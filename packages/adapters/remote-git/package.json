@@ -1,0 +1,31 @@
+{
+  "name": "@number7even/continuum-adapter-remote-git",
+  "version": "0.0.1",
+  "description": "Continuum remote-git adapter — turns any external GitHub repo into a compact, prompt-friendly Objective State Payload Observation (gitingest digest + pluggable synthesis). Solves the cold-start problem for unfamiliar codebases.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "continuum-adapter-remote-git": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "src/gitingest_digest.py"
+  ],
+  "scripts": {
+    "build": "tsc -b && cp src/gitingest_digest.py dist/gitingest_digest.py",
+    "start": "node dist/index.js",
+    "test": "node --test",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@number7even/continuum-core": "0.0.1"
+  },
+  "license": "Apache-2.0",
+  "author": "Riaan Kleynhans <riaan@number7even.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/number7even/CONTINUUM.git",
+    "directory": "packages/adapters/remote-git"
+  }
+}
