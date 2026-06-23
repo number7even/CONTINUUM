@@ -1,245 +1,210 @@
 'use client';
 
 /**
- * AMF Studio — Layer-3 content engine MVP.
+ * AMF — "Headless Hive" control room.
  *
- * Topic + format + angle -> streamed structured content (Addictive Storytelling).
+ * An observability dashboard for an autonomous media assembly line, NOT a
+ * prompt box. Four zones: (1) trend ingestion feed, (2) factory-floor Kanban,
+ * (3) editing bay + AI judge, (4) distribution + intent mining.
+ *
+ * HONESTY (The Nine, P4): the live agent backend (real trend scraping, ComfyUI
+ * GPU swarm, ElevenLabs, FFmpeg, AiToEarn distribution, ad swarms) is NOT wired
+ * yet. Every figure on this screen is illustrative scaffold state, flagged as
+ * such by the banner. Each zone is the wiring point for its real backend.
+ *
  * Brand CI: Inkwell ground, Au Lait ink, Creme Brulee accent.
  */
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
+// ── palette ──────────────────────────────────────────────────────────────────
 const INK = '#232b2d';
 const PANEL = '#283133';
-const HAIRLINE = '#36423f';
-const INK_TEXT = '#f6f3ec';
+const PANEL2 = '#2a3335';
+const HAIR = '#36423f';
+const TEXT = '#f6f3ec';
 const BODY = '#c8c3b6';
 const MUTED = '#9aa09a';
 const CREME = '#c89a72';
-const CREME_BRIGHT = '#e0b387';
+const CREME_HI = '#e0b387';
+const GREEN = '#7ddf64';
+const AMBER = '#ffb454';
+const BLUE = '#7fb8d8';
 
-const FORMATS = [
-  { id: 'video-script', label: 'Video script', hint: '45–90s short-form' },
-  { id: 'social-thread', label: 'Social thread', hint: '5–7 posts' },
-  { id: 'blog-outline', label: 'Blog outline', hint: 'skimmable structure' },
-] as const;
+// ── illustrative scaffold data (NOT live) ────────────────────────────────────
+const TRENDS = [
+  { topic: 'AI agents that refuse to fake "done"', reddit: 4210, x: 1880, tiktok: '2.1M', poly: '61%', fun: 94 },
+  { topic: 'Why your RAG bill is 10x too high', reddit: 2670, x: 940, tiktok: '780k', poly: null, fun: 88 },
+  { topic: 'The 2am deploy that took down prod', reddit: 5120, x: 3300, tiktok: '4.6M', poly: null, fun: 91 },
+  { topic: 'Local LLMs finally beat the API on cost', reddit: 1980, x: 1240, tiktok: '610k', poly: '54%', fun: 83 },
+];
 
-type FormatId = (typeof FORMATS)[number]['id'];
+const LANES = [
+  { key: 'director', name: 'AI Director', sub: 'storyboard + timing', items: [{ id: 'JOB-204', t: 'AI agents refuse "done"', meta: '5 scenes · 47s' }] },
+  { key: 'audio', name: 'Audio Synthesis', sub: 'ElevenLabs + timestamps', items: [{ id: 'JOB-203', t: 'RAG bill 10x', meta: 'VO 0:39 · word-ts ✓' }] },
+  { key: 'render', name: 'Headless GPU Swarm', sub: 'ComfyUI · bare metal', items: [{ id: 'JOB-202', t: '2am deploy', meta: '6/9 clips · 67%' }] },
+  { key: 'assembly', name: 'Editing Bay', sub: 'FFmpeg / Remotion', items: [{ id: 'JOB-201', t: 'Local LLMs win', meta: 'ducking + subs' }] },
+];
 
-export default function Studio() {
-  const [topic, setTopic] = useState('');
-  const [angle, setAngle] = useState('');
-  const [format, setFormat] = useState<FormatId>('video-script');
-  const [output, setOutput] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+const JUDGE = [
+  { k: 'Hook strength (first 3s)', v: 9 },
+  { k: 'Pacing / dead air', v: 8 },
+  { k: 'Subtitle sync', v: 10 },
+  { k: 'Visual artifacts', v: 9 },
+  { k: 'CTA clarity', v: 9 },
+];
 
-  async function generate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!topic.trim() || busy) return;
-    setBusy(true);
-    setError(null);
-    setOutput('');
-    setCopied(false);
-    const ac = new AbortController();
-    abortRef.current = ac;
-    try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, format, angle }),
-        signal: ac.signal,
-      });
-      if (!res.ok || !res.body) {
-        throw new Error((await res.text().catch(() => res.statusText)) || `HTTP ${res.status}`);
-      }
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        setOutput((o) => o + dec.decode(value, { stream: true }));
-      }
-    } catch (err) {
-      if ((err as Error).name !== 'AbortError') setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-      abortRef.current = null;
-    }
-  }
+const PLATFORMS = ['TikTok', 'YouTube Shorts', 'Instagram Reels', 'X', 'YT Community', 'LinkedIn'];
+const INTENT = [
+  { who: '@dev_marco', sig: 'how do I try this?', kind: 'buy-intent' },
+  { who: '@sara.builds', sig: 'link please 🙏', kind: 'buy-intent' },
+  { who: '@nullpointer', sig: 'does it work with Cursor?', kind: 'question' },
+];
 
-  function copyOut() {
-    navigator.clipboard.writeText(output).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }
+// ── small UI atoms ───────────────────────────────────────────────────────────
+function Zone({ n, title, sub, children }: { n: string; title: string; sub: string; children: React.ReactNode }) {
+  return (
+    <section style={{ background: PANEL, border: `1px solid ${HAIR}`, borderRadius: 12, padding: '1.1rem 1.25rem', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', marginBottom: '0.9rem' }}>
+        <span style={{ fontFamily: 'ui-monospace, monospace', color: CREME, fontSize: '0.8rem' }}>{n}</span>
+        <h2 style={{ margin: 0, fontSize: '1.05rem', letterSpacing: '-0.01em' }}>{title}</h2>
+        <span style={{ color: MUTED, fontSize: '0.78rem', marginLeft: 'auto' }}>{sub}</span>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{children}</div>
+    </section>
+  );
+}
+
+function Dot({ c }: { c: string }) {
+  return <span style={{ width: 7, height: 7, borderRadius: '50%', background: c, display: 'inline-block' }} />;
+}
+
+export default function HeadlessHive() {
+  const [sent, setSent] = useState<Record<number, boolean>>({});
 
   return (
-    <main style={{ maxWidth: 1080, margin: '0 auto', padding: '2.5rem 2rem 5rem' }}>
-      <header style={{ borderBottom: `1px solid ${HAIRLINE}`, paddingBottom: '1.25rem', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <h1 style={{ margin: 0, fontSize: '1.6rem', letterSpacing: '-0.02em' }}>AMF Studio</h1>
-          <span style={{ color: CREME, fontSize: '0.85rem', fontFamily: 'ui-monospace, monospace' }}>
-            Autonomous Media Factory · Layer 3
-          </span>
+    <main style={{ maxWidth: 1480, margin: '0 auto', padding: '1.5rem 1.5rem 3rem' }}>
+      {/* top bar */}
+      <header style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+        <h1 style={{ margin: 0, fontSize: '1.35rem', letterSpacing: '-0.02em' }}>AMF · Headless Hive</h1>
+        <span style={{ fontFamily: 'ui-monospace, monospace', color: CREME, fontSize: '0.8rem' }}>Autonomous Media Factory</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '1.1rem', fontSize: '0.8rem', color: MUTED, fontFamily: 'ui-monospace, monospace' }}>
+          <span><Dot c={GREEN} /> queue 4</span>
+          <span><Dot c={AMBER} /> rendering 1</span>
+          <span><Dot c={BLUE} /> syndicating 1</span>
         </div>
-        <p style={{ margin: '0.5rem 0 0', color: MUTED, fontSize: '0.95rem', maxWidth: '60ch' }}>
-          A topic in, a structured piece out. Built on the Addictive Storytelling
-          structure (Stakes, Big Question, Head Fake, Rehook). The engine does not
-          invent statistics; anything it cannot stand behind is left as a{' '}
-          <code style={{ color: BODY }}>[STAT: …]</code> placeholder for you to verify.
-        </p>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) 1fr', gap: '2rem', alignItems: 'start' }}>
-        {/* Controls */}
-        <form onSubmit={generate} style={{ display: 'grid', gap: '1.25rem' }}>
-          <label style={{ display: 'grid', gap: '0.4rem' }}>
-            <span style={{ fontSize: '0.85rem', color: BODY }}>Topic</span>
-            <textarea
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g. Why most AI memory tools quietly lose your context"
-              rows={3}
-              style={fieldStyle}
-            />
-          </label>
+      {/* honesty banner — this is scaffold, not a running factory */}
+      <div style={{ background: 'rgba(255,180,84,0.08)', border: `1px solid ${AMBER}55`, borderRadius: 8, padding: '0.55rem 0.9rem', marginBottom: '1.25rem', fontSize: '0.82rem', color: BODY }}>
+        <strong style={{ color: AMBER }}>Control-room shell.</strong> The agent backend (live trend scraping, ComfyUI GPU render, ElevenLabs, FFmpeg, AiToEarn distribution, ad swarms) is not wired yet. Every value below is illustrative state showing the assembly line's structure, not live data. Each zone is the wiring point for its real backend.
+      </div>
 
-          <label style={{ display: 'grid', gap: '0.4rem' }}>
-            <span style={{ fontSize: '0.85rem', color: BODY }}>Angle / audience <span style={{ color: MUTED }}>(optional)</span></span>
-            <input
-              value={angle}
-              onChange={(e) => setAngle(e.target.value)}
-              placeholder="e.g. solo founders shipping with Claude Code"
-              style={fieldStyle}
-            />
-          </label>
+      {/* 2x2 zone grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: 'minmax(300px, 1fr) minmax(300px, 1fr)', gap: '1.25rem', height: 'calc(100vh - 180px)' }}>
 
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.85rem', color: BODY }}>Format</span>
-            <div style={{ display: 'grid', gap: '0.5rem' }}>
-              {FORMATS.map((f) => {
-                const on = format === f.id;
-                return (
-                  <button
-                    type="button"
-                    key={f.id}
-                    onClick={() => setFormat(f.id)}
-                    style={{
-                      textAlign: 'left',
-                      padding: '0.7rem 0.9rem',
-                      borderRadius: 8,
-                      border: `1px solid ${on ? CREME : HAIRLINE}`,
-                      background: on ? 'rgba(200,154,114,0.10)' : PANEL,
-                      color: INK_TEXT,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span style={{ fontWeight: on ? 600 : 400 }}>{f.label}</span>
-                    <span style={{ color: MUTED, fontSize: '0.78rem' }}>{f.hint}</span>
-                  </button>
-                );
-              })}
+        {/* ZONE 1 — Brain */}
+        <Zone n="01" title="The Brain" sub="Layer 2 · trend ingestion">
+          <div style={{ display: 'grid', gap: '0.7rem' }}>
+            {TRENDS.map((t, i) => (
+              <article key={i} style={{ background: PANEL2, border: `1px solid ${t.fun >= 90 ? CREME + '66' : HAIR}`, borderRadius: 9, padding: '0.8rem 0.95rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.95rem', color: TEXT }}>{t.topic}</span>
+                  <span title="Fun Judge virality score" style={{ flexShrink: 0, fontFamily: 'ui-monospace, monospace', fontSize: '0.8rem', color: t.fun >= 90 ? CREME_HI : BODY }}>fun {t.fun}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', margin: '0.55rem 0 0.7rem', fontSize: '0.76rem', color: MUTED, fontFamily: 'ui-monospace, monospace' }}>
+                  <span>↑ {t.reddit.toLocaleString()} reddit</span>
+                  <span>♥ {t.x.toLocaleString()} x</span>
+                  <span>▶ {t.tiktok} tiktok</span>
+                  {t.poly && <span style={{ color: GREEN }}>◈ {t.poly} polymarket</span>}
+                </div>
+                <button
+                  onClick={() => setSent((s) => ({ ...s, [i]: true }))}
+                  disabled={sent[i]}
+                  style={{ padding: '0.4rem 0.8rem', borderRadius: 6, border: 'none', background: sent[i] ? '#3a4446' : CREME, color: sent[i] ? MUTED : '#1c2224', fontWeight: 600, fontSize: '0.8rem', cursor: sent[i] ? 'default' : 'pointer' }}
+                >
+                  {sent[i] ? 'Queued →' : 'Send to factory'}
+                </button>
+              </article>
+            ))}
+          </div>
+        </Zone>
+
+        {/* ZONE 2 — Factory Floor */}
+        <Zone n="02" title="Factory Floor" sub="Redis/BullMQ · production lanes">
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${LANES.length}, 1fr)`, gap: '0.6rem', height: '100%' }}>
+            {LANES.map((lane) => (
+              <div key={lane.key} style={{ background: PANEL2, border: `1px solid ${HAIR}`, borderRadius: 8, padding: '0.55rem', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: TEXT }}>{lane.name}</div>
+                <div style={{ fontSize: '0.68rem', color: MUTED, marginBottom: '0.55rem' }}>{lane.sub}</div>
+                {lane.items.map((it) => (
+                  <div key={it.id} style={{ background: INK, border: `1px solid ${HAIR}`, borderRadius: 6, padding: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.66rem', color: CREME }}>{it.id}</div>
+                    <div style={{ fontSize: '0.76rem', color: BODY, margin: '0.15rem 0' }}>{it.t}</div>
+                    <div style={{ fontSize: '0.68rem', color: MUTED }}>{it.meta}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Zone>
+
+        {/* ZONE 3 — Editing Bay + Judge */}
+        <Zone n="03" title="Editing Bay · QC" sub="Hermes AI Video Judge">
+          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '1rem', height: '100%' }}>
+            <div style={{ background: '#13191a', border: `1px solid ${HAIR}`, borderRadius: 9, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: MUTED, position: 'relative', minHeight: 160 }}>
+              <div style={{ position: 'absolute', top: 8, left: 10, fontFamily: 'ui-monospace, monospace', fontSize: '0.66rem', color: CREME }}>JOB-201 · 9:16 · 0:47</div>
+              <div style={{ fontSize: '2rem', opacity: 0.5 }}>▶</div>
+              <div style={{ fontSize: '0.74rem' }}>compiled MP4 preview</div>
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                <span style={{ fontSize: '1.8rem', fontWeight: 700, color: GREEN }}>9.0</span>
+                <span style={{ color: MUTED, fontSize: '0.8rem' }}>/ 10 judge</span>
+              </div>
+              {JUDGE.map((j) => (
+                <div key={j.k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', padding: '0.22rem 0', color: BODY }}>
+                  <span>{j.k}</span>
+                  <span style={{ fontFamily: 'ui-monospace, monospace', color: j.v >= 9 ? GREEN : AMBER }}>{j.v}</span>
+                </div>
+              ))}
+              <button style={{ marginTop: '0.7rem', width: '100%', padding: '0.55rem', borderRadius: 7, border: 'none', background: CREME, color: '#1c2224', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
+                Approve &amp; syndicate
+              </button>
             </div>
           </div>
+        </Zone>
 
-          <button
-            type="submit"
-            disabled={busy || !topic.trim()}
-            style={{
-              padding: '0.8rem 1.25rem',
-              borderRadius: 8,
-              border: 'none',
-              background: busy || !topic.trim() ? '#3a4446' : CREME,
-              color: busy || !topic.trim() ? MUTED : '#1c2224',
-              fontWeight: 600,
-              fontSize: '1rem',
-              cursor: busy || !topic.trim() ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {busy ? 'Generating…' : 'Generate content'}
-          </button>
-        </form>
-
-        {/* Output */}
-        <section
-          style={{
-            background: PANEL,
-            border: `1px solid ${HAIRLINE}`,
-            borderRadius: 10,
-            minHeight: '50vh',
-            padding: '1.5rem 1.75rem',
-            position: 'relative',
-          }}
-        >
-          {output && (
-            <button
-              onClick={copyOut}
-              style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                padding: '0.35rem 0.7rem',
-                borderRadius: 6,
-                border: `1px solid ${HAIRLINE}`,
-                background: INK,
-                color: copied ? '#7ddf64' : BODY,
-                fontSize: '0.78rem',
-                cursor: 'pointer',
-              }}
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          )}
-
-          {error && (
-            <div style={{ color: '#ff8585', background: '#3a1010', padding: '0.75rem 1rem', borderRadius: 6, fontSize: '0.9rem', marginBottom: '1rem' }}>
-              <strong>Error:</strong> {error}
+        {/* ZONE 4 — Distribution + Intent */}
+        <Zone n="04" title="Distribution · Intent" sub="AiToEarn · syndication + CRM">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: '1rem', height: '100%' }}>
+            <div>
+              <div style={{ fontSize: '0.74rem', color: MUTED, marginBottom: '0.5rem' }}>Syndication</div>
+              <div style={{ display: 'grid', gap: '0.4rem' }}>
+                {PLATFORMS.map((p, i) => (
+                  <div key={p} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: PANEL2, border: `1px solid ${HAIR}`, borderRadius: 6, padding: '0.35rem 0.6rem', fontSize: '0.76rem', color: BODY }}>
+                    <span>{p}</span>
+                    <Dot c={i < 4 ? GREEN : MUTED} />
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
-
-          {!output && !busy && !error && (
-            <div style={{ color: MUTED, paddingTop: '15vh', textAlign: 'center' }}>
-              <p style={{ margin: 0 }}>Your generated {FORMATS.find((f) => f.id === format)?.label.toLowerCase()} appears here.</p>
-              <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem' }}>Enter a topic and press Generate.</p>
+            <div>
+              <div style={{ fontSize: '0.74rem', color: MUTED, marginBottom: '0.5rem' }}>Intent ticker</div>
+              <div style={{ display: 'grid', gap: '0.45rem' }}>
+                {INTENT.map((m, i) => (
+                  <div key={i} style={{ background: PANEL2, border: `1px solid ${m.kind === 'buy-intent' ? GREEN + '55' : HAIR}`, borderRadius: 7, padding: '0.5rem 0.65rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem' }}>
+                      <span style={{ color: CREME, fontFamily: 'ui-monospace, monospace' }}>{m.who}</span>
+                      {m.kind === 'buy-intent' && <span style={{ color: GREEN, fontSize: '0.66rem' }}>● buy-intent</span>}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: BODY, marginTop: '0.2rem' }}>&ldquo;{m.sig}&rdquo;</div>
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
-
-          {(output || busy) && (
-            <pre
-              style={{
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                fontFamily: 'inherit',
-                fontSize: '0.98rem',
-                lineHeight: 1.6,
-                color: INK_TEXT,
-                margin: 0,
-              }}
-            >
-              {output}
-              {busy && <span style={{ color: CREME_BRIGHT }}>▍</span>}
-            </pre>
-          )}
-        </section>
+          </div>
+        </Zone>
       </div>
     </main>
   );
 }
-
-const fieldStyle: React.CSSProperties = {
-  background: '#2a3335',
-  color: '#f6f3ec',
-  border: '1px solid #36423f',
-  borderRadius: 8,
-  padding: '0.7rem 0.9rem',
-  fontSize: '0.95rem',
-  fontFamily: 'inherit',
-  outline: 'none',
-  resize: 'vertical',
-};
