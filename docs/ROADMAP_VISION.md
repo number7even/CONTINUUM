@@ -212,6 +212,24 @@ witness before budget is committed — verify-then-spend. ⚠ Components touchin
 real money (L6 swarms) or platform ToS (L2 Agent-Reach) require explicit operator
 sign-off before any live run.
 
+**AMF build decisions (operator, 2026-06-23):**
+- **Voice synthesis: open-source, NOT ElevenLabs.** Use `rapidaai/voice-ai`
+  + `OpenBMB/VoxCPM` for narration + word-timestamps. Removes a paid-API
+  dependency from L4.
+- **GPU/Hetzner:** operator is procuring bare-metal RTX (Hetzner). L4 ComfyUI
+  video render unblocks when it lands.
+- **Ghost (L5 owned-media):** MIT self-host. Needs a domain + Stripe key
+  (operator-provided). Articles publish here.
+- **Agent-Reach (L2):** 🚧 **HELD — operator reviewing ToS/legal exposure**
+  (cookie-based scraping of walled gardens). Not wired until explicit go.
+  L2 ingestion proceeds in the meantime on **public, ToS-clean sources only**
+  (Reddit public JSON, Polymarket public API, YouTube RSS).
+- **Strategic priority:** the content engine (L2→L5 producing path) is the
+  **main GTM**. Build order favours getting topic→script→render working over
+  L6/L7 monetisation.
+- **amf.continuum.rest:** control-room shell SHIPPED (5-tab Headless Hive,
+  illustrative state). First real backend = L2 Zone-1 trend ingestion.
+
 ---
 
 ## Decision gates (human, not code — these block their phases)

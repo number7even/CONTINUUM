@@ -14,7 +14,17 @@
  *
  * Brand CI: Inkwell ground, Au Lait ink, Creme Brulee accent.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+interface LiveTrend {
+  topic: string;
+  source: 'HN' | 'Lobsters';
+  points: number;
+  comments: number;
+  ageHours: number;
+  fun: number;
+  url: string;
+}
 
 const INK = '#232b2d';
 const PANEL = '#283133';
@@ -120,6 +130,32 @@ export default function HeadlessHive() {
   const [tab, setTab] = useState<Tab>('The Brain');
   const [sent, setSent] = useState<Record<number, boolean>>({});
 
+  // Zone 1 — real trend ingestion (live public sources).
+  const [live, setLive] = useState<LiveTrend[] | null>(null);
+  const [trendErr, setTrendErr] = useState<string | null>(null);
+  const [trendMeta, setTrendMeta] = useState<{ source: string; fetchedAt: string; degraded?: string[] } | null>(null);
+  const [loadingTrends, setLoadingTrends] = useState(false);
+
+  async function loadTrends() {
+    setLoadingTrends(true);
+    setTrendErr(null);
+    try {
+      const res = await fetch('/api/trends', { cache: 'no-store' });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      setLive(j.trends);
+      setTrendMeta({ source: j.source, fetchedAt: j.fetchedAt, degraded: j.degraded });
+    } catch (e) {
+      setTrendErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingTrends(false);
+    }
+  }
+
+  useEffect(() => {
+    loadTrends();
+  }, []);
+
   return (
     <main style={{ maxWidth: 1560, margin: '0 auto', padding: '1.25rem 1.5rem 3rem' }}>
       {/* top bar */}
@@ -152,9 +188,9 @@ export default function HeadlessHive() {
         })}
       </nav>
 
-      {/* honesty banner */}
+      {/* honesty banner — Zone 1 is now live; 2-5 remain scaffold */}
       <div style={{ background: 'rgba(255,180,84,0.08)', border: `1px solid ${AMBER}55`, borderRadius: 8, padding: '0.5rem 0.9rem', marginBottom: '1.1rem', fontSize: '0.8rem', color: BODY }}>
-        <strong style={{ color: AMBER }}>Control-room shell.</strong> The agent backend is not wired yet. Every value below is illustrative state showing the assembly line's structure, not live data.
+        <strong style={{ color: GREEN }}>The Brain is live</strong> (real public-source trends). <strong style={{ color: AMBER }}>Factory Floor, Editing Bay, Distribution, and Marketing Swarms are still illustrative scaffold</strong> — their agent backends (GPU render, voice, FFmpeg, distribution, ad swarms) are not wired yet.
       </div>
 
       <div style={{ minHeight: 'calc(100vh - 230px)' }}>
@@ -162,32 +198,52 @@ export default function HeadlessHive() {
         {tab === 'The Brain' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <p style={{ margin: 0, color: MUTED, fontSize: '0.9rem' }}>Ranked by Fun Judge virality score. Trends ≥ 90 auto-approve into the factory; below that, you send manually.</p>
-              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.78rem', color: CREME }}>auto-approve ≥ 90</span>
+              <p style={{ margin: 0, color: MUTED, fontSize: '0.9rem' }}>
+                Live trends from {trendMeta?.source ?? 'public tech sources'}, ranked by a velocity heuristic (points + weighted comments, recency-decayed).{' '}
+                <span style={{ color: '#6b736d' }}>Heuristic, not the ML Fun Judge.</span>
+              </p>
+              <span style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                {live && <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.72rem', color: GREEN }}>● LIVE{trendMeta?.degraded ? ` (degraded: ${trendMeta.degraded.join(', ')})` : ''}</span>}
+                <button onClick={loadTrends} disabled={loadingTrends} style={{ background: 'none', border: `1px solid ${HAIR}`, borderRadius: 6, color: BODY, padding: '0.3rem 0.7rem', fontSize: '0.76rem', cursor: loadingTrends ? 'default' : 'pointer' }}>
+                  {loadingTrends ? 'Refreshing…' : 'Refresh'}
+                </button>
+              </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1rem' }}>
-              {TRENDS.map((t, i) => (
-                <article key={i} style={{ background: PANEL, border: `1px solid ${t.fun >= 90 ? CREME + '66' : HAIR}`, borderRadius: 11, padding: '1.1rem 1.2rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <span style={{ fontWeight: 600, fontSize: '1.05rem', color: TEXT }}>{t.topic}</span>
-                    <span style={{ flexShrink: 0, textAlign: 'center' }}>
-                      <span style={{ display: 'block', fontFamily: 'ui-monospace, monospace', fontSize: '1.4rem', fontWeight: 700, color: t.fun >= 90 ? CREME_HI : BODY }}>{t.fun}</span>
-                      <span style={{ fontSize: '0.62rem', color: MUTED }}>FUN</span>
-                    </span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(85px, 1fr))', gap: '0.5rem', margin: '1rem 0', fontSize: '0.78rem', fontFamily: 'ui-monospace, monospace' }}>
-                    <Sig label="reddit" val={'↑' + t.reddit.toLocaleString()} />
-                    <Sig label="x" val={'♥' + t.x.toLocaleString()} />
-                    <Sig label="tiktok" val={'▶' + t.tiktok} />
-                    <Sig label="youtube" val={'▶' + t.yt} />
-                    {t.poly && <Sig label="polymarket" val={'◈' + t.poly} accent={GREEN} />}
-                  </div>
-                  <button onClick={() => setSent((s) => ({ ...s, [i]: true }))} disabled={sent[i]} style={{ padding: '0.5rem 1rem', borderRadius: 7, border: 'none', background: sent[i] ? '#3a4446' : CREME, color: sent[i] ? MUTED : '#1c2224', fontWeight: 600, fontSize: '0.85rem', cursor: sent[i] ? 'default' : 'pointer' }}>
-                    {sent[i] ? 'Queued to factory →' : 'Send to factory'}
-                  </button>
-                </article>
-              ))}
-            </div>
+
+            {trendErr && (
+              <div style={{ background: '#3a1010', border: `1px solid ${RED}55`, borderRadius: 8, padding: '0.8rem 1rem', color: RED, fontSize: '0.85rem' }}>
+                <strong>Live source unreachable:</strong> {trendErr}. No fallback to fake data — refresh to retry.
+              </div>
+            )}
+
+            {!live && !trendErr && (
+              <div style={{ color: MUTED, padding: '3rem 0', textAlign: 'center' }}>Ingesting live trends…</div>
+            )}
+
+            {live && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1rem' }}>
+                {live.map((t, i) => (
+                  <article key={i} style={{ background: PANEL, border: `1px solid ${t.fun >= 70 ? CREME + '66' : HAIR}`, borderRadius: 11, padding: '1.1rem 1.2rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start' }}>
+                      <a href={t.url} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, fontSize: '1.02rem', color: TEXT, textDecoration: 'none' }}>{t.topic}</a>
+                      <span style={{ flexShrink: 0, textAlign: 'center' }}>
+                        <span style={{ display: 'block', fontFamily: 'ui-monospace, monospace', fontSize: '1.4rem', fontWeight: 700, color: t.fun >= 70 ? CREME_HI : BODY }}>{t.fun}</span>
+                        <span style={{ fontSize: '0.62rem', color: MUTED }}>FUN</span>
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', margin: '1rem 0', fontSize: '0.76rem', fontFamily: 'ui-monospace, monospace' }}>
+                      <Sig label="source" val={t.source} accent={CREME} />
+                      <Sig label="points" val={'▲' + t.points.toLocaleString()} />
+                      <Sig label="comments" val={'💬' + t.comments.toLocaleString()} />
+                      <Sig label="age" val={t.ageHours + 'h'} />
+                    </div>
+                    <button onClick={() => setSent((s) => ({ ...s, [i]: true }))} disabled={sent[i]} style={{ padding: '0.5rem 1rem', borderRadius: 7, border: 'none', background: sent[i] ? '#3a4446' : CREME, color: sent[i] ? MUTED : '#1c2224', fontWeight: 600, fontSize: '0.85rem', cursor: sent[i] ? 'default' : 'pointer' }}>
+                      {sent[i] ? 'Queued to factory →' : 'Send to factory'}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
