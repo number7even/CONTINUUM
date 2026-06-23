@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 export const metadata = {
-  title: 'AMF Studio — Continuum',
+  title: 'AMF · Headless Hive',
   description: 'Autonomous Media Factory content studio.',
   robots: { index: false, follow: false },
 };
