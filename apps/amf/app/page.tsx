@@ -15,6 +15,7 @@
  * Brand CI: Inkwell ground, Au Lait ink, Creme Brulee accent.
  */
 import { useEffect, useState } from 'react';
+import L4Audio from './components/L4Audio';
 
 interface LiveTrend {
   topic: string;
@@ -52,7 +53,7 @@ const TRENDS = [
 
 const LANES = [
   { name: 'AI Director', sub: 'storyboard + scene timing', items: [{ id: 'JOB-204', t: 'AI agents refuse "done"', meta: '5 scenes · 47s', pct: 100, st: GREEN }, { id: 'JOB-205', t: 'PR deleted the DB', meta: 'drafting beats', pct: 40, st: AMBER }] },
-  { name: 'Audio Synthesis', sub: 'ElevenLabs + word timestamps', items: [{ id: 'JOB-203', t: 'RAG bill 10x', meta: 'VO 0:39 · ts ✓', pct: 100, st: GREEN }] },
+  { name: 'Audio Synthesis', sub: 'human voice · Auphonic', items: [{ id: 'JOB-203', t: 'RAG bill 10x', meta: 'enhanced · word-ts', pct: 100, st: GREEN }] },
   { name: 'Headless GPU Swarm', sub: 'ComfyUI · Hetzner bare-metal', items: [{ id: 'JOB-202', t: '2am deploy', meta: '6/9 clips', pct: 67, st: AMBER }] },
   { name: 'Editing Bay', sub: 'FFmpeg / Remotion', items: [{ id: 'JOB-201', t: 'Local LLMs win', meta: 'ducking + subs', pct: 85, st: AMBER }] },
   { name: 'QC Judge', sub: 'Hermes video judge', items: [{ id: 'JOB-200', t: 'Vibe-coding jobs', meta: 'scored 9.0/10', pct: 100, st: GREEN }] },
@@ -279,7 +280,8 @@ export default function HeadlessHive() {
         {/* ── FACTORY FLOOR ─────────────────────────────────────────────────── */}
         {tab === 'Factory Floor' && (
           <div>
-            <p style={{ margin: '0 0 1rem', color: MUTED, fontSize: '0.9rem' }}>The Unified Execution Document moves left to right across the Redis/BullMQ event loop. Each lane is a specialist agent working without your input.</p>
+            <L4Audio />
+            <p style={{ margin: '0 0 1rem', color: MUTED, fontSize: '0.9rem' }}>The Unified Execution Document moves left to right across the Redis/BullMQ event loop. Each lane is a specialist agent working without your input. <span style={{ color: '#6b736d' }}>(Lanes below are illustrative; the L4 audio panel above is a real wired route.)</span></p>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${LANES.length}, 1fr)`, gap: '0.85rem', alignItems: 'start' }}>
               {LANES.map((lane) => (
                 <div key={lane.name} style={{ background: PANEL, border: `1px solid ${HAIR}`, borderRadius: 10, padding: '0.85rem', minHeight: '60vh' }}>
