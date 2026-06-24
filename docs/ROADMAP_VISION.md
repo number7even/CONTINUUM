@@ -232,6 +232,20 @@ sign-off before any live run.
   **main GTM**. Build order favours getting topic→script→render working over
   L6/L7 monetisation.
 - **amf.continuum.rest:** control-room shell SHIPPED (5-tab Headless Hive).
+- **L5 syndication = yikart/AiToEarn (CONFIRMED + verified, 2026-06-24).** MIT,
+  13+ platforms (TikTok/YouTube/IG/X/LinkedIn/Threads/Pinterest + CN nets),
+  **self-hostable via Docker**, **native MCP integration** (AMF agents publish
+  over MCP). Auth reality (verified from README, P4): the **Relay** removes
+  per-platform DEVELOPER-APP registration, but you STILL connect + authorize
+  each project's real social accounts once. DECISION: **self-host** (M4 Mini /
+  VPS) — do NOT route 8 brands' account access through the hosted aitoearn.ai
+  relay. ⚠ automation-ToS pacing risk (warm accounts, don't blast).
+- **Scale = 8 projects, daily, autopilot (operator, 2026-06-24).** Forces the
+  voice track to **AI voice (VoxCPM2/TTS)** for volume — human voice cannot
+  scale to 8 daily recordings (overrides the earlier human-voice lock for the
+  autopilot track; human voice stays a premium/flagship option). Each project =
+  a tenant config (topic/brand/targets) on the W27 TenantRegistry. Worker =
+  Mac Mini M4 16GB (publish-then-purge for the 256GB SSD).
 - **Access gating (2026-06-24):** AMF login gate SHIPPED — HMAC-signed session
   cookie, `/login`, `/api/auth`, middleware. Safe-by-default: OPEN until the
   operator sets `AMF_ACCESS_PASSWORD` + `AMF_SESSION_SECRET` (then ENFORCED).
