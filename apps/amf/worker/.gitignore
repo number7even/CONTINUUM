@@ -1,0 +1,9 @@
+# Python venv + model caches (never commit — multi-GB)
+.venv/
+__pycache__/
+*.pyc
+# worker run artifacts (audio, renders)
+out/
+render-out/
+*.wav
+*.mp4
