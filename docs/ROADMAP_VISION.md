@@ -232,6 +232,19 @@ sign-off before any live run.
   **main GTM**. Build order favours getting topic→script→render working over
   L6/L7 monetisation.
 - **amf.continuum.rest:** control-room shell SHIPPED (5-tab Headless Hive).
+- **Access gating (2026-06-24):** AMF login gate SHIPPED — HMAC-signed session
+  cookie, `/login`, `/api/auth`, middleware. Safe-by-default: OPEN until the
+  operator sets `AMF_ACCESS_PASSWORD` + `AMF_SESSION_SECRET` (then ENFORCED).
+  This is the foundation; full **multi-tenant** (tenant management + per-tenant
+  namespaces + app onboarding) is the larger build — to be layered on the
+  engine's existing W27 tenant infra (TenantRegistry, JWT tenant-claims,
+  sanitiseTenantId).
+- **⚠ VOICE DECISION CONFLICT (unresolved, 2026-06-24):** the VoiceCosmos tenant
+  journey says **VoxCPM2 + Rapida (AI voice)**, contradicting the 2026-06-23
+  "final" lock of **human voice + Auphonic**. THIRD flip (ElevenLabs → VoxCPM →
+  human+Auphonic → VoxCPM2). The shipped L4 is human+Auphonic. Operator must
+  rule which is final before L4-audio is wired live. Flagged, not silently
+  switched (P4/clause #2).
   Zone-1 (The Brain) is LIVE on real public sources (HN + Lobsters); zones
   2–5 remain labelled scaffold.
 - **ZeroEdit pipeline (new components, 2026-06-23):** the AMF producing path
