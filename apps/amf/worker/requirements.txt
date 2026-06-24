@@ -1,0 +1,6 @@
+# AMF L4 voice worker — Python deps (Apache-2.0 stack, runs on Apple Silicon MPS)
+# Python >= 3.10
+voxcpm            # TTS (Apache-2.0) — script → speech, 30 languages, voice cloning
+whisperx          # alignment (Apache-2.0) — audio → word-level timestamps
+soundfile         # wav I/O
+torch>=2.5.0      # MPS on Apple Silicon; CUDA on NVIDIA
