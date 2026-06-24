@@ -35,14 +35,14 @@ def synthesize(text: str, out_wav: Path, device: str, voice_ref: str | None) -> 
     from voxcpm import VoxCPM  # type: ignore
     import soundfile as sf  # type: ignore
 
-    model_id = os.environ.get("VOXCPM_MODEL", "openbmb/VoxCPM-2B")
-    model = VoxCPM.from_pretrained(model_id)
-    # VoxCPM.generate returns a waveform (numpy float array) at the model's SR.
+    model_id = os.environ.get("VOXCPM_MODEL", "openbmb/VoxCPM2")
+    model = VoxCPM.from_pretrained(model_id, device=None if device == "auto" else device)
+    # VoxCPM.generate returns a waveform (numpy float array). VoxCPM2 outputs 16kHz.
     kwargs = {}
     if voice_ref:
         kwargs["prompt_wav_path"] = voice_ref  # controllable cloning (reference voice)
     wav = model.generate(text=text, **kwargs)
-    sr = getattr(model, "sample_rate", 16000)
+    sr = int(os.environ.get("VOXCPM_SR", "16000"))
     sf.write(str(out_wav), wav, sr)
     info = sf.info(str(out_wav))
     return float(info.frames) / float(info.samplerate)
