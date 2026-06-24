@@ -6,15 +6,27 @@
  * Gated on AUPHONIC_API_KEY (P6).
  */
 import { hasAuphonicKey, getProduction } from '../../../../lib/auphonic';
+import { getJobStore } from '../../../../lib/job';
 
 export const runtime = 'nodejs';
 
 export async function GET(req: Request): Promise<Response> {
+  const params = new URL(req.url).searchParams;
+
+  // jobId path: read the append-only job state (the worker-queue document).
+  const jobId = params.get('jobId');
+  if (jobId) {
+    const job = await getJobStore().get(jobId);
+    if (!job) return Response.json({ ok: false, error: 'job not found (in-memory store does not persist across invocations — provision Vercel KV)' }, { status: 404 });
+    return Response.json({ ok: true, job });
+  }
+
+  // uuid path: poll Auphonic directly (fallback when webhook can't reach us).
   if (!hasAuphonicKey()) {
     return new Response('AUPHONIC_API_KEY not set.', { status: 503 });
   }
-  const uuid = new URL(req.url).searchParams.get('uuid');
-  if (!uuid) return new Response('uuid query param required', { status: 400 });
+  const uuid = params.get('uuid');
+  if (!uuid) return new Response('jobId or uuid query param required', { status: 400 });
   try {
     const prod = await getProduction(uuid);
     const done = prod.status === 3;

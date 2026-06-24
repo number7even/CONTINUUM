@@ -239,12 +239,15 @@ sign-off before any live run.
   namespaces + app onboarding) is the larger build — to be layered on the
   engine's existing W27 tenant infra (TenantRegistry, JWT tenant-claims,
   sanitiseTenantId).
-- **⚠ VOICE DECISION CONFLICT (unresolved, 2026-06-24):** the VoiceCosmos tenant
-  journey says **VoxCPM2 + Rapida (AI voice)**, contradicting the 2026-06-23
-  "final" lock of **human voice + Auphonic**. THIRD flip (ElevenLabs → VoxCPM →
-  human+Auphonic → VoxCPM2). The shipped L4 is human+Auphonic. Operator must
-  rule which is final before L4-audio is wired live. Flagged, not silently
-  switched (P4/clause #2).
+- **✅ VOICE DECISION RESOLVED (operator ruling, 2026-06-24): HYBRID, layered.**
+  Not a binary choice — two engines for two layers:
+  - **L4 (video content): HUMAN voice + Auphonic — FINAL.** Protects YouTube
+    monetisation, defeats the "AI slop" demonetisation risk, secures the revenue
+    floor. This is what the shipped L4 implements. ✓
+  - **L7 (lead conversion / interactive assistants): AI voice = VoxCPM2 + Rapida.**
+    Real-time interactive lead conversion + white-label AI assistants, 30+
+    languages. Different purpose, different layer — no conflict.
+  Supersedes the ElevenLabs / VoxCPM-for-L4 iterations (kept above as the log).
   Zone-1 (The Brain) is LIVE on real public sources (HN + Lobsters); zones
   2–5 remain labelled scaffold.
 - **ZeroEdit pipeline (new components, 2026-06-23):** the AMF producing path

@@ -10,6 +10,7 @@
  * (durable store, alignment engine) and marked TODO(L4).
  */
 import { hasAuphonicKey, getProduction } from '../../../../lib/auphonic';
+import { transition, getJobStore } from '../../../../lib/job';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -26,17 +27,22 @@ export async function POST(req: Request): Promise<Response> {
   }
   if (!uuid) return new Response('uuid required', { status: 400 });
 
+  const store = getJobStore();
+  const now = () => new Date().toISOString();
+
+  // Correlate Auphonic uuid → our job (submit persisted it).
+  const job = await store.byAuphonicUuid(uuid);
+
   // status 2 = Error, 3 = Done (Auphonic). Anything else: ignore (still working).
   if (status === '2') {
-    // TODO(L4): mark job(uuid) failed in the durable store.
-    return Response.json({ ok: true, uuid, handled: 'error' });
+    if (job) await store.put(transition(job, 'error', now(), { note: 'Auphonic reported error' }));
+    return Response.json({ ok: true, uuid, handled: 'error', correlated: Boolean(job) });
   }
   if (status !== '3') {
     return Response.json({ ok: true, uuid, handled: 'ignored', status });
   }
 
   if (!hasAuphonicKey()) {
-    // Webhook arrived but we can't fetch the result without the key.
     return new Response('AUPHONIC_API_KEY not set; cannot fetch production result.', { status: 503 });
   }
 
@@ -44,20 +50,30 @@ export async function POST(req: Request): Promise<Response> {
     const prod = await getProduction(uuid);
     // prod.output_files[] holds the enhanced audio + transcript/subtitle URLs.
 
-    // TODO(L4): correlate uuid -> jobId via the durable store (submit persisted it).
-    // TODO(L4): download enhanced audio + transcript to object storage (Vercel Blob).
-    // TODO(L4): forced-alignment pass on the enhanced audio to produce word-level
-    //           timings (whisperx | aeneas) — Auphonic subtitles are segment-level
-    //           only; word-level is the contract's load-bearing mitigation (§0).
-    // TODO(L4): assemble + persist the L5AudioPayload (lib/l5-payload.ts) and set
-    //           status: 'ready-for-assembly'.
+    if (job) {
+      // Transition: enhanced → (aligning) → ready-for-assembly.
+      let next = transition(job, 'enhanced', now(), {
+        note: 'Auphonic done',
+        data: { outputs: prod.output_files?.map((f) => f.format) ?? [] },
+      });
+      // TODO(L4): download enhanced audio + transcript to object storage (Vercel Blob).
+      // TODO(L4): forced-alignment pass (whisperx | aeneas) → word-level timings.
+      //           Auphonic subtitles are segment-level only; word-level is the
+      //           contract's load-bearing mitigation (§0). Sets payload.words +
+      //           wordLevelSource, then transition → 'ready-for-assembly'.
+      await store.put(next);
+    }
 
     return Response.json({
       ok: true,
       uuid,
+      correlated: Boolean(job),
+      durableStore: store.durable,
       auphonicStatus: prod.status,
       outputs: prod.output_files?.map((f) => f.format) ?? [],
-      note: 'result fetched; correlation + alignment + persistence gated on operator store/engine choice (see contract §3, §5).',
+      note: job
+        ? 'job advanced to "enhanced"; Blob download + word-alignment → ready-for-assembly gated on KV/Blob/engine (contract §3, §5).'
+        : 'no job correlated (in-memory store does not survive across invocations — provision Vercel KV).',
     });
   } catch (err) {
     return new Response(`webhook handler failed: ${err instanceof Error ? err.message : String(err)}`, { status: 502 });

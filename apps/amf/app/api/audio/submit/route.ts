@@ -7,6 +7,7 @@
  * recording) + `jobId`.
  */
 import { hasAuphonicKey, createProduction, uploadAudio, startProduction } from '../../../../lib/auphonic';
+import { createJob, transition, getJobStore } from '../../../../lib/job';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -34,6 +35,10 @@ export async function POST(req: Request): Promise<Response> {
 
   const origin = new URL(req.url).origin;
   try {
+    const now = new Date().toISOString();
+    const store = getJobStore();
+    let job = createJob(jobId, { trendTopic: String(form.get('trendTopic') ?? '') || undefined }, now);
+
     const uuid = await createProduction({
       presetUuid,
       webhook: `${origin}/api/audio/webhook`,
@@ -42,13 +47,20 @@ export async function POST(req: Request): Promise<Response> {
     await uploadAudio(uuid, audio, 'recording');
     await startProduction(uuid);
 
-    // TODO(L4): persist { jobId -> { auphonicUuid: uuid, status: 'enhancing' } }
-    // to a durable store (Vercel KV / Postgres / CONTINUUM storage seam). An
-    // in-memory map does NOT survive across serverless invocations, so the
-    // webhook (a separate invocation) cannot correlate without a real store.
-    // Gated on the operator choosing the store. See contract §3 "Storage reality".
+    // Persist into the append-only job state. The webhook correlates back via
+    // auphonicUuid. NOTE: store.durable=false (in-memory) does NOT survive across
+    // serverless invocations — production needs Vercel KV (see lib/job.ts).
+    job = { ...transition(job, 'enhancing', new Date().toISOString(), { note: 'submitted to Auphonic' }), auphonicUuid: uuid };
+    await store.put(job);
 
-    return Response.json({ ok: true, jobId, auphonicUuid: uuid, status: 'enhancing' });
+    return Response.json({
+      ok: true,
+      jobId,
+      auphonicUuid: uuid,
+      phase: job.phase,
+      durableStore: store.durable,
+      warning: store.durable ? undefined : 'In-memory job store: webhook correlation will not survive in production. Provision Vercel KV.',
+    });
   } catch (err) {
     return new Response(`Auphonic submit failed: ${err instanceof Error ? err.message : String(err)}`, { status: 502 });
   }
