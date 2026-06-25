@@ -1,0 +1,147 @@
+{
+  "jobId": "proof",
+  "enhancedAudioUrl": "/Users/emporiumcollection/Development/supabase-projects/CONTINUUM/apps/amf/worker/out/proof/super.wav",
+  "durationSec": 9.68,
+  "transcript": "Valve just shipped a Linux gaming PC, and the people who should care most are not gamers. Steam OS ships with a full desktop mode.",
+  "segments": [
+    {
+      "text": "Valve just shipped a Linux gaming PC, and the people who should care most are not gamers.",
+      "start": 0.492,
+      "end": 5.984
+    },
+    {
+      "text": "Steam OS ships with a full desktop mode.",
+      "start": 6.565,
+      "end": 8.95
+    }
+  ],
+  "words": [
+    {
+      "word": "Valve",
+      "start": 0.492,
+      "end": 0.833
+    },
+    {
+      "word": "just",
+      "start": 0.893,
+      "end": 1.073
+    },
+    {
+      "word": "shipped",
+      "start": 1.153,
+      "end": 1.394
+    },
+    {
+      "word": "a",
+      "start": 1.454,
+      "end": 1.494
+    },
+    {
+      "word": "Linux",
+      "start": 1.574,
+      "end": 1.895
+    },
+    {
+      "word": "gaming",
+      "start": 1.935,
+      "end": 2.276
+    },
+    {
+      "word": "PC,",
+      "start": 2.316,
+      "end": 2.817
+    },
+    {
+      "word": "and",
+      "start": 3.318,
+      "end": 3.418
+    },
+    {
+      "word": "the",
+      "start": 3.458,
+      "end": 3.539
+    },
+    {
+      "word": "people",
+      "start": 3.579,
+      "end": 3.859
+    },
+    {
+      "word": "who",
+      "start": 3.919,
+      "end": 4.04
+    },
+    {
+      "word": "should",
+      "start": 4.08,
+      "end": 4.26
+    },
+    {
+      "word": "care",
+      "start": 4.32,
+      "end": 4.621
+    },
+    {
+      "word": "most",
+      "start": 4.801,
+      "end": 5.062
+    },
+    {
+      "word": "are",
+      "start": 5.142,
+      "end": 5.242
+    },
+    {
+      "word": "not",
+      "start": 5.302,
+      "end": 5.483
+    },
+    {
+      "word": "gamers.",
+      "start": 5.543,
+      "end": 5.984
+    },
+    {
+      "word": "Steam",
+      "start": 6.565,
+      "end": 6.826
+    },
+    {
+      "word": "OS",
+      "start": 6.866,
+      "end": 7.026
+    },
+    {
+      "word": "ships",
+      "start": 7.086,
+      "end": 7.407
+    },
+    {
+      "word": "with",
+      "start": 7.447,
+      "end": 7.587
+    },
+    {
+      "word": "a",
+      "start": 7.628,
+      "end": 7.648
+    },
+    {
+      "word": "full",
+      "start": 7.748,
+      "end": 7.988
+    },
+    {
+      "word": "desktop",
+      "start": 8.069,
+      "end": 8.61
+    },
+    {
+      "word": "mode.",
+      "start": 8.67,
+      "end": 8.95
+    }
+  ],
+  "wordLevelSource": "whisperx",
+  "status": "ready-for-assembly"
+}

@@ -33,7 +33,10 @@ function composeVideo(payload, audioFile, opts = {}) {
     tl += `\n      tl.fromTo("#${id}",{opacity:0,y:30},{opacity:1,y:0,duration:0.3},${lstart.toFixed(2)});`;
     tl += `\n      tl.to("#${id}",{opacity:0,duration:0.25},${(lend + 0.05).toFixed(2)});`;
   });
-  const audioEl = audioFile ? `<audio src="${esc(audioFile)}" data-start="0" data-duration="${total.toFixed(2)}"></audio>` : '';
+  // Audio is muxed onto the rendered video with FFmpeg after render (robust +
+  // deterministic), NOT embedded in the composition — HyperFrames' in-comp audio
+  // muxing is finicky and the FFmpeg path is guaranteed. So: no <audio> element.
+  const audioEl = '';
   return `<!doctype html><html lang="en"><head><meta charset="UTF-8"/>
 <meta name="viewport" content="width=${W}, height=${H}"/>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
@@ -66,10 +69,34 @@ if (audioSrc && existsSync(audioSrc)) {
   copyFileSync(audioSrc, resolve(outDir, audioFile));
 }
 
-writeFileSync(resolve(outDir, 'index.html'), composeVideo(payload, audioFile));
-// minimal hyperframes project config
-writeFileSync(resolve(outDir, 'hyperframes.json'), JSON.stringify({ paths: { blocks: 'compositions', assets: 'assets' } }, null, 2));
+// Proven sequence (verified 2026-06-25): hyperframes `init` scaffolds the
+// recognized project layout, we overwrite index.html with our composition, then
+// `npm run render` (the scaffold's own script) produces the MP4. A hand-rolled
+// hyperframes.json is NOT recognized as a project root.
+console.error('[L5] scaffolding HyperFrames project…');
+execSync('npx --yes hyperframes@latest init proj', { cwd: outDir, stdio: 'inherit' });
+const projDir = resolve(outDir, 'proj');
+writeFileSync(resolve(projDir, 'index.html'), composeVideo(payload, audioFile));
+if (audioFile) copyFileSync(resolve(outDir, audioFile), resolve(projDir, audioFile));
 
-console.error('[L5] rendering MP4 via HyperFrames…');
-execSync('npx --yes hyperframes@latest render', { cwd: outDir, stdio: 'inherit' });
-console.error(`[L5] done → ${outDir}/renders/`);
+console.error('[L5] rendering video via HyperFrames…');
+execSync('npm run render', { cwd: projDir, stdio: 'inherit' });
+
+// find the rendered (silent) mp4
+const rendersDir = resolve(projDir, 'renders');
+const silent = execSync(`ls -t "${rendersDir}"/*.mp4 2>/dev/null | head -1`, { encoding: 'utf8' }).trim();
+if (!silent) { console.error('[L5] ERROR: no rendered mp4 found'); process.exit(1); }
+
+if (audioFile) {
+  // Mux the voice track onto the silent video (deterministic FFmpeg path).
+  const voiceWav = resolve(projDir, audioFile);
+  const voiced = resolve(rendersDir, 'voiced.mp4');
+  console.error('[L5] muxing voice track via FFmpeg…');
+  execSync(
+    `ffmpeg -y -i "${silent}" -i "${voiceWav}" -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -shortest "${voiced}"`,
+    { stdio: 'inherit' },
+  );
+  console.error(`[L5] ✓ voiced MP4 → ${voiced}`);
+} else {
+  console.error(`[L5] ✓ silent MP4 → ${silent}`);
+}
