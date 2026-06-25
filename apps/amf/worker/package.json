@@ -1,0 +1,10 @@
+{
+  "name": "@number7even/continuum-amf-worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "AMF producing worker — L4 voice/b-roll + L5 assembly (runs on the M1 worker).",
+  "dependencies": {
+    "@fal-ai/client": "^1.0.0"
+  }
+}

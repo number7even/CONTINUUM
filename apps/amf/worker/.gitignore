@@ -7,3 +7,4 @@ out/
 render-out/
 *.wav
 *.mp4
+node_modules/
