@@ -49,15 +49,23 @@ def synthesize(text: str, out_wav: Path, device: str, voice_ref: str | None) -> 
 
 
 def align(audio_path: Path, device: str):
-    """whisperx transcribe + align → word-level timings."""
+    """whisperx transcribe + align → word-level timings.
+
+    whisperx (ctranslate2/faster-whisper) supports only cpu/cuda, NOT mps. On
+    Apple Silicon we therefore run alignment on CPU (fast enough for short clips)
+    even when VoxCPM synthesized on mps.
+    """
     import whisperx  # type: ignore
 
-    asr = whisperx.load_model(os.environ.get("WHISPER_MODEL", "base"), device, compute_type="int8")
+    asr_device = "cpu" if device == "mps" else device
+    # Force the language (we know it — the script is ours). Auto-detect mis-fires
+    # on short clean TTS audio (e.g. detects 'la'/Latin). LANG env overrides.
+    lang = os.environ.get("AMF_LANG", "en")
+    asr = whisperx.load_model(os.environ.get("WHISPER_MODEL", "base"), asr_device, compute_type="int8", language=lang)
     audio = whisperx.load_audio(str(audio_path))
     result = asr.transcribe(audio, batch_size=8)
-    lang = result.get("language", "en")
-    align_model, metadata = whisperx.load_align_model(language_code=lang, device=device)
-    aligned = whisperx.align(result["segments"], align_model, metadata, audio, device, return_char_alignments=False)
+    align_model, metadata = whisperx.load_align_model(language_code=lang, device=asr_device)
+    aligned = whisperx.align(result["segments"], align_model, metadata, audio, asr_device, return_char_alignments=False)
 
     words = []
     for w in aligned.get("word_segments", []):
