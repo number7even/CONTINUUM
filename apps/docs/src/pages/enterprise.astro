@@ -1,0 +1,127 @@
+---
+/**
+ * /enterprise — the high-ticket enterprise pitch + demo-request capture.
+ *
+ * The sales-led front door: problem → agitation → verify-then-dissolve reveal →
+ * proof → offer → capture. Posts to /api/demo-request. Brand CI (Inkwell/Creme),
+ * indexable, self-contained (no Starlight chrome — a focused landing).
+ */
+const INK = '#232b2d', PANEL = '#283133', HAIR = '#36423f', TEXT = '#f6f3ec',
+  BODY = '#c8c3b6', MUTED = '#9aa09a', CREME = '#c89a72', CREME_HI = '#e0b387', GREEN = '#7ddf64';
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Continuum for Enterprise — verifiable AI accountability</title>
+  <meta name="description" content="The only AI memory layer that refuses to mark work done until a shell command proves it. Tenant-scoped, isolated, auditable — for enterprise AI engineering teams." />
+  <style define:vars={{ INK, PANEL, HAIR, TEXT, BODY, MUTED, CREME, CREME_HI, GREEN }}>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--INK); color: var(--TEXT); font-family: -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.6; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+    a { color: var(--CREME-HI); }
+    .eyebrow { font-family: ui-monospace, monospace; color: var(--CREME); font-size: 0.85rem; letter-spacing: 0.05em; }
+    h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); letter-spacing: -0.03em; margin: 0.6rem 0 1rem; text-wrap: balance; }
+    .lede { font-size: 1.25rem; color: var(--BODY); max-width: 60ch; }
+    h2 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 3.5rem 0 1rem; }
+    h3 { font-size: 1.05rem; margin: 0 0 0.3rem; }
+    p { color: var(--BODY); max-width: 64ch; }
+    .reveal { background: var(--PANEL); border: 1px solid var(--HAIR); border-radius: 12px; padding: 1.75rem 2rem; margin: 2.5rem 0; }
+    .reveal .big { font-size: 1.35rem; color: var(--TEXT); font-weight: 600; }
+    .proof { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+    .proof div { background: var(--PANEL); border: 1px solid var(--HAIR); border-radius: 10px; padding: 1rem 1.2rem; }
+    .proof .n { font-family: ui-monospace, monospace; color: var(--CREME-HI); font-size: 1.3rem; font-weight: 700; }
+    .proof .l { color: var(--MUTED); font-size: 0.85rem; }
+    ul.steps { list-style: none; max-width: 64ch; margin: 1rem 0; }
+    ul.steps li { padding: 0.6rem 0; border-top: 1px solid var(--HAIR); display: flex; gap: 1rem; }
+    ul.steps li span { color: var(--CREME); font-family: ui-monospace, monospace; flex-shrink: 0; }
+    form { background: var(--PANEL); border: 1px solid var(--HAIR); border-radius: 12px; padding: 2rem; margin-top: 1.5rem; display: grid; gap: 1rem; max-width: 560px; }
+    label { display: grid; gap: 0.35rem; font-size: 0.85rem; color: var(--BODY); }
+    input, textarea, select { background: #2a3335; color: var(--TEXT); border: 1px solid var(--HAIR); border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.95rem; font-family: inherit; outline: none; }
+    button { padding: 0.8rem 1.25rem; border: none; border-radius: 8px; background: var(--CREME); color: #1c2224; font-weight: 600; font-size: 1rem; cursor: pointer; }
+    button:disabled { background: #3a4446; color: var(--MUTED); cursor: not-allowed; }
+    .ok { background: rgba(125,223,100,0.1); border: 1px solid #7ddf6455; border-radius: 8px; padding: 1rem; color: var(--BODY); }
+    .err { background: #3a1010; border: 1px solid #ff858555; border-radius: 8px; padding: 0.8rem 1rem; color: #ff8585; font-size: 0.88rem; }
+    .nav { font-size: 0.85rem; color: var(--MUTED); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav"><a href="/">← Continuum</a></div>
+    <p class="eyebrow" style="margin-top:2rem">CONTINUUM FOR ENTERPRISE</p>
+    <h1>Your AI assistants stop forgetting. And stop claiming work is done when it isn't.</h1>
+    <p class="lede">For engineering orgs shipping with Claude Code and Cursor: verifiable AI accountability, tenant-isolated, auditable, across every team.</p>
+
+    <h2>The problem at scale</h2>
+    <p>At one developer, an AI that forgets context and over-claims completion is an annoyance. Across 50 engineers shipping to production, it is untracked risk: hallucinated "done", lost decisions, and no record of what the AI actually did or proved.</p>
+
+    <div class="reveal">
+      <p class="eyebrow">THE DIFFERENCE</p>
+      <p class="big">Continuum is the only AI memory layer that refuses to mark work done until a shell command proves it.</p>
+      <p style="margin-top:0.75rem">Every completion carries a verify command. The task dissolves only when that command exits zero. Provable, not plausible. Every "done" has a receipt.</p>
+    </div>
+
+    <h2>The proof</h2>
+    <div class="proof">
+      <div><div class="n">2.85×</div><div class="l">measured token reduction (reproducible benchmark)</div></div>
+      <div><div class="n">hash-sealed</div><div class="l">append-only, tamper-evident audit trail of every state</div></div>
+      <div><div class="n">isolated</div><div class="l">mechanically-proven per-tenant data separation</div></div>
+      <div><div class="n">local-first</div><div class="l">secrets scrubbed pre-write; your data stays yours</div></div>
+    </div>
+
+    <h2>How it works for your org</h2>
+    <ul class="steps">
+      <li><span>01</span><div><h3>Provisioned tenant</h3><p>We stand up an isolated, authenticated Continuum instance scoped to your organization.</p></div></li>
+      <li><span>02</span><div><h3>Your teams connect</h3><p>Engineers paste one config snippet into Claude Code or Cursor. Continuum's tools appear in the AI they already use.</p></div></li>
+      <li><span>03</span><div><h3>Warm, accountable AI</h3><p>Zero cold starts, 5-source project memory, and the verify-then-dissolve gate — across every session, scoped to your org.</p></div></li>
+      <li><span>04</span><div><h3>Auditable record</h3><p>Every decision and verified completion is hash-sealed and queryable. "What was true on the 14th?" has an exact answer.</p></div></li>
+    </ul>
+
+    <h2>Request access</h2>
+    <p>Enterprise is onboarded directly. Tell us about your team and we'll set up a demo and a scoped pilot.</p>
+
+    <form id="demo-form">
+      <label>Work email *<input type="email" name="email" required placeholder="you@company.com" /></label>
+      <label>Company *<input type="text" name="company" required placeholder="Acme Corp" /></label>
+      <label>Your name<input type="text" name="name" placeholder="Jane Doe" /></label>
+      <label>Engineers using AI assistants
+        <select name="teamSize">
+          <option value="">Select…</option>
+          <option>1–10</option><option>11–50</option><option>51–200</option><option>200+</option>
+        </select>
+      </label>
+      <label>What are you trying to solve?<textarea name="message" rows="3" placeholder="e.g. our AI ships unverified work; we need an audit trail"></textarea></label>
+      <button type="submit" id="submit">Request enterprise demo</button>
+      <div id="result"></div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('demo-form');
+    const btn = document.getElementById('submit');
+    const result = document.getElementById('result');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.disabled = true; btn.textContent = 'Sending…'; result.innerHTML = '';
+      const data = Object.fromEntries(new FormData(form).entries());
+      try {
+        const res = await fetch('/api/demo-request', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+        });
+        const j = await res.json();
+        if (!res.ok || !j.ok) throw new Error(j.error || 'Something went wrong');
+        form.reset();
+        result.className = 'ok';
+        result.textContent = "Thank you. We'll be in touch within one business day to set up your demo.";
+        btn.style.display = 'none';
+      } catch (err) {
+        result.className = 'err';
+        result.textContent = 'Error: ' + (err.message || err) + '. Or email riaan@number7even.com directly.';
+        btn.disabled = false; btn.textContent = 'Request enterprise demo';
+      }
+    });
+  </script>
+</body>
+</html>

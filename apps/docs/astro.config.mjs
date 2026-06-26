@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import vercel from '@astrojs/vercel';
 
 /**
  * Continuum — public docs + landing site (MD8 deliverable).
@@ -14,6 +15,10 @@ import starlight from '@astrojs/starlight';
  */
 export default defineConfig({
   site: 'https://www.continuum.rest',
+  // Hybrid: Starlight doc pages stay prerendered (static); only opted-in routes
+  // (the demo-request API) are serverless. Keeps the live apex pages unchanged.
+  output: 'static',
+  adapter: vercel(),
   integrations: [
     starlight({
       title: 'Continuum',
