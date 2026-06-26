@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const revalidate = 0;
 
+import { redirect } from 'next/navigation';
 import { fetchDashboard, type Todo } from './lib';
 
 const INK = '#232b2d', PANEL = '#283133', PANEL2 = '#2a3335', HAIR = '#36423f',
@@ -27,6 +28,7 @@ const LANES: Array<{ key: Todo['status']; label: string; color: string }> = [
 
 export default async function Dashboard() {
   const d = await fetchDashboard();
+  if (d.reason === 'login') redirect('/dashboard/login');
   const todos = d.todos ?? [];
   const byLane = (s: Todo['status']) => todos.filter((t) => t.status === s);
   const doneCount = byLane('done').length;

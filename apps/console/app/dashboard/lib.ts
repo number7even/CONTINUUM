@@ -8,6 +8,7 @@
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { cookies } from 'next/headers';
 
 export interface Todo {
   id: string;
@@ -54,13 +55,25 @@ function parseToolText<T>(res: unknown, fallback: T): T {
   }
 }
 
+/** The client's pasted tenant token (cookie) takes precedence over the env
+ *  demo token, so each logged-in client sees THEIR tenant. Returns null when
+ *  neither is present (→ login required). */
+async function resolveToken(): Promise<{ token: string | null; fromCookie: boolean }> {
+  try {
+    const cookieToken = (await cookies()).get('continuum_tenant_token')?.value;
+    if (cookieToken) return { token: decodeURIComponent(cookieToken), fromCookie: true };
+  } catch { /* cookies() unavailable in some contexts */ }
+  return { token: process.env.CONTINUUM_HTTP_TOKEN ?? null, fromCookie: false };
+}
+
 export async function fetchDashboard(): Promise<DashboardData> {
   const url = process.env.CONTINUUM_HTTP_URL;
-  const token = process.env.CONTINUUM_HTTP_TOKEN;
+  const { token } = await resolveToken();
   const projectId = process.env.CONTINUUM_PROJECT_ID;
   const empty: DashboardData = { ok: false, todos: [], state: null, digest: null, latencyMs: 0 };
 
-  if (!url || !token) return { ...empty, reason: 'unconfigured' };
+  if (!url) return { ...empty, reason: 'unconfigured' };
+  if (!token) return { ...empty, reason: 'login' };
 
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
   if (projectId) headers['X-Continuum-Project'] = projectId;
