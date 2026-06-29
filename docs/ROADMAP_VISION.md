@@ -283,6 +283,7 @@ sign-off before any live run.
 | Gate | Blocks | Status |
 |---|---|---|
 | Inject a working npm token (2FA) | Phase 0 publish | 🚧 **operator action pending** |
+| Set `DEMO_WEBHOOK_URL` in `continuum-docs` Vercel env | Enterprise leads routing to operator | 🚧 **operator action pending** — code shipped (`b03d9cb`); handler degrades gracefully (logs leads) until set. Pick Discord/Slack/Zapier webhook → `vercel env add DEMO_WEBHOOK_URL production` → redeploy. Then live-test via `www.continuum.rest/enterprise`. |
 | Lock `D-V2.2` (Postgres-as-directory vs revert) | Phase 2 pgschema | 🚧 open |
 | Ship local inference (`ruvllm`, Issue #3) | Phase 4 deeper rungs | 🚧 open |
 | AMF go/no-go + `AMF/` repo split | Phase 5 | 🔒 decided: build, separate repo, post-V1 |
