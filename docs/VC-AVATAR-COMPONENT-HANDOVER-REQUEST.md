@@ -32,6 +32,12 @@ the same way **per tenant + avatar**. So the handover must be **presenter-agnost
 no hard-coded Paulina/Aria identities in the core; identity comes from config + the
 consent registry.
 
+**Downstream target (so the matte handoff is right):** the presenter is composited
+**over our own b-roll** (talking head as an overlay, not full-frame), with burned
+captions and a brand frame. We build the b-roll generation + compositor (it is **not**
+yours to build — see §8); but item 8's matte must output in a form our compositor can
+layer cleanly. The matte output contract is in §3a.
+
 ## 2. What to deliver (the reuse package)
 
 Deliver the **✅-reuse** components from the avatar tech handoff. For **each**: the
@@ -61,6 +67,25 @@ and version them:
 - **Voice proxy output** — exact audio byte contract (sample rate, channels, PCM vs MP3) so Cartesia and VoxCPM are truly interchangeable.
 - **`avatar_sources` schema** — columns + types: `talent_name`, `consent_by`, `voiceidvault_excluded` (always true for content faces), `prep_status`, `source_clip`.
 - **Webhook payloads** — the render-complete webhook body shape (for Replicate/MuseTalk).
+
+### 3a. Matte → composite output contract (the one b-roll-adjacent ask)
+
+We do **not** want you to build b-roll or the compositor (§8). We **do** need item 8's
+matte to emit something our compositor can layer over b-roll without re-processing.
+Please pin and document:
+
+- **Alpha output format** — per-frame transparency as **WebM (VP9 alpha)** *or* a
+  **PNG sequence + manifest**. State which, and the pixel format (e.g. `yuva420p`).
+- **Edge quality** — feathering/spill behaviour at the hair/shoulder boundary (the
+  difference between "floats over b-roll" and "ugly halo"). Note any known artifacts.
+- **Resolution + frame rate** — what it outputs natively; we target **1080×1920 @ 30fps**.
+- **Sync anchor** — how the matted clip's timeline maps back to the source audio (so
+  captions + b-roll cuts stay word-synced after compositing).
+- **Headroom** — is BodyPix the current best, or did you move to a stronger segmenter?
+  Tell us what you'd use today.
+
+That is the **entire** b-roll-side ask: a clean, documented presenter cut-out. Generation,
+matching, captions, and vertical assembly are ours.
 
 ## 4. Consent + rights artifacts (mandatory — P9)
 
@@ -113,11 +138,13 @@ contracts**, and the **§6 runnable example**.
 
 Do **not** build or deliver these — they are the CONTINUUM/AMF team's work:
 - Long-form → short-form **segmentation + scripting** (the content brain).
-- **B-roll library + matching.**
-- **Compositor** (presenter-over-b-roll + captions + vertical export).
-- **Review/publish dashboard.**
+- **B-roll generation** (ComfyUI / fal.ai / licensed library) + **matching**.
+- **Compositor** (presenter-over-b-roll + captions + vertical export — HyperFrames / FFmpeg / Remotion).
+- **Review/publish dashboard** + syndication.
 
 We only need the **avatar + voice engine** — the proven half — packaged for reuse.
+The single point where our b-roll work touches yours is the **matte output contract
+in §3a**: give us a clean cut-out, and everything downstream of it is ours.
 
 ## 9. Open decisions for VC team input (flag, don't decide for us)
 
