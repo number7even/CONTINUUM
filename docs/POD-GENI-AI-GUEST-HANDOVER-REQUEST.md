@@ -93,7 +93,7 @@ but defer to you on ownership. Either way: **the contract already exists — bui
 
 ```
 AI_GUEST_BOT_URL          DAILY_API_KEY / room config
-DEEPGRAM_API_KEY          VOXCPM2_ENDPOINT / VOXCPM2_SECRET
+DEEPGRAM_API_KEY          VOXCPM2_URL / VOXCPM2_API_KEY   # reconciled to the worker's names, 2026-06-29
 GEMINI_API_KEY (or router-routed LLM)
 # CONTINUUM grounding (our side):
 CONTINUUM_HTTP_URL        CONTINUUM_HTTP_TOKEN (tenant-scoped)

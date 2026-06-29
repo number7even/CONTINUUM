@@ -57,17 +57,33 @@ interface ClaimVerdict {
 }
 
 interface CorpusAdapter {
-  /** Session warm-up: pre-load the most relevant corpus for this topic so the
-   *  per-turn loop rarely needs a network hop. Returns the seed grounding context. */
-  prime(topic: string, k: number): Promise<GroundedPassage[]>;
+  /** PRIMARY seam — the function the Pod-Geni worker already calls at session start.
+   *  Reconciled 2026-06-29 with Pod-Geni's built `load_corpus(corpus_ref)`: the worker
+   *  depends ONLY on this shape, so the CONTINUUM swap is a drop-in (not a rewrite).
+   *  `research` is assembled from cited Observations; each carries its observationId. */
+  loadCorpus(corpusRef: CorpusRef): Promise<{
+    title: string;
+    research: GroundedPassage[];   // cited grounding context
+    topics: string[];
+    preparedQuestions: string[];
+  }>;
 
-  /** Per-turn retrieval (only when the primed context is insufficient). */
+  /** CONTINUUM-side enrichments (the AMF fork adds these; the base worker loads once).
+   *  Per-turn retrieval when the loaded corpus is insufficient. */
   retrieve(query: string, k: number): Promise<GroundedPassage[]>;
 
-  /** Post-turn / post-session: flag AI claims not traceable to the corpus. */
+  /** Post-turn / post-session: flag AI claims not traceable to the corpus. Routes to
+   *  continuum_check_brand / verified_facts (replaces the static AiUngroundedClaim store). */
   checkClaims(claims: string[]): Promise<ClaimVerdict[]>;
 }
 ```
+
+> **Interface reconciliation (2026-06-29):** Pod-Geni's worker calls one function,
+> `load_corpus(corpus_ref) → {title, research, topics, preparedQuestions}`. That is the
+> contract's `loadCorpus`. The earlier `prime()` is the same idea with a thinner return —
+> folded into `loadCorpus`. `retrieve()` / `checkClaims()` are CONTINUUM-side add-ons beyond
+> the base load-once model. `scripts/ai-guest-corpus-smoke.mjs` proves the retrieval
+> primitives `loadCorpus` is assembled from (search → cited passages → claim-check).
 
 ### 1a. `ContinuumCorpusAdapter` (CONTINUUM/AMF owns)
 
@@ -75,7 +91,7 @@ Backed by the shipped MCP tools against a tenant-scoped engine connection:
 
 | Adapter method | CONTINUUM call | Notes |
 |---|---|---|
-| `prime(topic,k)` | `continuum_search_docs(topic, k)` → `continuum_get_observations(ids)` | full passages + IDs, loaded into bot context at `sessions/start` |
+| `loadCorpus(ref)` | `continuum_search_docs(topic, k)` → `continuum_get_observations(ids)`; assemble `research` from cited passages; derive `topics` / `preparedQuestions` | the worker's session-start call (= Pod-Geni `load_corpus`) |
 | `retrieve(q,k)` | `continuum_search_docs(q, k)` (+ `get_observations` for the winners) | Layer-1 → Layer-3 on demand |
 | `checkClaims(claims)` | per claim: `continuum_search_docs(claim, 3)`; `grounded = topScore ≥ THRESHOLD`; `supportingIds = hit ids`. Optionally `continuum_check_brand(claim)` to also catch **promise/position contradictions**. | retrieval-grounded now; semantic when vector search is exposed |
 
@@ -105,7 +121,8 @@ Extends Pod-Geni's existing dispatch with an explicit `corpusRef` (replaces the 
   "sessionId": "string",
   "podcastId": "string",
   "roomUrl": "https://<daily-room>",
-  "voiceProfileId": "string",          // resolves the VoxCPM2 voice
+  "mode": "interviewer" | "guest",     // Pod-Geni-added: AI-interviews-human (default) | AI-as-guest
+  "voiceProfileId": "string",          // resolves the VoxCPM2 voice (standardised stack)
   "persona": "string",                 // e.g. "Sharp and skeptical Series-B VC"
   "corpusRef": {
     "adapter": "continuum" | "podgeni",
@@ -114,7 +131,7 @@ Extends Pod-Geni's existing dispatch with an explicit `corpusRef` (replaces the 
   },
   "grounding": {
     "threshold": 0.0,                  // min retrieval score to count as "grounded"
-    "primeTopic": "string",            // warm-up topic for CorpusAdapter.prime()
+    "primeTopic": "string",            // warm-up topic for loadCorpus()
     "primeK": 12,
     "checkMode": "per_turn" | "post_session"  // when to run checkClaims()
   },
@@ -126,7 +143,9 @@ Extends Pod-Geni's existing dispatch with an explicit `corpusRef` (replaces the 
 ```
 
 **Secrets are NEVER in this payload** (P1): the bot reads `CONTINUUM_HTTP_TOKEN`,
-`DAILY_API_KEY`, `DEEPGRAM_API_KEY`, `VOXCPM2_*`, LLM key from its own environment.
+`DAILY_API_KEY`, `DEEPGRAM_API_KEY`, `VOXCPM2_URL`, `VOXCPM2_API_KEY`, LLM key from its own
+environment. **Voice stack standardised on VoxCPM2 48kHz (Apache-2.0), 2026-06-29** — var
+names follow Pod-Geni's worker (`VOXCPM2_URL` / `VOXCPM2_API_KEY`).
 
 Lifecycle events to `callbackUrl`: `joined`, `turn` (each AI turn + citations + flags),
 `left`, `error`.

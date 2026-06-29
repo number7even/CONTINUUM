@@ -138,11 +138,13 @@ The hybrid both terminals converged on. Recorded here to close the loop:
 - **Sequencing:** **not now.** v2 capture mode — the worker waits; we ship the walk-and-talk
   MVP first. The runtime being ready does not pull it into v1.
 
-**Still open (Riaan to ratify — see the CONTINUUM terminal's note):** voice-engine
-convergence (Pod-Geni proposes VoxCPM2 48kHz, Apache-2.0); the `VOXCPM2_URL/API_KEY` vs
-`VOXCPM2_ENDPOINT/SECRET` name reconciliation; and aligning the two corpus-adapter
-interfaces (`load_corpus → {title,research,topics,preparedQuestions}` vs the contract's
-`prime/retrieve/checkClaims`).
+**Now resolved (Riaan, 2026-06-29):**
+- **Voice engine → VoxCPM2 48kHz (Apache-2.0)** standardised across both products; VC told
+  to hold Cartesia (kept as a swappable fallback behind `TTSService`).
+- **Var names → `VOXCPM2_URL` / `VOXCPM2_API_KEY`** (the worker's names); our request §6 updated.
+- **Corpus-adapter interface → `loadCorpus(corpusRef) → {title, research, topics,
+  preparedQuestions}`** is the worker-facing seam (= your `load_corpus`); `retrieve` /
+  `checkClaims` are CONTINUUM-side add-ons. `AI-GUEST-BOT-CONTRACT.md §1` reconciled to match.
 
 ---
 

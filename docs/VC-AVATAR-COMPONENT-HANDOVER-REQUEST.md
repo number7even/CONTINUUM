@@ -151,7 +151,10 @@ in §3a**: give us a clean cut-out, and everything downstream of it is ours.
 - **HeyGen vs MuseTalk to start.** HeyGen ships fastest but uploads the face to a 3rd
   party (cost + ToS + cuts against P1/sovereignty). Tell us the real per-minute cost and
   ToS limits you hit, so we make the call deliberately.
-- **Cartesia vs sovereign VoxCPM voice.** Same trade — managed-now vs owned-later.
+- **Voice stack — DECIDED 2026-06-29: standardise on VoxCPM2 48kHz (Apache-2.0).** Please
+  **hold the Cartesia path** — we're converging both products on VoxCPM2 behind the
+  `TTSService` interface. Still deliver the Cartesia proxy as a *swappable fallback* behind
+  that interface, but VoxCPM2 is the default; don't invest further in Cartesia-specific work.
 - Anything in the proven pipeline that was **fragile or maintenance-heavy** — tell us now.
 
 ---
