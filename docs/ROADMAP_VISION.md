@@ -278,6 +278,30 @@ sign-off before any live run.
 
 ---
 
+## Brand Kernel (Layer-0) — point-of-view engine *(scaffold shipped 2026-06-29)*
+
+A **new application track on CONTINUUM**, not a new engine phase — and it doubles
+as AMF's L3 brain (brand-aware scripting). Retrofits an identity + distribution
+layer **above** AMF + CONTINUUM so output feels like *you* and routes to *your*
+channels. Full spec: [`docs/BRAND_KERNEL.md`](./BRAND_KERNEL.md).
+
+- ✅ **Kernel scaffold** — `continuum_record_brand_dna` (promise / position /
+  framework / persona) + `continuum_check_brand` (Publish Identity Gate: FTS5
+  retrieval that cites the conflicting Observation ID). 9-check smoke green;
+  nested-brand inheritance proven. The Promise Log = verify-then-dissolve applied
+  to brand claims.
+- 🔒 **Brand architecture: NESTED** (locked 2026-06-29) — Master brand = personal;
+  sub-brands (`voicecosmos`, `zoro`, `consulting`) are a `subBrand` tag inheriting
+  Master DNA, not separate tenants.
+- 🚧 **Brand DNA v1 + Voice Print** — gated on operator inputs (origin monologue +
+  50 posts, P9). The machine is built; the fuel is the human's.
+- 🅿️ Channel Router · Voice-drift detection · gate-in-publish-path — after DNA lands.
+
+**Gate:** one raw idea → on-brand LinkedIn post + newsletter + video script in your
+voice, routed correctly, all passing the "is this actually me?" gate.
+
+---
+
 ## Decision gates (human, not code — these block their phases)
 
 | Gate | Blocks | Status |

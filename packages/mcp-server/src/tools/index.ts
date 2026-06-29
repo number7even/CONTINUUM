@@ -23,6 +23,8 @@ import { deleteObservationTool, handleDeleteObservation } from './delete-observa
 import { getTodosTool, handleGetTodos } from './get-todos.js';
 import { createTodoTool, handleCreateTodo } from './create-todo.js';
 import { updateTodoTool, handleUpdateTodo } from './update-todo.js';
+import { recordBrandDnaTool, handleRecordBrandDna } from './record-brand-dna.js';
+import { checkBrandTool, handleCheckBrand } from './check-brand.js';
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   recordCheckpointTool,
@@ -35,6 +37,8 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   getTodosTool,
   createTodoTool,
   updateTodoTool,
+  recordBrandDnaTool,
+  checkBrandTool,
 ] as const;
 
 const DISPATCH_TABLE: Record<string, ToolHandler> = {
@@ -48,6 +52,8 @@ const DISPATCH_TABLE: Record<string, ToolHandler> = {
   continuum_get_todos: handleGetTodos,
   continuum_create_todo: handleCreateTodo,
   continuum_update_todo: handleUpdateTodo,
+  continuum_record_brand_dna: handleRecordBrandDna,
+  continuum_check_brand: handleCheckBrand,
 };
 
 /**
