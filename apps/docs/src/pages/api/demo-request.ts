@@ -61,11 +61,13 @@ export const POST: APIRoute = async ({ request }) => {
 
   if (webhook) {
     try {
-      // Slack/Discord-compatible { text } payload; most webhook tools accept it.
+      // Universal payload: `text` (Slack), `content` (Discord), and the raw
+      // `inquiry` object (Zapier/Make/custom endpoints → email/sheet/CRM).
+      // Each consumer reads the field it understands; extras are ignored.
       await fetch(webhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: summary, inquiry }),
+        body: JSON.stringify({ text: summary, content: summary, inquiry }),
       });
     } catch (err) {
       // don't fail the prospect's submission if the webhook hiccups; log it.
