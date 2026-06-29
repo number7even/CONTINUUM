@@ -80,7 +80,7 @@ back into our orchestrator. Either path, the contract is the seam.
 ```
 GEMINI_API_KEY            GEMINI_MODEL
 DEEPGRAM_API_KEY          DEEPGRAM_MODEL
-VOXCPM2_URL               VOXCPM2_API_KEY        # your doc calls these VOXCPM2_ENDPOINT / VOXCPM2_SECRET — pick one name set
+VOXCPM2_URL               VOXCPM2_API_KEY        # standardised names (ratified in AI-GUEST-BOT-CONTRACT.md §2)
 DAILY_API_KEY             DAILY_DOMAIN
 FIREBASE_PROJECT_ID       GOOGLE_APPLICATION_CREDENTIALS   # or ADC
 ALLOWED_CALLER_EMAIL                                       # pin the orchestrator's service-account email
@@ -94,9 +94,10 @@ CONTINUUM_HTTP_URL        CONTINUUM_HTTP_TOKEN   # tenant-scoped (brand-riaan)
 AI_GUEST_BOT_URL          AI_GUEST_BOT_API_KEY   # set in functions/.env.pod-geni-ai, then redeploy functions
 ```
 
-> ⚠️ **Name reconciliation:** our worker reads `VOXCPM2_URL` / `VOXCPM2_API_KEY`; your §6 lists
-> `VOXCPM2_ENDPOINT` / `VOXCPM2_SECRET`. Standardise on one set before you add the vars
-> (rename in `ai-guest-bot/pipecat/.env.example` + `config`/`voxcpm2_tts.py` if you prefer yours).
+> ✅ **VoxCPM2 var names — SETTLED.** `AI-GUEST-BOT-CONTRACT.md §2` ratified
+> `VOXCPM2_URL` / `VOXCPM2_API_KEY` (the worker's existing names). No code rename needed; the
+> earlier `VOXCPM2_ENDPOINT` / `VOXCPM2_SECRET` from the *request* §6 is superseded — add the
+> `_URL` / `_API_KEY` names to your vault.
 
 ## §7 — Acceptance criteria (maps directly to the built worker)
 The Pipecat worker satisfies the smoke as written: bot joins the Daily room, conducts the
