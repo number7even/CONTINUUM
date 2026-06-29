@@ -276,6 +276,29 @@ sign-off before any live run.
   STRATEGY.md), Redis/BullMQ queue, `@metaharness/router`. All still gated /
   parked behind GPU + paid accounts + the orchestration build.
 
+### B-roll generation pipeline (L4-visual + L5) — *spec sealed 2026-06-29, unbuilt*
+
+Beyond the walk-and-talk presenter, the content engine composites the talking head
+**over generated b-roll**. The pipeline, to-spec and honestly labelled:
+
+| Stage | Spec (standard) | Status |
+|---|---|---|
+| L4 audio | Human voice (QuickTime) → **Auphonic** enhance on the worker queue (human voice mandated for YT monetisation) | 🟡 worker queue exists; Auphonic key unwired (P9) |
+| L4 visuals | word-level timestamps → b-roll synced to them. **ComfyUI GPU swarm** (needs a GPU box) is the target; **fal.ai** the cheap stand-in (LTX output rejected — needs Kling-tier or curated/licensed library) | ❌ unbuilt |
+| L5 matte | presenter cut-out from VC (`§3a` of the VC handover) — clean alpha to composite over b-roll | 🅿️ gated on VC handover |
+| L5 assembly | **HyperFrames** (`npx skills add heygen-com/hyperframes`) → **FFmpeg / Remotion** concat + audio-duck + word-synced caption burn | 🟡 HyperFrames render proven once on M1; full compositor unbuilt |
+| L5 QC / slice | Hermes video judge (pacing) → Vigola 9:16 slice | ❌ unbuilt |
+
+**Hard constraints (locked):** (1) **no Agent-Reach / cookie-scraping** behind login
+walls — official APIs / licensed / public data only (P7/P8, ToS); (2) **no auto-publish
+/ auto-reply** — human approval gate holds; (3) b-roll generation + compositor are the
+**AMF team's** build, **not** the VC team's (their only b-roll-adjacent deliverable is
+the §3a matte contract).
+
+**Gate (prove before industrialising):** ONE short end-to-end — walk-and-talk → matte →
+2–3 b-roll cuts + word-synced captions → 1080×1920 → one human-approved publishable
+short. Only then build the swarm.
+
 ---
 
 ## Brand Kernel (Layer-0) — point-of-view engine *(scaffold shipped 2026-06-29)*
