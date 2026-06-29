@@ -1,147 +1,98 @@
-# StudioMunich ⇄ AMF — Talent Booking Handshake (target contract)
+# StudioMunich VAULT ⇄ AMF — Integration (AMF as partner consumer)
 
-> **Audience:** the **StudioMunich** build (Riaan, `studiomunich.digital`) and the
-> **AMF/CONTINUUM** track. This is the **target StudioMunich's booking API builds toward** —
-> contract-first, like the AI-Guest bot. AMF consumes it; CONTINUUM verifies it.
+> **Authoritative provider contract:** `StudioMunich VAULT — Partner Integration Playbook`
+> (`/api/vault/v1/*`, © Riaan Kleynhans). **This doc is the AMF-side consumer spec** — how the
+> content engine implements that playbook, plus the CONTINUUM render-ledger seam the playbook
+> doesn't cover. The playbook wins on any conflict.
 >
-> **Status:** spec. StudioMunich is in-progress and **not inspected** (P4) — this is the
-> AMF-side requirement, not a description of working software.
->
-> **The one fork it assumes:** StudioMunich is THE talent registry + consent owner (it
-> supersedes VC-Hospitality's `avatar_sources`). If that decision flips, registry+consent
-> stay with VC and StudioMunich becomes a thin booking front — see §9.
+> **Supersedes the earlier draft of this file (P4):** it guessed a `book → grant` API that
+> hands AMF a raw `faceSourceRef + voiceId`. **Wrong.** VAULT *renders* and returns
+> **cryptographically signed bytes**; you verify the signature and serve, you never hold the
+> likeness. Corrected below.
 
 ---
 
-## 0. The principle
-
-StudioMunich is the **registry + marketplace for consented digital talent** — faces +
-voices (Riaan, Astrid, Paulina; a VoiceCosmos "Faces by Industry" catalog). A brand using
-AMF **books** a talent for a defined use. A booking is **verify-then-dissolve**: it is live
-only while its `consentGrant` and rights still verify, recorded in CONTINUUM. Renting a human
-likeness is the most consent-sensitive thing in the whole stack (P8 — do not trap or extract;
-P6 — be safely endable; P9 — the consent leap is the human's).
+## 1. Architecture (corrected against the playbook)
 
 ```
- AMF ──bookTalent(talentId, usageScope)──► StudioMunich
-                                              │ issues a GRANT (face + voice + consent + scope + expiry)
- AMF ◄───────────── grant ─────────────────┘
-   │
-   ├─► record booking in CONTINUUM (verify-then-dissolve: valid only while consent verifies)
-   └─► feed faceSourceRef + voiceId into the VC rendering pipeline → talking head
+ Rented talent  studiomunich:<actorId>  (Riaan / Astrid / Paulina / industry face)
+   AMF ──license──► VAULT ──► identitySovereignToken (per tenant+actor)
+   AMF ──render───► VAULT ──► SIGNED face/voice BYTES + X-Rights-Signature
+   AMF: verify signature → composite over b-roll → record render in CONTINUUM ledger
+                                           │ 404 (no signed snippet) → decline → synthetic fallback
+ Synthetic       digital:<id>            → AMF renders itself (VC pipeline + VoxCPM2)
 ```
 
-## 1. The booking API (what StudioMunich exposes)
+- **VAULT renders rented talent.** The VC talking-head engine (HeyGen/MuseTalk) + voice clone
+  are **not** used for `studiomunich:` actors — VAULT returns the signed media.
+- **VC's only role for rented talent = the matte** (cut VAULT's presenter out to composite
+  over AMF b-roll, per VC handover §3a) — *if* VAULT returns full-frame. Confirm whether VAULT
+  can return a matted/alpha presenter; if so, even the matte drops out.
+- **Synthetic avatars** (`digital:`) still use the full VC pipeline + VoxCPM2 — that's where the
+  VC avatar engine earns its place.
 
+## 2. AMF's implementation of the 7 partner steps
+
+| Playbook step | AMF does | Where |
+|---|---|---|
+| 1. Browse `/talent` | catalog the bookable faces/voices ("Faces by Industry") in the content-engine talent picker | AMF |
+| 2. `/license` → token | rent per (tenant=brand, actor); **store `identitySovereignToken`** per tenant+actor | AMF + CONTINUUM ledger |
+| 3. `/presence|voice/render` | for each scripted line/short, request signed bytes (`avatarId: studiomunich:<actorId>`) | AMF worker (L4/L5) |
+| 4. **Verify `X-Rights-Signature`** | recompute HMAC over `[actorId, modality, phraseHash, duration, tier]`; **HARD REJECT if mismatch** | AMF — non-negotiable |
+| 5. Meter usage | record `(tenantId, actorId, signature, duration)` for billing reconciliation | CONTINUUM ledger (§3) |
+| 6. Webhooks | verify `X-SM-Signature`; on `talent.takedown` **stop in seconds**, revert to `digital:` | AMF receiver |
+| 7. Rights wall | never serve unsigned human media; `voiceidvault_excluded` carries; takedown immediate | everywhere |
+
+`404` from render is **normal** (partial coverage) → decline gracefully → synthetic fallback.
+Until the playbook's 5-check smoke is green against live VAULT, the path runs **in shadow**
+(declines to synthetic — never serves unsigned likeness).
+
+## 3. The CONTINUUM render-ledger seam (AMF-unique honesty layer)
+
+The playbook gives rights-by-signature; CONTINUUM gives the brand its own **verifiable,
+reconcilable record** of every likeness use — verify-then-dissolve on a rental:
+
+- **On `license.granted`:** record an Observation `{ tenantId, actorId, usageLicenseId,
+  tier, expiresAt }` with a `verifyCommand` that re-checks the license is active + unexpired.
+- **On each accepted render:** record `{ tenantId, actorId, X-Rights-Signature, phraseHash,
+  duration }`. This is the brand-side ledger that **reconciles with VAULT on
+  `(tenantId, actorId, signature)`** (step 5) — two independent ledgers, one truth.
+- **On `talent.takedown` / `license.revoked`:** the license Observation's verify flips to
+  fail → **the permission dissolves** → no further render for that actor. The engine cannot
+  serve a likeness the talent pulled. That is the honest core (P6 safely-endable, P8 no-extract).
+
+Net: every rented-likeness frame AMF ships is **signed (VAULT), verified (AMF), and recorded
+(CONTINUUM)** — provable after the fact, reconcilable to the penny, and revocable in seconds.
+
+## 4. Content (signed snippets) vs live conversation (synthetic)
+
+- **Scripted content** (shorts, brand video) → VAULT signed renders for known text. Rights
+  by construction. This is the content-engine path.
+- **Live AI-Guest** (real-time interview, arbitrary speech) → VAULT can't pre-sign live
+  arbitrary audio, so the conversational bot uses **synthetic VoxCPM2 streaming**
+  (`digital:`), per `AI-GUEST-BOT-CONTRACT.md`. Don't try to route live turns through VAULT
+  signed snippets — that's what the `404 → decline` path is telling you.
+
+## 5. Decisions this resolves
+- **Talent registry + consent owner = StudioMunich VAULT** (the open fork — RESOLVED). VC's
+  `avatar_sources` is superseded for rented talent; **the VC handover narrows to: the matte +
+  the synthetic-avatar engine (for `digital:` only).**
+- **Voice:** VoxCPM2 for synthetic/live; VAULT-signed for rented content. (VAULT's roadmap to
+  fal serverless generation is transparent to AMF — still verify `X-Rights-Signature` + handle `404`.)
+
+## 6. Acceptance (the playbook's 5 + the ledger)
+The playbook's 5-check smoke (catalog → license → signed render + reject-unsigned → metered →
+takedown-stops-serving) **plus**: a CONTINUUM render Observation lands per accepted render and
+reconciles with VAULT on `(tenantId, actorId, signature)`; a `talent.takedown` flips the
+license Observation's verify to fail.
+
+## Secrets / config (NAMES ONLY — P1, operator-to-operator)
 ```
-POST {STUDIOMUNICH_URL}/v1/talent/book        → issue a grant
-GET  {STUDIOMUNICH_URL}/v1/talent/{id}         → talent card (public/bookable metadata)
-GET  {STUDIOMUNICH_URL}/v1/bookings/{grantId}  → current grant status (for re-verification)
-POST {STUDIOMUNICH_URL}/v1/bookings/{grantId}/revoke   → talent/operator withdraws consent
-GET  {STUDIOMUNICH_URL}/v1/talent?industry=... → catalog ("Faces by Industry")
-```
-Auth: bearer (the booking brand's StudioMunich key). Secrets are **names only** here (P1).
-
-## 2. The grant bundle (`POST /v1/talent/book` response)
-
-```jsonc
-{
-  "grantId": "string",                 // the booking handle (CONTINUUM records this)
-  "talentId": "riaan" | "astrid" | "paulina" | "<industry-face-id>",
-  "bookedBy": "brand-id",              // which brand/tenant booked it
-  "faceSourceRef": {
-    "kind": "clip" | "still",
-    "url": "https://studiomunich/.../riaan1",   // the source the VC engine renders from
-    "spec": "front-facing, clean mouth, plain bg, 1080x1920-capable"
-  },
-  "voiceId": "string",                 // VoxCPM2 voice id (standardised stack, §6)
-  "usageScope": {
-    "purpose": "content-creation" | "brand-site" | "ad",
-    "channels": ["youtube","linkedin","tiktok"],
-    "territory": "string|worldwide",
-    "exclusive": false
-  },
-  "consentGrant": { /* §3 */ },
-  "issuedAt": "ISO-8601",
-  "expiresAt": "ISO-8601",            // bookings EXPIRE — no perpetual likeness use
-  "revocable": true                    // talent can withdraw; AMF must re-verify before each render batch
-}
-```
-
-## 3. The consent grant (the rights wall — non-negotiable, P8/P9)
-
-```jsonc
-{
-  "consentBy": "string",               // the talent who granted likeness/voice
-  "likenessConsent": true,             // signed likeness rights on file at StudioMunich
-  "voiceConsent": true,                // voice-clone rights on file
-  "voiceidvaultExcluded": true,        // ALWAYS true — a content face is NEVER biometric-auth valid
-  "consentDocRef": "string",           // pointer to the signed artifact (not the artifact)
-  "permittedUses": ["content-creation","brand-site"],
-  "prohibitedUses": ["deepfake-misrepresentation","political","adult","biometric-auth"],
-  "disclosureRequired": true,          // AI-presented content must be labelled (EU/German market)
-  "revocationHonoredWithin": "PT24H"   // how fast a withdrawal propagates to a hard stop
-}
-```
-
-> The wall (carried from the VC handover): a registered content face is **never** valid for
-> VoiceIDVault biometric auth. `voiceidvaultExcluded` is always `true`. StudioMunich enforces it.
-
-## 4. The CONTINUUM verification seam (verify-then-dissolve on a booking)
-
-A booking is not a fact because StudioMunich says so — it is a fact while it **verifies**.
-AMF records each grant in CONTINUUM and re-checks before every render batch:
-
-- On `book`: write an Observation/state entry — `talentId`, `grantId`, `usageScope`,
-  `consentDocRef`, `expiresAt` — with a **`verifyCommand`** that calls
-  `GET /v1/bookings/{grantId}` and exits 0 **only if** status is `active`, not expired, not
-  revoked, and the purpose matches the intended render.
-- Before any render batch, AMF runs that verify. **Fail → no render.** A withdrawn or expired
-  grant dissolves the permission automatically — the engine cannot render a likeness the
-  talent has pulled. That is the honest core of a face-rental marketplace.
-
-## 5. How AMF consumes a grant
-
-`faceSourceRef` + `voiceId` feed straight into the **VC rendering pipeline** (the avatar
-handover): voice (VoxCPM2) → talking head (HeyGen/MuseTalk via `BaseAvatarProvider`) → matte
-(§3a clean alpha) → composite over b-roll. StudioMunich supplies *who*; VC renders *how*; AMF
-assembles; CONTINUUM proves the *right* to.
-
-## 6. Voice + face formats (reuse the settled decisions)
-- **Voice: VoxCPM2 48kHz** (standardised 2026-06-29). `voiceId` is a VoxCPM2 id.
-- **Face: matte-ready** — `faceSourceRef` must render to a clean alpha cut-out per the VC
-  handover **§3a** (so the presenter composites over AMF b-roll without a halo).
-
-## 7. SaaS path (the marketplace)
-At scale, a brand on AMF browses `GET /v1/talent?industry=hospitality`, books a "Face by
-Industry," and AMF produces that brand's content with a *consented, time-boxed, revocable*
-likeness. Same handshake, many tenants. Riaan's case is the n=1: content creation with the
-company persona — himself / Astrid by product.
-
-## 8. Acceptance (green smoke)
-`book → grant → CONTINUUM record → render → revoke → re-verify blocks render`:
-1. `book(talentId:'riaan', purpose:'content-creation')` → a grant with a future `expiresAt`.
-2. CONTINUUM records it; the `verifyCommand` exits 0 (grant active).
-3. A render batch proceeds (mock VC ok).
-4. `revoke(grantId)` → the same `verifyCommand` now exits non-zero → **the next batch is blocked**.
-   That single revoke→block is the whole point: consent withdrawal stops the machine.
-
-## 9. Open decision + honest caveats
-- **Registry ownership (the fork):** this spec assumes StudioMunich owns registry + consent
-  (supersedes VC `avatar_sources`). If it flips, VC keeps the registry and StudioMunich
-  becomes a booking front over it — §1–§3 then describe a StudioMunich→VC proxy, not a store.
-  **Decide before either team finalises.**
-- **StudioMunich is unverified** — external, in-progress; this is the AMF-side requirement,
-  not inspected code (P4).
-- **Disclosure / deepfake law** — AI-presented likeness has real legal exposure (EU/German
-  market especially). `disclosureRequired` + `prohibitedUses` are not optional polish.
-
-## Secrets / config (NAMES ONLY — P1)
-```
-STUDIOMUNICH_URL          STUDIOMUNICH_API_KEY     # per booking brand
-CONTINUUM_HTTP_URL        CONTINUUM_HTTP_TOKEN     # booking verification (tenant-scoped)
+STUDIOMUNICH_VAULT_URL        STUDIOMUNICH_VAULT_SECRET        # AMF's partner bearer
+SM_WEBHOOK_SIGNING_SECRET     VAULT_RIGHTS_SIGNING_SECRET      # verify webhooks + render signatures
+CONTINUUM_HTTP_URL            CONTINUUM_HTTP_TOKEN             # the render ledger (tenant-scoped)
 ```
 
 ---
 
-_Target contract by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._
+_AMF-side integration of the StudioMunich VAULT Partner Playbook — Riaan Kleynhans, Human in the Loop._

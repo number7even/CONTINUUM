@@ -24,6 +24,15 @@
 
 ---
 
+> **⚠️ Scope narrowed 2026-06-29 — read first.** StudioMunich VAULT is now the talent
+> registry + renderer for **rented** talent (`studiomunich:<actorId>` — Riaan/Astrid/Paulina):
+> VAULT returns cryptographically **signed rendered bytes**, so the talking-head providers
+> (HeyGen/Tavus/MuseTalk) + the registry/consent below are **NOT needed for rented talent** —
+> see `STUDIOMUNICH-TALENT-HANDSHAKE.md`. What AMF still needs from VC: **(1) the matte**
+> (cut VAULT's presenter out to composite over b-roll, §3a) and **(2) the full avatar+voice
+> engine ONLY for synthetic `digital:` avatars** we render ourselves. Treat the components
+> below through that lens — most matter only for the synthetic path now.
+
 ## 1. Context (why we need it)
 
 We are reusing the talking-head + voice-clone pipeline for two consented presenters

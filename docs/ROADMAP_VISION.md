@@ -333,16 +333,18 @@ catalog). Brands using AMF **book/rent** a talent for their content or site. Sit
 the avatar stack: StudioMunich hosts talent; the VC components *render* it; AMF *consumes*
 it; CONTINUUM *verifies the booking*.
 
-- **The handshake (needed):** AMF books a talent → StudioMunich returns a grant
-  `{ talentId, faceSourceRef, voiceId (VoxCPM2), consentGrant, usageScope, expiry }` → AMF
-  feeds face + voice into the VC rendering pipeline. A booking is **verify-then-dissolve**:
-  live only while `consentGrant` + rights verify — recorded in CONTINUUM (the honesty layer
-  for renting a likeness, P9).
+- **The handshake (now grounded in the real VAULT playbook):** AMF `POST /license` → an
+  `identitySovereignToken`, then `POST /render` → **cryptographically signed** face/voice
+  **bytes** (VAULT renders; AMF never holds the likeness) → verify `X-Rights-Signature` →
+  composite. **Takedown webhook stops serving in seconds.** CONTINUUM holds the brand-side
+  render ledger (reconciles with VAULT on `(tenantId, actorId, signature)`). Full AMF-side
+  spec: `STUDIOMUNICH-TALENT-HANDSHAKE.md`.
 - **Riaan's case:** content creation with the company persona — himself / Astrid by product.
-- 🚧 **Open decision (see gates):** does StudioMunich become THE talent registry + consent
-  owner, superseding VC's `avatar_sources`? If yes, the VC handover narrows to the rendering
-  engine only.
-- ❌ Unverified — external, in-progress; architecture from Riaan's description, not inspected.
+- ✅ **Resolved:** VAULT owns talent registry + consent. VC narrows to the **matte +
+  synthetic-avatar engine** (for `digital:` only); rented `studiomunich:<actorId>` talent is
+  rendered by VAULT.
+- ❌ VAULT itself unverified from here — external, in-progress; integration spec is the
+  AMF-side requirement, the playbook is authoritative.
 
 ---
 
@@ -351,7 +353,7 @@ it; CONTINUUM *verifies the booking*.
 | Gate | Blocks | Status |
 |---|---|---|
 | Inject a working npm token (2FA) | Phase 0 publish | 🚧 **operator action pending** |
-| StudioMunich as canonical talent registry + consent owner (vs VC `avatar_sources`) | VC handover scope · talent-booking handshake | 🚧 open — decide before finalising the VC ask |
+| StudioMunich as canonical talent registry + consent owner (vs VC `avatar_sources`) | VC handover scope · talent-booking handshake | ✅ **decided 2026-06-29: VAULT owns it.** VC narrows to matte + synthetic-avatar engine. See `STUDIOMUNICH-TALENT-HANDSHAKE.md` |
 | Set `DEMO_WEBHOOK_URL` in `continuum-docs` Vercel env | Enterprise leads routing to operator | 🚧 **operator action pending** — code shipped (`b03d9cb`); handler degrades gracefully (logs leads) until set. Pick Discord/Slack/Zapier webhook → `vercel env add DEMO_WEBHOOK_URL production` → redeploy. Then live-test via `www.continuum.rest/enterprise`. |
 | Lock `D-V2.2` (Postgres-as-directory vs revert) | Phase 2 pgschema | 🚧 open |
 | Ship local inference (`ruvllm`, Issue #3) | Phase 4 deeper rungs | 🚧 open |
