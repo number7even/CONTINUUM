@@ -82,6 +82,14 @@ Backed by the shipped MCP tools against a tenant-scoped engine connection:
 Connection: `CONTINUUM_HTTP_URL` + tenant `CONTINUUM_HTTP_TOKEN` (one tenant = one brand's
 corpus). The `corpusRef` in the session contract (§2) carries the tenant.
 
+> **Build gotcha (proven in `scripts/ai-guest-corpus-smoke.mjs`):** `continuum_search_docs`
+> passes the query **straight to FTS5 MATCH**. Natural-language input breaks it two ways —
+> punctuation throws (`syntax error near "."`) and implicit-AND under-recalls. The adapter
+> **must** convert NL → a quoted **OR-query** before calling it:
+> `terms(text).map(t => '"'+t+'"').join(' OR ')`. Feed `search_docs` keywords, never raw
+> sentences. (`continuum_check_brand` already sanitises internally, so claim-contradiction
+> checks can take the raw claim.)
+
 ### 1b. `PodGeniCorpusAdapter` (Pod-Geni's existing default)
 Wraps the current `corpusDocPath` grounding + `AiUngroundedClaim` flagging. Kept so AI
 Guest works standalone; CONTINUUM is the preferred adapter for brand-honest grounding.
