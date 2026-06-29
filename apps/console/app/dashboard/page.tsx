@@ -14,6 +14,7 @@ export const revalidate = 0;
 
 import { redirect } from 'next/navigation';
 import { fetchDashboard, type Todo } from './lib';
+import MemorySearch from './MemorySearch';
 
 const INK = '#232b2d', PANEL = '#283133', PANEL2 = '#2a3335', HAIR = '#36423f',
   TEXT = '#f6f3ec', BODY = '#c8c3b6', MUTED = '#9aa09a', CREME = '#c89a72',
@@ -123,6 +124,13 @@ export default async function Dashboard() {
             : <p style={{ color: MUTED, fontSize: '0.85rem' }}>No digest yet.</p>}
         </section>
       </div>
+
+      {/* memory search */}
+      <section style={{ background: PANEL, border: `1px solid ${HAIR}`, borderRadius: 10, padding: '1.1rem 1.25rem', marginTop: '1.25rem' }}>
+        <h3 style={{ margin: '0 0 0.4rem', fontSize: '1rem' }}>Search memory</h3>
+        <p style={{ color: MUTED, fontSize: '0.82rem', margin: '0 0 0.9rem' }}>Query the 5-source project memory (git · docs · transcripts · feedback · observations). Compact results, no LLM tokens burned.</p>
+        <MemorySearch />
+      </section>
 
       {/* connection config */}
       <section style={{ background: PANEL, border: `1px solid ${HAIR}`, borderRadius: 10, padding: '1.1rem 1.25rem', marginTop: '1.25rem' }}>
