@@ -325,11 +325,33 @@ voice, routed correctly, all passing the "is this actually me?" gate.
 
 ---
 
+## StudioMunich — Talent Registry & Booking layer *(noted 2026-06-29, external build in progress)*
+
+`studiomunich.digital/vault` (Riaan building). The canonical home for **consented digital
+talent** — faces + voices (Riaan, Astrid, Paulina, and a VoiceCosmos "Faces by Industry"
+catalog). Brands using AMF **book/rent** a talent for their content or site. Sits *under*
+the avatar stack: StudioMunich hosts talent; the VC components *render* it; AMF *consumes*
+it; CONTINUUM *verifies the booking*.
+
+- **The handshake (needed):** AMF books a talent → StudioMunich returns a grant
+  `{ talentId, faceSourceRef, voiceId (VoxCPM2), consentGrant, usageScope, expiry }` → AMF
+  feeds face + voice into the VC rendering pipeline. A booking is **verify-then-dissolve**:
+  live only while `consentGrant` + rights verify — recorded in CONTINUUM (the honesty layer
+  for renting a likeness, P9).
+- **Riaan's case:** content creation with the company persona — himself / Astrid by product.
+- 🚧 **Open decision (see gates):** does StudioMunich become THE talent registry + consent
+  owner, superseding VC's `avatar_sources`? If yes, the VC handover narrows to the rendering
+  engine only.
+- ❌ Unverified — external, in-progress; architecture from Riaan's description, not inspected.
+
+---
+
 ## Decision gates (human, not code — these block their phases)
 
 | Gate | Blocks | Status |
 |---|---|---|
 | Inject a working npm token (2FA) | Phase 0 publish | 🚧 **operator action pending** |
+| StudioMunich as canonical talent registry + consent owner (vs VC `avatar_sources`) | VC handover scope · talent-booking handshake | 🚧 open — decide before finalising the VC ask |
 | Set `DEMO_WEBHOOK_URL` in `continuum-docs` Vercel env | Enterprise leads routing to operator | 🚧 **operator action pending** — code shipped (`b03d9cb`); handler degrades gracefully (logs leads) until set. Pick Discord/Slack/Zapier webhook → `vercel env add DEMO_WEBHOOK_URL production` → redeploy. Then live-test via `www.continuum.rest/enterprise`. |
 | Lock `D-V2.2` (Postgres-as-directory vs revert) | Phase 2 pgschema | 🚧 open |
 | Ship local inference (`ruvllm`, Issue #3) | Phase 4 deeper rungs | 🚧 open |
