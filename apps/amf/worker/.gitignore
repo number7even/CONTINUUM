@@ -10,3 +10,6 @@ render-out/
 node_modules/
 
 .env.local
+
+# operator fuel — voice recordings, b-roll, scripts (P1: never commit)
+fuel/
