@@ -1,20 +1,23 @@
 /**
- * adapter-news.mjs — the LEGIT L2 brain: WorldMonitor (MCP) → CONTINUUM corpus.
+ * adapter-news.mjs — the LEGIT L2 brain: multi-provider intelligence → CONTINUUM corpus.
  *
- * The ethical replacement for the killed Agent-Reach: instead of cookie-scraping
- * walled gardens, this consumes WorldMonitor's HOSTED MCP server (39 tools, 500+
- * curated feeds, AI-synthesized) as a peer MCP server, and writes each brief as a
- * privacy-filtered CONTINUUM Observation — sourced, searchable, brand-filterable.
- * No AGPL exposure (we are an API client of their SaaS, not integrating their code).
+ * The ethical replacement for the killed Agent-Reach. Pulls from licensed/curated
+ * providers (no cookie-scraping) and writes each item as a privacy-filtered
+ * Observation — sourced, searchable, brand-filterable. Two layers:
  *
- * Pipeline:  WorldMonitor /mcp  ──get_world_brief / get_news_intelligence──►  Observation[]
- *            (X-WorldMonitor-Key)                                              (FTS5 corpus)
- * "Today's topic" = query that corpus, scored against your product pillars.
+ *   • worldmonitor  — MACRO: WorldMonitor hosted MCP (geopolitics/energy/cyber), 39 tools.
+ *   • feedly        — YOUR VERTICALS: Feedly Web API streams (hospitality/safari/
+ *                     digital-strategy/consumer-behavior — your own curated feeds + AI Feeds).
  *
- *   WORLDMONITOR_API_KEY=wm_… node adapter-news.mjs [--project worldmonitor]
- *   node adapter-news.mjs --smoke      # proves the CONTINUUM-write path (mock briefs)
+ * "Today's topic" = query this corpus, scored against your product pillars.
+ * No AGPL exposure (API clients of hosted SaaS, not integrating their code).
  *
- * HONEST (P4): the live WorldMonitor call is GATED on the key + UNTESTED without one
+ *   WORLDMONITOR_API_KEY=wm_…              node adapter-news.mjs --provider worldmonitor
+ *   FEEDLY_ACCESS_TOKEN=… FEEDLY_STREAM_ID=… node adapter-news.mjs --provider feedly
+ *   node adapter-news.mjs --provider all [--project worldmonitor]
+ *   node adapter-news.mjs --smoke          # proves the corpus-write path (mock items, no keys)
+ *
+ * HONEST (P4): live provider calls are GATED on their keys + UNTESTED without them
  * (same discipline as the Auphonic/whisperx seams). The corpus-write half IS proven.
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
@@ -24,9 +27,6 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
-const WM_URL = process.env.WORLDMONITOR_MCP_URL || 'https://worldmonitor.app/mcp';
-const SOURCE_ID = 'worldmonitor';
-const DEFAULT_TOOLS = ['get_world_brief', 'get_news_intelligence'];
 
 /** sha256(seed) → UUID-shape stable id (same convention as the docs adapter). */
 function stableId(seed) {
@@ -34,109 +34,134 @@ function stableId(seed) {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
 }
 
-/** Live WorldMonitor MCP call (gated; untested without a key). Uses the MCP SDK
- *  StreamableHTTP transport with the X-WorldMonitor-Key header. */
-async function callWorldMonitor(tool, args = {}) {
-  const key = process.env.WORLDMONITOR_API_KEY;
-  if (!key) throw new Error('WORLDMONITOR_API_KEY not set');
-  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
-  const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-  const headers = { 'X-WorldMonitor-Key': key };
-  const client = new Client({ name: 'continuum-adapter-news', version: '0.0.1' }, { capabilities: {} });
-  const transport = new StreamableHTTPClientTransport(new URL(WM_URL), { requestInit: { headers } });
-  try {
-    await client.connect(transport);
-    const res = await client.callTool({ name: tool, arguments: args });
-    const text = res?.content?.find((c) => c.type === 'text')?.text ?? '';
-    let parsed = null;
-    try { parsed = JSON.parse(text); } catch { /* plain text brief */ }
-    return { tool, text, parsed };
-  } finally {
-    try { await client.close(); } catch { /* noop */ }
-  }
-}
+// ── Provider: WorldMonitor (hosted MCP) ──────────────────────────────────────
+const worldmonitor = {
+  id: 'worldmonitor',
+  obsType: 'world_brief',
+  gate: () => (process.env.WORLDMONITOR_API_KEY ? null : 'set WORLDMONITOR_API_KEY (wm_…) from worldmonitor.app'),
+  async fetch() {
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+    const url = process.env.WORLDMONITOR_MCP_URL || 'https://worldmonitor.app/mcp';
+    const headers = { 'X-WorldMonitor-Key': process.env.WORLDMONITOR_API_KEY };
+    const client = new Client({ name: 'continuum-adapter-news', version: '0.0.1' }, { capabilities: {} });
+    const transport = new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers } });
+    const items = [];
+    try {
+      await client.connect(transport);
+      for (const tool of ['get_world_brief', 'get_news_intelligence']) {
+        const res = await client.callTool({ name: tool, arguments: {} }).catch(() => null);
+        const text = res?.content?.find((c) => c.type === 'text')?.text ?? '';
+        if (!text) continue;
+        let parsed = null; try { parsed = JSON.parse(text); } catch { /* plain */ }
+        items.push({ title: tool, content: text, category: parsed?.category || tool.replace(/^get_/, ''), sources: parsed?.sources || [], published: new Date().toISOString() });
+      }
+    } finally { try { await client.close(); } catch { /* noop */ } }
+    return items;
+  },
+};
 
-/** Map a WorldMonitor result → a CONTINUUM Observation input (stable id, sources in metadata). */
-function briefToObservation(tool, text, parsed) {
-  const content = typeof text === 'string' && text.trim() ? text : JSON.stringify(parsed ?? {});
-  const sources = parsed?.sources || parsed?.links || [];
-  const category = parsed?.category || tool.replace(/^get_/, '');
-  return {
-    id: stableId(`${tool}|${content}`),
-    sourceId: SOURCE_ID,
-    type: 'world_brief',
-    content,
-    timestamp: new Date().toISOString(),
-    refs: [],
-    metadata: { tool, category, sources, ingestedFrom: 'worldmonitor-mcp' },
-  };
-}
+// ── Provider: Feedly (Web API streams — YOUR curated feeds/boards/AI-Feeds) ───
+const feedly = {
+  id: 'feedly',
+  obsType: 'feed_article',
+  gate: () => (process.env.FEEDLY_ACCESS_TOKEN && process.env.FEEDLY_STREAM_ID ? null : 'set FEEDLY_ACCESS_TOKEN + FEEDLY_STREAM_ID (an AI-Feed/board/category stream id)'),
+  async fetch() {
+    const token = process.env.FEEDLY_ACCESS_TOKEN;
+    const count = process.env.FEEDLY_COUNT || 20;
+    const items = [];
+    for (const streamId of String(process.env.FEEDLY_STREAM_ID).split(',').map((s) => s.trim()).filter(Boolean)) {
+      const url = `https://cloud.feedly.com/v3/streams/contents?streamId=${encodeURIComponent(streamId)}&count=${count}`;
+      const res = await fetch(url, { headers: { Authorization: `OAuth ${token}` } });
+      if (!res.ok) { console.error(`[feedly] ${streamId} → HTTP ${res.status}`); continue; }
+      const j = await res.json();
+      for (const it of j.items || []) {
+        const body = (it.summary?.content || it.content?.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        items.push({
+          title: it.title || '(untitled)',
+          content: `${it.title || ''}${body ? ' — ' + body : ''}`.trim(),
+          category: it.origin?.title || j.title || 'feedly',
+          sources: (it.alternate || []).map((a) => a.href).filter(Boolean),
+          published: it.published ? new Date(it.published).toISOString() : new Date().toISOString(),
+        });
+      }
+    }
+    return items;
+  },
+};
 
-/** The testable core: upsert briefs into the CONTINUUM corpus. Returns count written. */
-export function ingestBriefs(storage, observations) {
-  storage.upsertSource(SOURCE_ID, 'docs', { adapter: 'news', provider: 'worldmonitor' });
+const PROVIDERS = { worldmonitor, feedly };
+
+/** The testable core: upsert provider items into the CONTINUUM corpus. Returns count. */
+export function ingest(storage, provider, items) {
+  storage.upsertSource(provider.id, 'docs', { adapter: 'news', provider: provider.id });
   let written = 0;
-  for (const obs of observations) {
-    const r = storage.upsertObservation(obs);
-    if (r) written += 1; // null = scrubbed entirely by the privacy filter
+  for (const it of items) {
+    const obs = {
+      id: stableId(`${provider.id}|${it.title}|${it.content}`),
+      sourceId: provider.id,
+      type: provider.obsType,
+      content: it.content,
+      timestamp: it.published || new Date().toISOString(),
+      refs: [],
+      metadata: { provider: provider.id, category: it.category, sources: it.sources || [] },
+    };
+    if (storage.upsertObservation(obs)) written += 1; // null = privacy-scrubbed
   }
   return written;
 }
 
-async function run(projectId) {
+async function run(which, projectId) {
   const { openStorage } = await import(resolve(REPO_ROOT, 'packages/core/dist/index.js'));
   const storage = openStorage(projectId);
-  if (!process.env.WORLDMONITOR_API_KEY) {
-    console.error('[adapter-news] WORLDMONITOR_API_KEY not set → skipping live ingest (P6 safely-endable).');
-    console.error('               Get an API Starter+ key (wm_…) at worldmonitor.app, put it in .env.local.');
-    storage.close();
-    process.exit(0);
-  }
-  const obs = [];
-  for (const tool of DEFAULT_TOOLS) {
+  const targets = which === 'all' ? Object.values(PROVIDERS) : [PROVIDERS[which]].filter(Boolean);
+  if (!targets.length) { console.error(`unknown provider: ${which}`); storage.close(); process.exit(2); }
+  let total = 0;
+  for (const p of targets) {
+    const skip = p.gate();
+    if (skip) { console.error(`[adapter-news] ${p.id}: skipped (${skip}) — P6 safely-endable`); continue; }
     try {
-      const { text, parsed } = await callWorldMonitor(tool);
-      obs.push(briefToObservation(tool, text, parsed));
-      console.error(`[adapter-news] ${tool} → 1 brief`);
-    } catch (e) {
-      console.error(`[adapter-news] ${tool} failed: ${e.message}`);
-    }
+      const items = await p.fetch();
+      const n = ingest(storage, p, items);
+      total += n;
+      console.error(`[adapter-news] ${p.id}: ✅ ${n} item(s) → corpus`);
+    } catch (e) { console.error(`[adapter-news] ${p.id}: failed — ${e.message}`); }
   }
-  const written = ingestBriefs(storage, obs);
-  console.error(`[adapter-news] ✅ ${written} world brief(s) → corpus "${projectId}" (source=${SOURCE_ID})`);
+  console.error(`[adapter-news] total ${total} item(s) → "${projectId}"`);
   storage.close();
-  process.exit(written > 0 ? 0 : 1);
+  process.exit(0);
 }
 
 async function smoke() {
-  // Prove the CONTINUUM-write half WITHOUT a key, using mock briefs.
   process.env.CONTINUUM_STORAGE_BACKEND ??= 'sqlite';
   const { mkdtempSync, rmSync, existsSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   process.env.CONTINUUM_DATA_DIR = mkdtempSync(join(tmpdir(), 'adapter-news-'));
   const { openStorage } = await import(resolve(REPO_ROOT, 'packages/core/dist/index.js'));
-  const storage = openStorage('worldmonitor-test');
+  const storage = openStorage('news-test');
 
-  const mock = [
-    briefToObservation('get_world_brief', 'Energy: a tanker chokepoint disruption in the Strait of Hormuz lifts Brent; supply-chain risk rises across Gulf routes.', { category: 'energy', sources: ['https://example/wm/1'] }),
-    briefToObservation('get_news_intelligence', 'Cyber: a coordinated intrusion campaign targets industrial control systems across European utilities.', { category: 'cyber', sources: ['https://example/wm/2'] }),
-  ];
-  const written = ingestBriefs(storage, mock);
-  const hits = storage.searchObservations('"energy" OR "chokepoint" OR "cyber"', 10).filter((h) => h.type === 'world_brief');
-  const ok = written === 2 && hits.length >= 1;
-  console.error(`\nadapter-news smoke — corpus-write path`);
-  console.error(`  wrote ${written}/2 briefs · search('energy/cyber') → ${hits.length} world_brief hit(s)`);
-  console.error(`  ${ok ? '✅ PASS' : '❌ FAIL'} — WorldMonitor MCP client is wired + gated; live call needs WORLDMONITOR_API_KEY (untested without it, P4)\n`);
+  const w = ingest(storage, worldmonitor, [
+    { title: 'get_world_brief', content: 'Energy: a chokepoint disruption in the Strait of Hormuz lifts Brent; Gulf supply-chain risk rises.', category: 'energy', sources: ['https://ex/wm/1'] },
+  ]);
+  const f = ingest(storage, feedly, [
+    { title: 'Luxury safari demand rebounds', content: 'Luxury safari demand rebounds — Okavango Delta camps report record forward bookings into 2027.', category: 'Emporium-Safari', sources: ['https://ex/feedly/1'] },
+    { title: 'Hospitality AI concierge adoption', content: 'Hospitality AI concierge adoption accelerates among boutique hotels seeking 24/7 booking recovery.', category: 'hospitality', sources: ['https://ex/feedly/2'] },
+  ]);
+  const hits = storage.searchObservations('"energy" OR "safari" OR "hospitality" OR "concierge"', 10);
+  const types = new Set(hits.map((h) => h.type));
+  const ok = w === 1 && f === 2 && types.has('world_brief') && types.has('feed_article');
+  console.error(`\nadapter-news smoke — corpus-write path (worldmonitor + feedly)`);
+  console.error(`  worldmonitor ${w}/1 · feedly ${f}/2 · search → ${hits.length} hits, types: ${[...types].join(', ')}`);
+  console.error(`  ${ok ? '✅ PASS' : '❌ FAIL'} — both providers wired + gated; live calls need their keys (untested without, P4)\n`);
   storage.close();
-  const dir = process.env.CONTINUUM_DATA_DIR;
-  if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+  const dir = process.env.CONTINUUM_DATA_DIR; if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
   process.exit(ok ? 0 : 1);
 }
 
-const arg = process.argv[2];
-if (arg === '--smoke') smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
+const a = process.argv;
+if (a.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
 else {
-  const pIdx = process.argv.indexOf('--project');
-  run(pIdx >= 0 ? process.argv[pIdx + 1] : 'worldmonitor').catch((e) => { console.error(e.message); process.exit(1); });
+  const pi = a.indexOf('--provider'); const pr = a.indexOf('--project');
+  run(pi >= 0 ? a[pi + 1] : 'all', pr >= 0 ? a[pr + 1] : 'worldmonitor').catch((e) => { console.error(e.message); process.exit(1); });
 }
