@@ -4,6 +4,15 @@
 > **To:** VC-Hospitality (the showroom) team
 > **Re:** Package the proven avatar + voice stack so we can **reuse**, not rebuild it.
 > **Date:** 2026-06-29 · **Owner sign-off:** Riaan Kleynhans (P9 — likeness/voice consent is the human's)
+>
+> **✅ ANSWERED 2026-06-29 → `AVATAR_CORE_HANDOVER.md`** (code-verified vs the `hospitality`
+> branch). All 10 components confirmed real, BUT a Gap List corrects the request: **G1 — no
+> talking-head render backend is wired/proven** (the open blocker; contradicts the master
+> map's "fal proven"); **G2** webhook is dead, bind to poll; **G3** BodyPix matte is NOT
+> reusable, build RVM/BiRefNet; **G4** Cartesia 44.1k vs VoxCPM 48k, resample; **G5** remove
+> the hardcoded Cartesia `voice_id`. Deliverables: `avatar_sources` migration +
+> `register-content-faces.mjs` (Riaan/Astrid consent) + honest `avatar-smoke.mjs`
+> (registry+voice green, mp4 blocked on G1). The notes below are amended inline to the answer.
 
 ---
 
@@ -58,7 +67,7 @@ from the handoff and may have moved.
 |---|---|---|---|
 | 1 | **Face registry + consent gate** | `src/lib/avatar/source-registry.ts` | `registerFace()`, the `CANDIDATE_FACES` shape, and the `avatar_sources` **table DDL** (so we can stand up our own). `voiceidvault_excluded` must default true. |
 | 2 | **Provider abstraction** | `src/lib/avatar/providers/base-provider.ts` | The `BaseAvatarProvider` interface — this is the seam we build against. Document the method contract (submit job → poll/webhook → mp4). |
-| 3 | **Talking-head render: `fal-ai/musetalk`** (LOCKED 2026-06-30) | `FalAvatarProvider` (PR #11) — confirm path | The converged group render engine: source face + audio → lip-synced mp4, one shared `FAL_KEY`. **HeyGen / Tavus / Replicate-MuseTalk are STRUCK** per the master map (`AVATAR_ECOSYSTEM_ARCHITECTURE`, fal proven real-mp4). Deliver the provider + its request/response shape. |
+| 3 | **Talking-head render — ⚠️ OPEN (handover G1)** | batch seam = `ReplicateService.getPrediction()` **poll** + `AvatarJobQueue` · or sovereign `AVATAR_SOVEREIGN_RENDER_URL` (Hetzner) · master-map target = `fal-ai/musetalk` | **No render backend is wired/proven (ANSWERED 2026-06-29, code-verified): `REPLICATE_MODELS` has only image models, no render credential anywhere, fal/PR#11 not on disk.** The master map claims fal proven; the code-verified handover says no backend — **CONTRADICTION, resolve before any "proven" claim.** HeyGen/Tavus here are **streaming-only** (not batch mp4). Wire ONE backend (sovereign sidecar preferred per EU decision), then prove the mp4. |
 | 6 | **Voice clone proxy (Cartesia)** | `src/pages/api/voice/cartesia-stream.ts` | The proxy + the **PCM/audio output contract** (`model_id: sonic-2`, `voice.id`, byte format). Key stays server-side. |
 | 7 | **Voice clone proxy (sovereign VoxCPM)** | `src/pages/api/voice/voxcpm-stream.ts` | Same — documented as the drop-in sovereign alternate (identical PCM contract). |
 | 8 | **Background matte** | `src/lib/avatar/background-removal-service.ts` | BodyPix segmentation → transparent presenter (alpha output format). |
@@ -70,7 +79,7 @@ from the handoff and may have moved.
 These are the seams our content engine binds to — if they change, we break. Document
 and version them:
 
-- **`BaseAvatarProvider`** — submit(audio + face/avatar ref) → jobId; status(jobId) → `{state, videoUrl?}`. We code to the interface; the concrete impl is `FalAvatarProvider` (`fal-ai/musetalk`).
+- **`BaseAvatarProvider`** — ⚠️ **CORRECTED (handover §3.1):** this is a **realtime *streaming*** seam (`createSession`/`sendMessage`/`endSession`), **NOT** submit→jobId→mp4. The **batch mp4 seam** the content engine wants is **`ReplicateService.getPrediction()` poll + `AvatarJobQueue`** (handover §3.2). Bind to the poll, not the (dead, G2) webhook.
 - **Voice proxy output** — exact audio byte contract (sample rate, channels, PCM vs MP3) so Cartesia and VoxCPM are truly interchangeable.
 - **`avatar_sources` schema** — columns + types: `talent_name`, `consent_by`, `voiceidvault_excluded` (always true for content faces), `prep_status`, `source_clip`.
 - **Webhook payloads** — the render-complete webhook/poll body shape (for `fal-ai/musetalk`).
@@ -155,9 +164,11 @@ in §3a**: give us a clean cut-out, and everything downstream of it is ours.
 
 ## 9. Open decisions for VC team input (flag, don't decide for us)
 
-- **Render engine — LOCKED 2026-06-30: `fal-ai/musetalk`.** HeyGen / Tavus / Replicate-MuseTalk
-  are **struck** (master map: fal is the proven, shared engine, one `FAL_KEY`). No decision
-  needed; build to `FalAvatarProvider`.
+- **Render engine — ⚠️ OPEN (handover G1, supersedes the "LOCKED" claim).** `fal-ai/musetalk`
+  is the master-map *target*, but **no render backend is wired or proven** (code-verified:
+  only image models, no credential; fal/PR#11 not on disk). The map and the handover
+  **disagree**; HeyGen here is streaming-only. **Resolve + wire ONE backend (sovereign sidecar
+  preferred) before any mp4 claim.** This is the single blocker for rendered talking-heads.
 - **Voice stack — DUAL-PATH (corrected 2026-06-30):** **Cartesia (Sonic-2) now** — the proven
   engine for the AMF **scripted-content** pipeline (Riaan/Astrid clones). **VoxCPM2 (48kHz)
   sovereign-later** — the live AI-Guest / Pod-Geni path. Both coexist behind `TTSService`;
