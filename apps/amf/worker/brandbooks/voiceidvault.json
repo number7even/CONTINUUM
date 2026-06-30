@@ -1,0 +1,22 @@
+{
+  "name": "VoiceIDVault",
+  "kicker": "VOICEIDVAULT",
+  "tagline": "Enterprise-grade voice biometric security",
+  "colors": {
+    "bg": "#ffffff",
+    "surface": "#f5f5f5",
+    "ink": "#0a0a0a",
+    "muted": "#6b6b6b",
+    "primary": "#e8401f",
+    "primaryInk": "#ffffff",
+    "hairline": "#e5e5e5"
+  },
+  "fonts": {
+    "css": "",
+    "heading": "Inter, system-ui, -apple-system, sans-serif",
+    "body": "Inter, system-ui, -apple-system, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

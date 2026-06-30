@@ -1,0 +1,22 @@
+{
+  "name": "Pod-Geni",
+  "kicker": "POD-GENI",
+  "tagline": "A studio that listens while you record.",
+  "colors": {
+    "bg": "#1c2e2a",
+    "surface": "#24382f",
+    "ink": "#f1f0e8",
+    "muted": "#7c8b78",
+    "primary": "#8ba585",
+    "primaryInk": "#1c2e2a",
+    "hairline": "#34463d"
+  },
+  "fonts": {
+    "css": "",
+    "heading": "\"Poppins\", \"Helvetica Neue\", Arial, sans-serif",
+    "body": "\"Poppins\", \"Helvetica Neue\", Arial, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

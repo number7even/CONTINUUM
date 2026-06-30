@@ -1,0 +1,22 @@
+{
+  "name": "Continuum",
+  "kicker": "CONTINUUM",
+  "tagline": "Persistent memory for AI coding assistants that refuses to mark work done until a shell command proves it.",
+  "colors": {
+    "bg": "#232b2d",
+    "surface": "#283133",
+    "ink": "#f6f3ec",
+    "muted": "#c8c3b6",
+    "primary": "#e7cdb2",
+    "primaryInk": "#232b2d",
+    "hairline": "#3c4849"
+  },
+  "fonts": {
+    "css": "",
+    "heading": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+    "body": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

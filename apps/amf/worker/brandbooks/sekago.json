@@ -1,0 +1,22 @@
+{
+  "name": "Sekago",
+  "kicker": "SEKAGO",
+  "tagline": "What is your life worth?",
+  "colors": {
+    "bg": "#F4FFF5",
+    "surface": "#FFFFFF",
+    "ink": "#021F13",
+    "muted": "#6D726D",
+    "primary": "#22C55E",
+    "primaryInk": "#021F13",
+    "hairline": "#D9DEDC"
+  },
+  "fonts": {
+    "css": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+    "heading": "Inter, sans-serif",
+    "body": "Inter, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "https://sekago.com/favicon.svg",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

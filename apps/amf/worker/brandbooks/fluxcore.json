@@ -1,0 +1,22 @@
+{
+  "name": "FluxCore Dynamics",
+  "kicker": "FLUXCORE DYNAMICS",
+  "tagline": "Design Photonic Chips in Minutes, Not Months",
+  "colors": {
+    "bg": "#0a1613",
+    "surface": "#11201b",
+    "ink": "#f4f7f4",
+    "muted": "#8a9a92",
+    "primary": "#e6c069",
+    "primaryInk": "#15201b",
+    "hairline": "#1f2f29"
+  },
+  "fonts": {
+    "css": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+    "heading": "Inter, system-ui, sans-serif",
+    "body": "Inter, system-ui, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

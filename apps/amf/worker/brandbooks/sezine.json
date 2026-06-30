@@ -1,0 +1,22 @@
+{
+  "name": "Sezine",
+  "kicker": "SEZINE",
+  "tagline": "Humans rate the skills. The system enforces the identity.",
+  "colors": {
+    "bg": "#f9f7f0",
+    "surface": "#f2eee4",
+    "ink": "#2a2926",
+    "muted": "#6e6c67",
+    "primary": "#b17457",
+    "primaryInk": "#ffffff",
+    "hairline": "#e7e1d4"
+  },
+  "fonts": {
+    "css": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
+    "heading": "\"Clash Display\", system-ui, -apple-system, sans-serif",
+    "body": "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

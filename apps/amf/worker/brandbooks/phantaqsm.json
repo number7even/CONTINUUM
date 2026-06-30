@@ -1,0 +1,22 @@
+{
+  "name": "Phantaqsm",
+  "kicker": "PHANTAQSM",
+  "tagline": "A managed SSH honeypot deception layer for EU governments and regulated European enterprise.",
+  "colors": {
+    "bg": "#003399",
+    "surface": "#FFFFFF",
+    "ink": "#0F172A",
+    "muted": "#475569",
+    "primary": "#FFCC00",
+    "primaryInk": "#0F172A",
+    "hairline": "#E2E8F0"
+  },
+  "fonts": {
+    "css": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+    "heading": "Inter, system-ui, sans-serif",
+    "body": "Inter, system-ui, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

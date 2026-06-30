@@ -1,0 +1,22 @@
+{
+  "name": "Q-Intercept",
+  "kicker": "Q-INTERCEPT",
+  "tagline": "Quantum hardware will disappoint your enterprise through 2028. We know because we audit them.",
+  "colors": {
+    "bg": "#0E0C0C",
+    "surface": "#181515",
+    "ink": "#F5F3F2",
+    "muted": "#9A9290",
+    "primary": "#E8543F",
+    "primaryInk": "#FFFFFF",
+    "hairline": "#2A2524"
+  },
+  "fonts": {
+    "css": "https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap",
+    "heading": "'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif",
+    "body": "'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif",
+    "mono": "'JetBrains Mono', ui-monospace, monospace"
+  },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

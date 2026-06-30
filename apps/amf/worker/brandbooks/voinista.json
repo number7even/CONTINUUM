@@ -1,0 +1,9 @@
+{
+  "name": "Voinista",
+  "kicker": "VOINISTA",
+  "tagline": "Watch four analysts argue your next trade.",
+  "colors": { "bg": "#f8fafb", "surface": "#ffffff", "ink": "#0f1f2e", "muted": "#5b6b78", "primary": "#0f8a4f", "primaryInk": "#ffffff", "hairline": "#e4e9ed" },
+  "fonts": { "css": "", "heading": "Inter, system-ui, -apple-system, sans-serif", "body": "Inter, system-ui, -apple-system, sans-serif", "mono": "ui-monospace, monospace" },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

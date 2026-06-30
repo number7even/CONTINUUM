@@ -1,0 +1,22 @@
+{
+  "name": "Studio Munich",
+  "kicker": "STUDIO MUNICH",
+  "tagline": "Catalog Reimagined with AI.",
+  "colors": {
+    "bg": "#0c0c0e",
+    "surface": "#1e1e20",
+    "ink": "#fcfcfc",
+    "muted": "#9a9a9d",
+    "primary": "#e9970c",
+    "primaryInk": "#0c0c0e",
+    "hairline": "#2a2a2d"
+  },
+  "fonts": {
+    "css": "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@400;500;600&display=swap",
+    "heading": "'Playfair Display', Georgia, serif",
+    "body": "'Inter', system-ui, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

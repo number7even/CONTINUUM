@@ -1,0 +1,22 @@
+{
+  "name": "DigitalCoaching&Consulting",
+  "kicker": "DIGITALCOACHING&CONSULTING",
+  "tagline": "Empowering Digital Leaders with Cutting-Edge Strategies for Sustainable Growth",
+  "colors": {
+    "bg": "#0d1326",
+    "surface": "#161e36",
+    "ink": "#f5f7fa",
+    "muted": "#9aa3b8",
+    "primary": "#c9962f",
+    "primaryInk": "#0d1326",
+    "hairline": "#2a3350"
+  },
+  "fonts": {
+    "css": "https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap",
+    "heading": "Poppins, sans-serif",
+    "body": "Poppins, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}

@@ -1,0 +1,22 @@
+{
+  "name": "Viwago",
+  "kicker": "VIWAGO",
+  "tagline": "Turn the scan you already run into sealed, auditor-ready evidence",
+  "colors": {
+    "bg": "#f9fafb",
+    "surface": "#ffffff",
+    "ink": "#111827",
+    "muted": "#6b7280",
+    "primary": "#059669",
+    "primaryInk": "#ffffff",
+    "hairline": "#e5e7eb"
+  },
+  "fonts": {
+    "css": "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap",
+    "heading": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "body": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "UNKNOWN",
+  "note": "Colors approximated from live-site screenshot 2026-06-30 — confirm against official brandbook."
+}
