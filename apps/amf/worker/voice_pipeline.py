@@ -31,18 +31,44 @@ from pathlib import Path
 
 
 def synthesize(text: str, out_wav: Path, device: str, voice_ref: str | None) -> float:
-    """VoxCPM TTS → wav. Returns duration in seconds."""
+    """TTS → wav. Returns duration in seconds.
+
+    Engine via AMF_TTS env: 'supertonic' (default — 99M ONNX, light, 44.1kHz,
+    fits 16GB) or 'voxcpm' (2B PyTorch, high-end, needs a dedicated machine).
+    """
+    engine = os.environ.get("AMF_TTS", "supertonic").lower()
+    if engine == "voxcpm":
+        return _synth_voxcpm(text, out_wav, device, voice_ref)
+    return _synth_supertonic(text, out_wav, voice_ref)
+
+
+def _synth_supertonic(text: str, out_wav: Path, voice_ref: str | None) -> float:
+    """Supertonic 3 — 99M ONNX, on-device, 44.1kHz 16-bit. Apache-friendly, no GPU."""
+    from supertonic import TTS  # type: ignore
+
+    tts = TTS(auto_download=True)
+    voice = os.environ.get("AMF_VOICE", "M1")  # preset voice style (per-project later)
+    style = tts.get_voice_style(voice_name=voice)
+    lang = os.environ.get("AMF_LANG", "en")
+    wav, _duration = tts.synthesize(text=text, lang=lang, voice_style=style, total_steps=8, speed=1.05)
+    tts.save_audio(wav, str(out_wav))
+    import soundfile as sf  # type: ignore
+    info = sf.info(str(out_wav))
+    return float(info.frames) / float(info.samplerate)
+
+
+def _synth_voxcpm(text: str, out_wav: Path, device: str, voice_ref: str | None) -> float:
+    """VoxCPM2 — 2B PyTorch, high-end. OOM-heavy: run on a dedicated 16GB+ machine."""
     from voxcpm import VoxCPM  # type: ignore
     import soundfile as sf  # type: ignore
 
     model_id = os.environ.get("VOXCPM_MODEL", "openbmb/VoxCPM2")
     model = VoxCPM.from_pretrained(model_id, device=None if device == "auto" else device)
-    # VoxCPM.generate returns a waveform (numpy float array). VoxCPM2 outputs 16kHz.
     kwargs = {}
     if voice_ref:
-        kwargs["prompt_wav_path"] = voice_ref  # controllable cloning (reference voice)
-    wav = model.generate(text=text, **kwargs)
-    sr = int(os.environ.get("VOXCPM_SR", "16000"))
+        kwargs["prompt_wav_path"] = voice_ref  # controllable cloning
+    wav = model.generate(text=text, normalize=True, **kwargs)
+    sr = int(getattr(getattr(model, "tts_model", None), "sample_rate", 16000) or 16000)
     sf.write(str(out_wav), wav, sr)
     info = sf.info(str(out_wav))
     return float(info.frames) / float(info.samplerate)
@@ -83,11 +109,48 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--text")
     ap.add_argument("--text-file")
+    ap.add_argument("--align-audio", default=None,
+                    help="ALIGN-ONLY: whisperx an EXISTING audio file (a human recording) → "
+                         "word timings; skips synthesis. The human-voice content path.")
     ap.add_argument("--out", default="./out")
     ap.add_argument("--device", default="mps", choices=["mps", "cpu", "cuda"])
     ap.add_argument("--voice-ref", default=None)
     ap.add_argument("--job-id", default="job_local")
     args = ap.parse_args()
+
+    # ── Align-only path: a human voice recording → real per-word timing ──────────
+    # No TTS. Used by produce-short.mjs when AMF_VOICE is a real recording. Duration
+    # via stdlib `wave` (no soundfile dep). whisperx is the only heavy import here.
+    if args.align_audio:
+        audio_wav = Path(args.align_audio)
+        if not audio_wav.exists():
+            print(f"error: --align-audio file not found: {audio_wav}", file=sys.stderr)
+            return 2
+        out = Path(args.out)
+        out.mkdir(parents=True, exist_ok=True)
+        print("[L4] aligning human recording (whisperx, align-only)…", file=sys.stderr)
+        words, segments, transcript = align(audio_wav, args.device)
+        import wave as _wave
+        try:
+            with _wave.open(str(audio_wav), "rb") as wf:
+                duration = wf.getnframes() / float(wf.getframerate() or 1)
+        except Exception:
+            duration = float(words[-1]["end"]) if words else 0.0
+        payload = {
+            "jobId": args.job_id,
+            "enhancedAudioUrl": str(audio_wav),
+            "durationSec": round(duration, 2),
+            "transcript": transcript,
+            "segments": segments,
+            "words": words,
+            "wordLevelSource": "whisperx",
+            "status": "ready-for-assembly",
+        }
+        payload_path = out / "payload.json"
+        payload_path.write_text(json.dumps(payload, indent=2))
+        print(f"[L4] {len(words)} words (whisperx) → {payload_path}", file=sys.stderr)
+        print(str(payload_path))  # stdout = payload path (for the orchestrator)
+        return 0
 
     text = args.text or (Path(args.text_file).read_text() if args.text_file else None)
     if not text or not text.strip():

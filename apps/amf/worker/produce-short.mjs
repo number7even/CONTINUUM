@@ -73,16 +73,34 @@ if (process.env.AMF_VOICE && existsSync(process.env.AMF_VOICE)) {
   console.log(`      STUB tone · ${TOTAL}s`);
 }
 
-// ── word-level timings (even-spread stub; real glyphs) ───────────────────────
-const allWords = SCRIPT.join(' ').split(/\s+/).filter(Boolean);
-const dt = TOTAL / allWords.length;
-const words = allWords.map((w, i) => ({ word: w, start: +(i * dt).toFixed(2), end: +((i + 1) * dt - 0.02).toFixed(2) }));
+// ── word-level timings — REAL via whisperx on a real recording, else even-spread ──
+function evenSpread() {
+  const aw = SCRIPT.join(' ').split(/\s+/).filter(Boolean);
+  const d = TOTAL / aw.length;
+  return aw.map((w, i) => ({ word: w, start: +(i * d).toFixed(2), end: +((i + 1) * d - 0.02).toFixed(2) }));
+}
+function whisperxWords() {
+  // align-only the real recording → real per-word timestamps (the actual karaoke sync).
+  // stderr → file (keeps a whisperx traceback off the console); failure → caught below.
+  const alignOut = join(work, 'align');
+  const out = execSync(`python3 "${join(HERE, 'voice_pipeline.py')}" --align-audio "${voiceWav}" --out "${alignOut}" --device cpu 2>"${join(work, 'whisperx.err')}"`, { encoding: 'utf8', shell: '/bin/bash' });
+  const p = JSON.parse(readFileSync(out.trim().split('\n').pop().trim(), 'utf8'));
+  if (p.wordLevelSource !== 'whisperx' || !p.words?.length) throw new Error('no whisperx words');
+  return p.words;
+}
+let words, wordSource;
+if (process.env.AMF_VOICE && existsSync(process.env.AMF_VOICE)) {
+  try { words = whisperxWords(); wordSource = 'whisperx'; real.push('word-timing (whisperx)'); console.log('      word-timing: ✓ whisperx (real per-word sync)'); }
+  catch { words = evenSpread(); wordSource = 'none'; stub.push('word-timing (even-spread — whisperx not installed: pip install -r apps/amf/worker/requirements.txt)'); console.log('      word-timing: whisperx unavailable → even-spread fallback'); }
+} else {
+  words = evenSpread(); wordSource = 'none'; stub.push('word-timing (even-spread → swap: whisperx on your recording)');
+}
 
 // ── L5 captions — REAL glyphs via composeVideo → HyperFrames ─────────────────
 step('L5 captions — REAL text glyphs (composeVideo → HyperFrames, headless Chrome)');
 const payload = {
   jobId: 'one-short', enhancedAudioUrl: '', durationSec: TOTAL,
-  transcript: SCRIPT.join(' '), segments: [], words, wordLevelSource: 'none',
+  transcript: words.map((w) => w.word).join(' '), segments: [], words, wordLevelSource: wordSource,
   status: 'ready-for-assembly',
 };
 const payloadPath = join(work, 'payload.json');
@@ -92,7 +110,6 @@ execSync(`node "${join(HERE, 'render.mjs')}" "${payloadPath}" "${renderDir}"`, {
 const captionsMp4 = cap(`ls -t "${join(renderDir, 'proj', 'renders')}"/*.mp4 2>/dev/null | head -1`);
 if (!captionsMp4 || !existsSync(captionsMp4)) { console.error('HyperFrames produced no captions mp4'); process.exit(1); }
 real.push('captions (real glyphs)');
-stub.push('word-timing (even-spread → swap: whisperx)');
 
 // ── L4-vis b-roll — real/licensed clips or stub footage ──────────────────────
 step('L4-vis b-roll');
