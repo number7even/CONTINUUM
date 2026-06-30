@@ -1,0 +1,22 @@
+{
+  "name": "VoiceCosmos",
+  "kicker": "VOICE COSMOS",
+  "tagline": "The Voice Operating System",
+  "colors": {
+    "bg": "#0a0e0c",
+    "surface": "#151a18",
+    "ink": "#ffffff",
+    "muted": "#9ba29d",
+    "primary": "#cdf94a",
+    "primaryInk": "#0a0e0c",
+    "hairline": "#2b332f"
+  },
+  "fonts": {
+    "css": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap",
+    "heading": "Inter, -apple-system, sans-serif",
+    "body": "Inter, -apple-system, sans-serif",
+    "mono": "ui-monospace, monospace"
+  },
+  "logo": "https://www.voicecosmos.com/brand/voiceos-hero2.webp",
+  "note": "Colors/fonts approximated from the live hospitality site screenshot 2026-06-30 — confirm against the official brandbook."
+}
