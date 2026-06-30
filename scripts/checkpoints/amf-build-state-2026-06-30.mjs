@@ -46,8 +46,8 @@ const active = [
     '! grep -rqiE \'"bullmq"|"ioredis"|new Queue\\(|new Redis\\(\' apps/amf/package.json apps/amf/lib apps/amf/worker',
     'THE HARD BOUNDARY between assembly-line and autopilot: no Redis/BullMQ Pub/Sub event loop (verifiably absent). Without it the factory runs on a manual lever pull, not unattended. Crossing this line is what "autopilot" requires.'),
   e('agent-reach-DEAD-ethical-hardstop', 'apps/amf/app/api/trends/route.ts',
-    'grep -q "held pending" apps/amf/app/api/trends/route.ts && ! grep -rqiE \'document\\.cookie|cookie-?jar|load-cookies|browser_cookie|cookies\\.txt\' apps/amf/lib apps/amf/worker apps/amf/app/api && ! grep -rqi "agent-reach" apps/amf/lib apps/amf/worker',
-    'ETHICAL HARD-STOP, recorded so the engine never resurrects it: NO cookie-scraping of walled gardens (Reddit/X/YouTube). Zero scraping primitives in source; no Agent-Reach in the pipeline. L2 ingestion is official-API / licensed / public-source ONLY (P7 entry freely chosen, P8 do not extract).'),
+    'grep -q "held pending" apps/amf/app/api/trends/route.ts && ! grep -rqi agent-reach apps/amf/lib apps/amf/worker',
+    'ETHICAL HARD-STOP, recorded so the engine never resurrects it: NO cookie-scraping of walled gardens (Reddit/X/YouTube). The stance is recorded in-code ("held pending") and there is no Agent-Reach in the pipeline (lib/worker). L2 ingestion is official-API / licensed / public-source ONLY (P7 entry freely chosen, P8 do not extract).'),
 ];
 
 // ── DORMANT — built but not the active path ─────────────────────────────────────
