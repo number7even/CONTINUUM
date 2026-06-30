@@ -22,6 +22,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const SIGNAL_TYPES = new Set(['world_brief', 'feed_article']);
@@ -93,6 +94,23 @@ async function draftViaLLM(signal, brand, key) {
   return { ...JSON.parse(m[0]), drafted: 'llm' };
 }
 
+function pillarId(slug) {
+  const h = createHash('sha256').update(`pillar:${slug}`).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
+
+/** Derive pillar terms for a brand from the `pillars` corpus (pillars-ingest.mjs). */
+async function derivePillars(slug) {
+  if (!slug) return [];
+  try {
+    const { openStorage } = await import(resolve(REPO_ROOT, 'packages/core/dist/index.js'));
+    const ps = openStorage('pillars');
+    const obs = ps.getObservations([pillarId(slug)]);
+    ps.close();
+    return obs[0] ? terms(obs[0].content) : [];
+  } catch { return []; }
+}
+
 function loadBrand(name) {
   const def = { name: 'AMF', tagline: 'amf.continuum.rest', cta: 'DETAILS' };
   if (!name) return def;
@@ -112,9 +130,14 @@ async function run() {
   const a = process.argv;
   const get = (flag, def) => { const i = a.indexOf(flag); return i >= 0 ? a[i + 1] : def; };
   const project = get('--project', 'worldmonitor');
-  const brand = loadBrand(get('--brand', process.env.AMF_BRAND));
-  const pillars = (get('--pillars', '') || '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (!pillars.length) { console.error('--pillars "term1,term2,…" required (your product ontology)'); process.exit(2); }
+  const brandSlug = get('--brand', process.env.AMF_BRAND);
+  const brand = loadBrand(brandSlug);
+  let pillars = (get('--pillars', '') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!pillars.length && brandSlug) {
+    pillars = await derivePillars(brandSlug);
+    if (pillars.length) console.error(`[matcher] derived ${pillars.length} pillar terms for "${brandSlug}" from the pillars corpus`);
+  }
+  if (!pillars.length) { console.error('no pillars — pass --pillars "a,b,c" OR run pillars-ingest.mjs and use --brand <slug>'); process.exit(2); }
   const { openStorage } = await import(resolve(REPO_ROOT, 'packages/core/dist/index.js'));
   const storage = openStorage(project);
   const ranked = rankSignals(storage, pillars, Date.now(), 1);
