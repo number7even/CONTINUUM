@@ -140,8 +140,10 @@ The hybrid both terminals converged on. Recorded here to close the loop:
   MVP first. The runtime being ready does not pull it into v1.
 
 **Now resolved (Riaan, 2026-06-29):**
-- **Voice engine → VoxCPM2 48kHz (Apache-2.0)** standardised across both products; VC told
-  to hold Cartesia (kept as a swappable fallback behind `TTSService`).
+- **Voice engine → DUAL-PATH (corrected 2026-06-30 vs the earlier "one stack").** VoxCPM2
+  48kHz (Apache-2.0) is the **live / sovereign** path (this AI-Guest bot, Pod-Geni). The AMF
+  **scripted-content** pipeline uses **Cartesia (Sonic-2)** — proven, first-class, not a
+  fallback. Both coexist behind `TTSService`. (This bot stays VoxCPM2 — correct for live.)
 - **Var names → `VOXCPM2_URL` / `VOXCPM2_API_KEY`** (the worker's names); our request §6 updated.
 - **Corpus-adapter interface → `loadCorpus(corpusRef) → {title, research, topics,
   preparedQuestions}`** is the worker-facing seam (= your `load_corpus`); `retrieve` /

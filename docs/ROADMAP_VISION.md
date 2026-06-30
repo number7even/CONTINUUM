@@ -283,9 +283,10 @@ Beyond the walk-and-talk presenter, the content engine composites the talking he
 
 | Stage | Spec (standard) | Status |
 |---|---|---|
-| L4 audio | Human voice (QuickTime) → **Auphonic** enhance on the worker queue (human voice mandated for YT monetisation) | 🟡 worker queue exists; Auphonic key unwired (P9) |
+| L4 audio | Human voice (QuickTime) → **Auphonic** enhance on the worker queue (human voice mandated for YT monetisation). Voice clone = **Cartesia (Sonic-2)** for scripted content; VoxCPM2 sovereign-later. | 🟡 worker queue exists; Auphonic key unwired (P9) |
+| L4 talking-head | source face + audio → lip-synced mp4 via **`fal-ai/musetalk`** (LOCKED 2026-06-30; HeyGen/Tavus/Replicate struck per the master map). Rented talent rendered by VAULT (signed). | 📋 engine proven (PR #11); not on the voice-over-b-roll MVP path |
 | L4 visuals | word-level timestamps → b-roll synced to them. **ComfyUI GPU swarm** (needs a GPU box) is the target; **fal.ai** the cheap stand-in (LTX output rejected — needs Kling-tier or curated/licensed library) | ❌ unbuilt |
-| L5 matte | presenter cut-out from VC (`§3a` of the VC handover) — clean alpha to composite over b-roll | 🅿️ gated on VC handover |
+| L5 matte | presenter cut-out (**BodyPix**, or VAULT alpha) — clean alpha to composite a `fal-ai/musetalk`/VAULT talking-head over b-roll. **Hard prerequisite before Riaan/Astrid faces re-enter L5.** | 🅿️ gated on VC handover |
 | L5 assembly | **HyperFrames** (`npx skills add heygen-com/hyperframes`) → **FFmpeg / Remotion** concat + audio-duck + word-synced caption burn | 🟡 HyperFrames render proven once on M1; full compositor unbuilt |
 | L5 QC / slice | Hermes video judge (pacing) → Vigola 9:16 slice | ❌ unbuilt |
 

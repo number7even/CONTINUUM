@@ -26,8 +26,8 @@
 
 > **⚠️ Scope narrowed 2026-06-29 — read first.** StudioMunich VAULT is now the talent
 > registry + renderer for **rented** talent (`studiomunich:<actorId>` — Riaan/Astrid/Paulina):
-> VAULT returns cryptographically **signed rendered bytes**, so the talking-head providers
-> (HeyGen/Tavus/MuseTalk) + the registry/consent below are **NOT needed for rented talent** —
+> VAULT returns cryptographically **signed rendered bytes**, so the `fal-ai/musetalk` render
+> engine + the registry/consent below are **NOT needed for rented talent** —
 > see `STUDIOMUNICH-TALENT-HANDSHAKE.md`. What AMF still needs from VC: **(1) the matte**
 > (cut VAULT's presenter out to composite over b-roll, §3a) and **(2) the full avatar+voice
 > engine ONLY for synthetic `digital:` avatars** we render ourselves. Treat the components
@@ -58,9 +58,7 @@ from the handoff and may have moved.
 |---|---|---|---|
 | 1 | **Face registry + consent gate** | `src/lib/avatar/source-registry.ts` | `registerFace()`, the `CANDIDATE_FACES` shape, and the `avatar_sources` **table DDL** (so we can stand up our own). `voiceidvault_excluded` must default true. |
 | 2 | **Provider abstraction** | `src/lib/avatar/providers/base-provider.ts` | The `BaseAvatarProvider` interface — this is the seam we build against. Document the method contract (submit job → poll/webhook → mp4). |
-| 3 | **Talking-head: HeyGen** | `providers/heygen-provider.ts` | Working provider impl + the request/response shape it expects (`{ avatar/face, audio } → video.mp4`). |
-| 4 | **Talking-head: Tavus** | `providers/tavus-provider.ts` | Same, as the alternate provider. |
-| 5 | **Talking-head: sovereign (Replicate/MuseTalk)** | `src/lib/avatar/replicate-service.ts` | The `video-avatar` path, `REPLICATE_MODELS` version pins, and the webhook contract (`/api/avatar/replicate-webhook`). |
+| 3 | **Talking-head render: `fal-ai/musetalk`** (LOCKED 2026-06-30) | `FalAvatarProvider` (PR #11) — confirm path | The converged group render engine: source face + audio → lip-synced mp4, one shared `FAL_KEY`. **HeyGen / Tavus / Replicate-MuseTalk are STRUCK** per the master map (`AVATAR_ECOSYSTEM_ARCHITECTURE`, fal proven real-mp4). Deliver the provider + its request/response shape. |
 | 6 | **Voice clone proxy (Cartesia)** | `src/pages/api/voice/cartesia-stream.ts` | The proxy + the **PCM/audio output contract** (`model_id: sonic-2`, `voice.id`, byte format). Key stays server-side. |
 | 7 | **Voice clone proxy (sovereign VoxCPM)** | `src/pages/api/voice/voxcpm-stream.ts` | Same — documented as the drop-in sovereign alternate (identical PCM contract). |
 | 8 | **Background matte** | `src/lib/avatar/background-removal-service.ts` | BodyPix segmentation → transparent presenter (alpha output format). |
@@ -72,10 +70,10 @@ from the handoff and may have moved.
 These are the seams our content engine binds to — if they change, we break. Document
 and version them:
 
-- **`BaseAvatarProvider`** — submit(audio + face/avatar ref) → jobId; status(jobId) → `{state, videoUrl?}`. We code to the interface, not to HeyGen/Tavus/MuseTalk directly.
+- **`BaseAvatarProvider`** — submit(audio + face/avatar ref) → jobId; status(jobId) → `{state, videoUrl?}`. We code to the interface; the concrete impl is `FalAvatarProvider` (`fal-ai/musetalk`).
 - **Voice proxy output** — exact audio byte contract (sample rate, channels, PCM vs MP3) so Cartesia and VoxCPM are truly interchangeable.
 - **`avatar_sources` schema** — columns + types: `talent_name`, `consent_by`, `voiceidvault_excluded` (always true for content faces), `prep_status`, `source_clip`.
-- **Webhook payloads** — the render-complete webhook body shape (for Replicate/MuseTalk).
+- **Webhook payloads** — the render-complete webhook/poll body shape (for `fal-ai/musetalk`).
 
 ### 3a. Matte → composite output contract (the one b-roll-adjacent ask)
 
@@ -126,8 +124,8 @@ it exits 0. Please include a runnable example that does exactly this:
 
 > Given (a) a registered Riaan content face, (b) a Riaan Cartesia `voice_id`, and (c) a
 > hand-written 40s script, the delivered modules produce a **talking-head `.mp4` with
-> the cloned voice synced** — through the `BaseAvatarProvider` interface (HeyGen path is
-> fine for the acceptance run) — with **no identity hard-coded** (presenter passed as config).
+> the cloned voice synced** — through the `BaseAvatarProvider` interface (`fal-ai/musetalk`
+> render) — with **no identity hard-coded** (presenter passed as config).
 
 Deliver this as a script we can run: `node examples/avatar-smoke.mjs` → green. That's our
 definition of "delivered," not "the code is in the repo."
@@ -157,13 +155,13 @@ in §3a**: give us a clean cut-out, and everything downstream of it is ours.
 
 ## 9. Open decisions for VC team input (flag, don't decide for us)
 
-- **HeyGen vs MuseTalk to start.** HeyGen ships fastest but uploads the face to a 3rd
-  party (cost + ToS + cuts against P1/sovereignty). Tell us the real per-minute cost and
-  ToS limits you hit, so we make the call deliberately.
-- **Voice stack — DECIDED 2026-06-29: standardise on VoxCPM2 48kHz (Apache-2.0).** Please
-  **hold the Cartesia path** — we're converging both products on VoxCPM2 behind the
-  `TTSService` interface. Still deliver the Cartesia proxy as a *swappable fallback* behind
-  that interface, but VoxCPM2 is the default; don't invest further in Cartesia-specific work.
+- **Render engine — LOCKED 2026-06-30: `fal-ai/musetalk`.** HeyGen / Tavus / Replicate-MuseTalk
+  are **struck** (master map: fal is the proven, shared engine, one `FAL_KEY`). No decision
+  needed; build to `FalAvatarProvider`.
+- **Voice stack — DUAL-PATH (corrected 2026-06-30):** **Cartesia (Sonic-2) now** — the proven
+  engine for the AMF **scripted-content** pipeline (Riaan/Astrid clones). **VoxCPM2 (48kHz)
+  sovereign-later** — the live AI-Guest / Pod-Geni path. Both coexist behind `TTSService`;
+  deliver the Cartesia proxy as a first-class content voice, not a fallback.
 - Anything in the proven pipeline that was **fragile or maintenance-heavy** — tell us now.
 
 ---

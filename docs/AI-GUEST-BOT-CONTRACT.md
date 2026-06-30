@@ -143,9 +143,23 @@ Extends Pod-Geni's existing dispatch with an explicit `corpusRef` (replaces the 
 ```
 
 **Secrets are NEVER in this payload** (P1): the bot reads `CONTINUUM_HTTP_TOKEN`,
-`DAILY_API_KEY`, `DEEPGRAM_API_KEY`, `VOXCPM2_URL`, `VOXCPM2_API_KEY`, LLM key from its own
-environment. **Voice stack standardised on VoxCPM2 48kHz (Apache-2.0), 2026-06-29** — var
-names follow Pod-Geni's worker (`VOXCPM2_URL` / `VOXCPM2_API_KEY`).
+`DAILY_API_KEY`, `DEEPGRAM_API_KEY`, the TTS backend secrets, and the LLM key from its own
+environment. **Voice: VoxCPM2 48kHz (Apache-2.0)** — this is the **live / sovereign** path
+(AI-Guest, Pod-Geni). It is NOT a one-stack-for-everything rule: the AMF **scripted-content**
+pipeline uses **Cartesia (Sonic-2)** as its proven content voice. Two paths, two engines, each
+behind its own abstraction (corrected 2026-06-30 vs the earlier "standardise on VoxCPM2").
+
+VoxCPM2 has **two interchangeable hosting backends, selected by `TTS_BACKEND`** (the bot
+abstracts both behind one TTSService; the session contract above is unchanged either way):
+
+- **`fal` — serverless (recommended, 2026-06-29).** VoxCPM2 deployed as a fal.ai app
+  (`ai-guest-bot/voxcpm2-fal`, `<user>/voxcpm2-tts`); the bot calls it via `fal_client`. Env:
+  `FAL_KEY`, `FAL_VOXCPM_APP`. fal provisions the GPU + autoscales — no box to run, no
+  `VOXCPM2_URL` to keep alive. **The AMF fork uses this too** (one fal app can serve both
+  products).
+- **`http` — self-hosted.** VoxCPM2 behind a `/v1/tts` server (`ai-guest-bot/voxcpm2-server`)
+  on your own GPU host (GCP GPU VM / RunPod). Env: `VOXCPM2_URL`, `VOXCPM2_API_KEY` (the
+  worker's original names, still valid).
 
 Lifecycle events to `callbackUrl`: `joined`, `turn` (each AI turn + citations + flags),
 `left`, `error`.
@@ -162,7 +176,10 @@ Real-time conversation needs the loop tight. Target **< 1.2s** from user-stop to
 3. **LLM turn.** System prompt = persona + grounding rules (§4) + cited primed passages +
    recent transcript. Output: the spoken answer **plus the list of factual claims it made**
    (structured), each tagged with the `observationId`(s) it leaned on.
-4. **TTS (VoxCPM2, streaming).** Stream the first sentence to audio while the rest generates.
+4. **TTS (VoxCPM2).** Stream the first sentence to audio while the rest generates. Backend
+   matters for the budget: the **`http`** self-hosted server streams PCM (lowest first-audio
+   latency); **`fal`** serverless is request→WAV→download (add a fal queue + transfer hop, so
+   chunk per sentence and pipeline aggressively to stay under the < 1.2s target).
 5. **Speak** into the Daily room. Handle **barge-in**: if the user starts talking, stop TTS
    and yield (the interviewer never talks over the host).
 6. **Check (async, off the hot path).** Run `checkClaims()` per `grounding.checkMode`.

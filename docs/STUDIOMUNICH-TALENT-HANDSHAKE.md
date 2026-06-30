@@ -23,7 +23,7 @@
  Synthetic       digital:<id>            → AMF renders itself (VC pipeline + VoxCPM2)
 ```
 
-- **VAULT renders rented talent.** The VC talking-head engine (HeyGen/MuseTalk) + voice clone
+- **VAULT renders rented talent.** The `fal-ai/musetalk` render engine + voice clone
   are **not** used for `studiomunich:` actors — VAULT returns the signed media.
 - **VC's only role for rented talent = the matte** (cut VAULT's presenter out to composite
   over AMF b-roll, per VC handover §3a) — *if* VAULT returns full-frame. Confirm whether VAULT
