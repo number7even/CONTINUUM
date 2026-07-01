@@ -18,8 +18,8 @@
       "sales_signals": ["revenue leak", "labour shortage", "OTA commission", "direct booking", "guest satisfaction", "staffing cost", "occupancy drop"],
       "feeds": [
         {"url": "https://skift.com/feed/", "tier": 1, "name": "Skift"},
-        {"url": "https://www.phocuswire.com/RSS", "tier": 1, "name": "PhocusWire"},
-        {"url": "https://www.hospitalitynet.org/rss/all.xml", "tier": 2, "name": "HospitalityNet"}
+        {"url": "https://www.phocuswire.com/RSS", "tier": 1, "name": "PhocusWire", "status": "cloudflare-403 to non-browser clients (2026-07-01) — T1 authority stands; needs a browser-UA/proxy fetch to ingest"},
+        {"url": "https://www.hospitalitynet.org/rss", "tier": 2, "name": "HospitalityNet"}
       ]
     },
     {
@@ -43,8 +43,9 @@
       "keywords": ["ai agent", "agentic", "memory", "hallucination", "context window", "reliability", "verifiable", "mcp", "coding assistant", "eval"],
       "sales_signals": ["agent reliability failure", "hallucination incident", "enterprise ai trust", "agent memory", "ai evaluation"],
       "feeds": [
-        {"url": "https://hnrss.org/newest?q=AI+agent", "tier": 2, "name": "HN (AI agent)"},
-        {"url": "https://www.bleepingcomputer.com/feed/", "tier": 3, "name": "general tech"}
+        {"url": "https://www.braintrust.dev/blog/rss.xml", "tier": 1, "name": "Braintrust AI Engineering", "status": "no-public-rss-found (2026-07-01) — T1 authority ratified but no feed exists; substitute candidates pending operator ratification: Latent Space (https://www.latent.space/feed), Simon Willison (https://simonwillison.net/atom/everything/), HF Blog (https://huggingface.co/blog/feed.xml)"},
+        {"url": "https://github.blog/changelog/feed/", "tier": 1, "name": "GitHub Changelog"},
+        {"url": "https://hnrss.org/newest?q=AI+dev+tools", "tier": 3, "name": "HN (AI/Dev Tools)"}
       ]
     },
     {
@@ -99,7 +100,11 @@
       "topics": ["honeypot", "deception technology", "threat intelligence", "ssh attacks", "eu government security"],
       "keywords": ["honeypot", "deception", "threat intel", "ssh", "intrusion", "attacker", "eu gov", "critical infrastructure"],
       "sales_signals": ["government breach", "critical infrastructure attack", "eu cyber regulation (NIS2)", "ransomware"],
-      "feeds": [{"url": "https://thehackernews.com/feeds/posts/default", "tier": 1, "name": "TheHackerNews"}]
+      "feeds": [
+        {"url": "https://thehackernews.com/feeds/posts/default", "tier": 1, "name": "TheHackerNews"},
+        {"url": "https://www.servethehome.com/feed/", "tier": 1, "name": "ServeTheHome (HPC/infra)"},
+        {"url": "https://hnrss.org/newest?q=infrastructure", "tier": 3, "name": "HN (Infrastructure)"}
+      ]
     },
     {
       "slug": "qintercept", "priority": 3, "geo": true, "confidence": "tagline",
@@ -126,7 +131,10 @@
       "topics": ["silicon photonics", "photonic chip design", "eda tools", "ai for chip design", "optical computing"],
       "keywords": ["photonics", "photonic chip", "silicon photonics", "eda", "semiconductor", "optical", "chip design", "foundry"],
       "sales_signals": ["photonics funding", "chip design ai", "optical interconnect", "semiconductor shortage"],
-      "feeds": []
+      "feeds": [
+        {"url": "https://www.servethehome.com/feed/", "tier": 1, "name": "ServeTheHome (HPC/infra)"},
+        {"url": "https://hnrss.org/newest?q=infrastructure", "tier": 3, "name": "HN (Infrastructure)"}
+      ]
     },
     {
       "slug": "digitalcoaching", "priority": 3, "geo": false, "confidence": "tagline",
@@ -138,11 +146,17 @@
       "feeds": []
     },
     {
-      "slug": "sekago", "priority": 3, "geo": false, "confidence": "unknown",
-      "sector": "UNKNOWN — tagline 'What is your life worth?'",
-      "angle": "TBD — sector not verified. Ratify with the product owner before targeting.",
-      "topics": [], "keywords": [], "sales_signals": [], "feeds": [],
-      "note": "Sector unclear from the tagline. Do not target until confirmed (P4)."
+      "slug": "sekago", "priority": 1, "geo": false, "confidence": "sources-ratified",
+      "sector": "personal / identity security",
+      "angle": "Protect what a breach actually puts at risk — identity, data, personal security. ('What is your life worth?')",
+      "topics": ["data breach", "identity theft", "ransomware", "credential leak", "personal security", "account takeover"],
+      "keywords": ["breach", "identity theft", "ransomware", "phishing", "credential", "data leak", "account takeover", "dark web", "scam"],
+      "sales_signals": ["major breach", "ransomware attack", "identity theft surge", "credential dump", "data leak"],
+      "feeds": [
+        {"url": "https://krebsonsecurity.com/feed/", "tier": 1, "name": "KrebsOnSecurity"},
+        {"url": "https://www.darkreading.com/rss.xml", "tier": 2, "name": "Dark Reading"}
+      ],
+      "note": "Priority + security sources ratified by operator 2026-07-01; CATEGORY INFERRED from the ratified sources — confirm topics/keywords with the product owner (P4)."
     }
   ]
 }

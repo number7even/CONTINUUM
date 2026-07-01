@@ -151,5 +151,8 @@ async function smoke() {
   process.exit(okWin && okWeights ? 0 : 1);
 }
 
-if (process.argv.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
-else run().catch((e) => { console.error(e.message); process.exit(1); });
+// only run the CLI when invoked directly — safe to `import { rankSignals }` elsewhere
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
+  else run().catch((e) => { console.error(e.message); process.exit(1); });
+}

@@ -292,9 +292,12 @@ async function smoke() {
   process.exit(ok ? 0 : 1);
 }
 
-const a = process.argv;
-if (a.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
-else {
-  const pi = a.indexOf('--provider'); const pr = a.indexOf('--project'); const bi = a.indexOf('--brand');
-  run(pi >= 0 ? a[pi + 1] : 'all', pr >= 0 ? a[pr + 1] : 'worldmonitor', bi >= 0 ? a[bi + 1] : process.env.AMF_BRAND).catch((e) => { console.error(e.message); process.exit(1); });
+// only run the CLI when invoked directly — safe to `import { parseFeed, ingest }` elsewhere
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const a = process.argv;
+  if (a.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
+  else {
+    const pi = a.indexOf('--provider'); const pr = a.indexOf('--project'); const bi = a.indexOf('--brand');
+    run(pi >= 0 ? a[pi + 1] : 'all', pr >= 0 ? a[pr + 1] : 'worldmonitor', bi >= 0 ? a[bi + 1] : process.env.AMF_BRAND).catch((e) => { console.error(e.message); process.exit(1); });
+  }
 }
