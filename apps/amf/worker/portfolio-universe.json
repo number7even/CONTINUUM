@@ -16,6 +16,14 @@
       "topics": ["booking recovery", "no-show reduction", "after-hours booking", "guest experience", "upsell automation", "direct booking vs OTA", "front-desk labour"],
       "keywords": ["hotel", "spa", "salon", "hospitality", "booking", "concierge", "no-show", "occupancy", "guest", "reservation", "revenue", "OTA", "front desk"],
       "sales_signals": ["revenue leak", "labour shortage", "OTA commission", "direct booking", "guest satisfaction", "staffing cost", "occupancy drop"],
+      "filters": {
+        "_model": "Feedly: (Lodging Industry) AND (Use Cases) AND (AI) NOT (sports). Each must-group is one entity's alias set.",
+        "must": [
+          ["hotel", "hotels", "hotelier", "spa", "salon", "resort", "hospitality", "lodging", "motel", "inn", "guest", "accommodation"],
+          ["booking", "reservation", "no-show", "check-in", "front desk", "occupancy", "concierge", "revenue", "upsell", "guest experience", "reception"]
+        ],
+        "not": ["world cup", "fifa", "football", "soccer", "olympic", "olympics", "grand prix", "tournament", "match result", "playoff", "super bowl"]
+      },
       "feeds": [
         {"url": "https://skift.com/feed/", "tier": 1, "name": "Skift"},
         {"url": "https://www.phocuswire.com/RSS", "tier": 1, "name": "PhocusWire", "status": "cloudflare-403 to non-browser clients (2026-07-01) — T1 authority stands; needs a browser-UA/proxy fetch to ingest"},

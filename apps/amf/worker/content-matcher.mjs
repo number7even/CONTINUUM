@@ -52,6 +52,24 @@ function salesWeight(content, salesTerms) {
 }
 function engagementWeight(meta) { const e = Number((meta || {}).engagement || 0); return e > 0 ? 1 + Math.min(e / 200, 0.5) : 1; }
 
+/**
+ * Boolean pre-score gate (the Feedly AND/NOT model). product.filters = { must, not }:
+ *   must — array of GROUPS; the signal must hit ≥1 term in EVERY group  (AND-of-ORs)
+ *   not  — flat list; the signal must contain NONE                       (exclusion)
+ * Absent filters → everything passes (backward compatible). This kills broad-feed noise
+ * (e.g. a Skift "World Cup" story) BEFORE it can score, not by curation luck.
+ */
+export function passesFilters(content, product) {
+  const f = product?.filters; if (!f) return true;
+  const lc = String(content).toLowerCase();
+  if (Array.isArray(f.not) && f.not.some((t) => lc.includes(String(t).toLowerCase()))) return false;
+  if (Array.isArray(f.must)) for (const group of f.must) {
+    const alts = Array.isArray(group) ? group : [group];
+    if (!alts.some((t) => lc.includes(String(t).toLowerCase()))) return false;
+  }
+  return true;
+}
+
 /** Rank pillar-relevant signals by relevance × recency × authority × sales × engagement. */
 export function rankSignals(storage, pillarTerms, product, nowMs, k = 5) {
   const q = ftsQuery(pillarTerms);
@@ -66,7 +84,8 @@ export function rankSignals(storage, pillarTerms, product, nowMs, k = 5) {
     const o = byId.get(h.id); const meta = o?.metadata || {}; const content = o?.content || h.title; const sources = meta.sources || [];
     const rec = recencyWeight(h.timestamp, nowMs), auth = authorityWeight(sources, domTier), sales = salesWeight(content, salesTerms), eng = engagementWeight(meta);
     return { id: h.id, type: h.type, title: h.title, ts: h.timestamp, rel: +h.score.toFixed(3), content, sources, auth, sales, eng, score: h.score * rec * auth * sales * eng };
-  }).sort((a, b) => b.score - a.score).slice(0, k);
+  }).filter((x) => passesFilters(x.content, product)) // Feedly AND/NOT gate — drop noise before ranking
+    .sort((a, b) => b.score - a.score).slice(0, k);
 }
 
 function extractStats(text) {
@@ -135,20 +154,26 @@ async function smoke() {
   mk('22222222-2222-2222-2222-222222222222', 'A hotel booking trends piece about guest occupancy.', 1, 'randomblog.example', 0);
   // C: old, tier-1
   mk('33333333-3333-3333-3333-333333333333', 'Hotel no-show revenue leak, an old note about concierge booking.', 45, 'skift.com', 0);
+  // D: fresh × tier-1, would score #1 — BUT hits a NOT term (world cup). Boolean gate must drop it.
+  mk('44444444-4444-4444-4444-444444444444', 'World Cup fever fills hotels as football fans book rooms across the host city.', 1, 'skift.com', 0);
+  // E: off-topic — fails the lodging MUST group (no hospitality entity). Must be dropped.
+  mk('55555555-5555-5555-5555-555555555555', 'A fintech startup raised a Series B for its payments booking API.', 1, 'skift.com', 0);
 
   const product = getProduct('voicecosmos');
   const pillars = terms([...(product.topics || []), ...(product.keywords || [])].join(' '));
-  const ranked = rankSignals(s, pillars, product, now, 3);
+  const ranked = rankSignals(s, pillars, product, now, 5);
   const top = ranked[0];
   const brief = await buildBrief(top, loadBrand('voicecosmos'), product);
   const okWin = top?.id.startsWith('11111111'); // fresh × tier-1 × sales beats the others
   const okWeights = top && top.auth > 1 && top.sales > 1 && brief.weights;
-  console.error(`\ncontent-matcher smoke (relevance × recency × authority × sales)`);
-  console.error(`  pillars=${pillars.length} · ranked=${ranked.length} · top=${top?.id?.slice(0, 8)} score=${top?.score?.toFixed(3)} (auth ${top?.auth} · sales ${top?.sales?.toFixed(2)})`);
-  console.error(`  brief: "${brief.headline?.slice(0, 46)}…" cta=${brief.cta} drafted=${brief.drafted}`);
-  console.error(`  ${okWin && okWeights ? '✅ PASS' : '❌ FAIL'} — fresh × tier-1 × sales-signal ranks first; LLM gated (template proven)\n`);
+  const okFiltered = !ranked.some((r) => /world cup|fintech|series b/i.test(r.content)) && ranked.length === 3; // D+E dropped, A/B/C remain
+  console.error(`\ncontent-matcher smoke (Feedly gate + relevance × recency × authority × sales)`);
+  console.error(`  pillars=${pillars.length} · survivors=${ranked.length}/5 (World-Cup + fintech dropped by must/not) · top=${top?.id?.slice(0, 8)} (auth ${top?.auth} · sales ${top?.sales?.toFixed(2)})`);
+  console.error(`  boolean gate: ${okFiltered ? 'World-Cup NOT-dropped + off-topic MUST-dropped ✓' : 'LEAKED ✗'}`);
+  console.error(`  brief: "${brief.headline?.slice(0, 42)}…" cta=${brief.cta} drafted=${brief.drafted}`);
+  console.error(`  ${okWin && okWeights && okFiltered ? '✅ PASS' : '❌ FAIL'} — noise gated BEFORE scoring; fresh × tier-1 × sales still wins\n`);
   s.close(); const dir = process.env.CONTINUUM_DATA_DIR; if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
-  process.exit(okWin && okWeights ? 0 : 1);
+  process.exit(okWin && okWeights && okFiltered ? 0 : 1);
 }
 
 // only run the CLI when invoked directly — safe to `import { rankSignals }` elsewhere
