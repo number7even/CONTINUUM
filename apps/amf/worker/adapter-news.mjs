@@ -137,6 +137,35 @@ const rss = {
   },
 };
 
+// ── Google News (the FREE per-topic content firehose — no key) ───────────────
+// Where Feedly-discover was sparse for niche topics, Google News RSS returns real,
+// current articles for ANY query across ALL publishers — high recall, free. Query terms
+// derive from --brand (shared AMF_SIGNAL_QUERY). The boolean must/not gate + 5-D ranking
+// downstream turn this firehose into on-brand signal. type='feed_article' (intelligence).
+const googlenews = {
+  id: 'googlenews',
+  obsType: 'feed_article',
+  gate: () => (signalTerms().length ? null : 'set AMF_SIGNAL_QUERY or pass --brand (free — Google News RSS per topic, no key)'),
+  async fetch() {
+    const items = [], seen = new Set();
+    const lang = process.env.AMF_NEWS_LANG || 'en-US', geo = process.env.AMF_NEWS_GEO || 'US';
+    for (const q of signalTerms()) {
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${lang}&gl=${geo}&ceid=${geo}:${lang.split('-')[0]}`;
+      try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'continuum-adapter-news/0.1' } });
+        if (!res.ok) { console.error(`[googlenews] "${q}" → HTTP ${res.status}`); continue; }
+        const parsed = parseFeed(await res.text());
+        for (const it of parsed.slice(0, Number(process.env.AMF_NEWS_COUNT || 10))) {
+          const key = it.title.toLowerCase(); if (seen.has(key)) continue; seen.add(key);
+          items.push({ ...it, category: `gnews:${q}` });
+        }
+        console.error(`[googlenews] "${q}" → ${parsed.length} articles`);
+      } catch (e) { console.error(`[googlenews] "${q}" failed: ${e.message}`); }
+    }
+    return items;
+  },
+};
+
 // ── the ENGAGEMENT layer — trending signals with real crowd-scores (key-free) ──
 // Query terms come from AMF_SIGNAL_QUERY (comma list) — run() derives them from a
 // product's Portfolio-Universe keywords when --brand is passed. engagement = a raw
@@ -255,7 +284,7 @@ const own = {
   },
 };
 
-const PROVIDERS = { worldmonitor, feedly, rss, hackernews, reddit, youtube, own };
+const PROVIDERS = { worldmonitor, feedly, rss, googlenews, hackernews, reddit, youtube, own };
 
 /** Derive AMF_OWN_FEEDS from a product's own_feeds[] in the universe (--brand). */
 function deriveOwnFeeds(slug) {
