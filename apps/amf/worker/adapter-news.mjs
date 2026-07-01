@@ -198,6 +198,40 @@ const reddit = {
   },
 };
 
+// ── YouTube (RapidAPI youtube138) — SEARCH + TRENDING with real view/like counts ──
+// What free channel RSS can't do: query ANY topic + real engagement (views/likes/comments).
+// Gated on RAPIDAPI_KEY (put it in .env.local — NEVER in chat/commits, P1). Search terms come
+// from AMF_SIGNAL_QUERY (derived from --brand, shared with hn/reddit). Writes engagement_signal
+// with metadata.engagement scaled to the HN range (views/1000). UNTESTED without the key (P4).
+const youtube = {
+  id: 'youtube',
+  obsType: 'engagement_signal',
+  gate: () => (process.env.RAPIDAPI_KEY ? (signalTerms().length ? null : 'set AMF_SIGNAL_QUERY or pass --brand') : 'set RAPIDAPI_KEY (RapidAPI youtube138) in .env.local — never in chat (P1)'),
+  async fetch() {
+    const host = process.env.RAPIDAPI_YT_HOST || 'youtube138.p.rapidapi.com';
+    const headers = { 'X-RapidAPI-Key': process.env.RAPIDAPI_KEY, 'X-RapidAPI-Host': host };
+    const items = [], seen = new Set();
+    for (const q of signalTerms()) {
+      const url = `https://${host}/search/?q=${encodeURIComponent(q)}&hl=en&gl=US`;
+      try {
+        const res = await fetch(url, { headers });
+        if (!res.ok) { console.error(`[youtube] "${q}" → HTTP ${res.status}`); continue; }
+        const j = await res.json();
+        // defensive: youtube138 returns { contents: [ { type:'video', video:{ videoId, title, stats:{views}, ... } } ] }
+        for (const c of (j.contents || j.data || [])) {
+          const v = c.video || c; const id = v.videoId || v.id; if (!id || seen.has(id)) continue; seen.add(id);
+          const title = v.title || ''; if (!title) continue;
+          const views = Number(v.stats?.views ?? v.viewCount ?? 0);
+          const eng = Math.round(views / 1000); // scale YouTube views into the HN-points range
+          items.push({ title, content: title + (v.descriptionSnippet ? ' — ' + v.descriptionSnippet : ''), category: `youtube:${q}`, sources: [`https://www.youtube.com/watch?v=${id}`], engagement: eng, published: v.publishedDateTxt || new Date().toISOString() });
+        }
+        console.error(`[youtube] "${q}" → ${(j.contents || j.data || []).length} results`);
+      } catch (e) { console.error(`[youtube] "${q}" failed: ${e.message}`); }
+    }
+    return items;
+  },
+};
+
 // ── OWN feeds — first-party platform content to PULL / REWORK / SYNDICATE ─────
 // Not intelligence to draft FROM — it's your own published content to repurpose INTO
 // new formats/channels. Written as type='own_content' so the engine treats it as ours
@@ -221,7 +255,7 @@ const own = {
   },
 };
 
-const PROVIDERS = { worldmonitor, feedly, rss, hackernews, reddit, own };
+const PROVIDERS = { worldmonitor, feedly, rss, hackernews, reddit, youtube, own };
 
 /** Derive AMF_OWN_FEEDS from a product's own_feeds[] in the universe (--brand). */
 function deriveOwnFeeds(slug) {
