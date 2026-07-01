@@ -34,6 +34,29 @@ function stableId(seed) {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
 }
 
+// ── minimal RSS/Atom parser (no dep) — handles the common well-formed case ──────
+function decodeXml(s) {
+  return String(s).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&amp;/g, '&')
+    .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function xmlTag(block, name) {
+  const m = block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, 'i'));
+  return m ? decodeXml(m[1]) : '';
+}
+export function parseFeed(xml) {
+  const isAtom = /<feed[\s>]/i.test(xml) && !/<rss[\s>]/i.test(xml);
+  const blocks = xml.match(isAtom ? /<entry[\s>][\s\S]*?<\/entry>/gi : /<item[\s>][\s\S]*?<\/item>/gi) || [];
+  return blocks.map((b) => {
+    const title = xmlTag(b, 'title');
+    const link = isAtom ? (b.match(/<link[^>]*href="([^"]+)"/i)?.[1] || '') : xmlTag(b, 'link');
+    const desc = xmlTag(b, isAtom ? 'summary' : 'description') || xmlTag(b, 'content');
+    const dateRaw = xmlTag(b, isAtom ? 'updated' : 'pubDate') || xmlTag(b, 'published') || xmlTag(b, 'dc:date');
+    let published; try { published = dateRaw ? new Date(dateRaw).toISOString() : new Date().toISOString(); } catch { published = new Date().toISOString(); }
+    return { title, content: `${title}${desc ? ' — ' + desc : ''}`.slice(0, 2000), category: xmlTag(b, 'category') || 'rss', sources: [link].filter(Boolean), published };
+  }).filter((it) => it.title);
+}
+
 // ── Provider: WorldMonitor (hosted MCP) ──────────────────────────────────────
 const worldmonitor = {
   id: 'worldmonitor',
@@ -90,7 +113,27 @@ const feedly = {
   },
 };
 
-const PROVIDERS = { worldmonitor, feedly };
+// ── Provider: RSS (the FREE path — no API key; export your Feedly feeds as OPML) ─
+const rss = {
+  id: 'rss',
+  obsType: 'feed_article',
+  gate: () => (process.env.AMF_RSS_FEEDS ? null : 'set AMF_RSS_FEEDS="https://feed1,https://feed2" (public RSS/Atom — free, no API; export your Feedly OPML for the URLs)'),
+  async fetch() {
+    const items = [];
+    for (const url of String(process.env.AMF_RSS_FEEDS).split(',').map((s) => s.trim()).filter(Boolean)) {
+      try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'continuum-adapter-news/0.1' } });
+        if (!res.ok) { console.error(`[rss] ${url} → HTTP ${res.status}`); continue; }
+        const parsed = parseFeed(await res.text());
+        for (const it of parsed.slice(0, Number(process.env.AMF_RSS_COUNT || 20))) items.push(it);
+        console.error(`[rss] ${url} → ${parsed.length} items`);
+      } catch (e) { console.error(`[rss] ${url} failed: ${e.message}`); }
+    }
+    return items;
+  },
+};
+
+const PROVIDERS = { worldmonitor, feedly, rss };
 
 /** The testable core: upsert provider items into the CONTINUUM corpus. Returns count. */
 export function ingest(storage, provider, items) {
@@ -148,9 +191,12 @@ async function smoke() {
     { title: 'Luxury safari demand rebounds', content: 'Luxury safari demand rebounds — Okavango Delta camps report record forward bookings into 2027.', category: 'Emporium-Safari', sources: ['https://ex/feedly/1'] },
     { title: 'Hospitality AI concierge adoption', content: 'Hospitality AI concierge adoption accelerates among boutique hotels seeking 24/7 booking recovery.', category: 'hospitality', sources: ['https://ex/feedly/2'] },
   ]);
-  const hits = storage.searchObservations('"energy" OR "safari" OR "hospitality" OR "concierge"', 10);
+  // rss: prove the parser + ingest (the free, no-key path)
+  const rssItems = parseFeed('<?xml version="1.0"?><rss version="2.0"><channel><item><title>Boutique hotel AI concierge</title><description><![CDATA[Hotels recover after-hours bookings.]]></description><link>https://ex/rss/1</link><pubDate>Mon, 01 Jul 2026 08:00:00 GMT</pubDate></item></channel></rss>');
+  const r = ingest(storage, rss, rssItems);
+  const hits = storage.searchObservations('"energy" OR "safari" OR "hospitality" OR "concierge" OR "hotel"', 10);
   const types = new Set(hits.map((h) => h.type));
-  const ok = w === 1 && f === 2 && types.has('world_brief') && types.has('feed_article');
+  const ok = w === 1 && f === 2 && r === 1 && rssItems[0]?.sources[0] === 'https://ex/rss/1' && types.has('world_brief') && types.has('feed_article');
   console.error(`\nadapter-news smoke — corpus-write path (worldmonitor + feedly)`);
   console.error(`  worldmonitor ${w}/1 · feedly ${f}/2 · search → ${hits.length} hits, types: ${[...types].join(', ')}`);
   console.error(`  ${ok ? '✅ PASS' : '❌ FAIL'} — both providers wired + gated; live calls need their keys (untested without, P4)\n`);
