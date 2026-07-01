@@ -25,23 +25,24 @@ import { parseFeed } from './adapter-news.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const STOP = new Set(['the', 'and', 'for', 'that', 'this', 'with', 'you', 'your', 'are', 'from', 'into', 'its', 'has', 'have', 'will', 'not']);
 const terms = (t) => [...new Set((String(t).toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !STOP.has(w)))];
-const loadUniverse = () => JSON.parse(readFileSync(resolve(HERE, 'portfolio-universe.json'), 'utf8'));
-const productTerms = (p) => [...new Set([...(p.topics || []), ...(p.keywords || []), ...(p.sales_signals || [])].flatMap((s) => terms(s)))];
+export const loadUniverse = () => JSON.parse(readFileSync(resolve(HERE, 'portfolio-universe.json'), 'utf8'));
+export const productTerms = (p) => [...new Set([...(p.topics || []), ...(p.keywords || []), ...(p.sales_signals || [])].flatMap((s) => terms(s)))];
 
 /** Fraction of a product's vocabulary that appears anywhere in the feed's recent text. */
-function fitScore(feedText, p) {
+export function fitScore(feedText, p) {
   const pt = productTerms(p);
   const lc = feedText.toLowerCase();
   const matched = pt.filter((t) => lc.includes(t));
   return { fraction: pt.length ? matched.length / pt.length : 0, matched, total: pt.length };
 }
-function proposeTier(fraction) {
+export function proposeTier(fraction) {
   if (fraction >= 0.30) return { band: 'T1–T2', note: 'strong topical fit — assign T1 if a primary/trade source, else T2' };
   if (fraction >= 0.12) return { band: 'T2–T3', note: 'moderate fit — T2 only if authoritative, else T3' };
   return { band: 'reject / T3', note: 'weak fit — likely noise for this product; reject, or T3 at most' };
 }
 
-async function sample(url) {
+/** Fetch + parse a feed's recent items. Throws on unreachable (caller decides). */
+export async function sampleFeed(url) {
   const res = await fetch(url, { headers: { 'User-Agent': 'continuum-rate-source/0.1' } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return parseFeed(await res.text());
@@ -51,7 +52,7 @@ async function run() {
   const a = process.argv, get = (f) => { const i = a.indexOf(f); return i >= 0 ? a[i + 1] : undefined; };
   const url = get('--url'), brand = get('--brand');
   if (!url) { console.error('usage: node rate-source.mjs --url <feed> [--brand <slug>]'); process.exit(2); }
-  let items; try { items = await sample(url); } catch (e) { console.error(`\n❌ ${url}\n   unreachable: ${e.message} — cannot rate an unreachable feed (P4)\n`); process.exit(1); }
+  let items; try { items = await sampleFeed(url); } catch (e) { console.error(`\n❌ ${url}\n   unreachable: ${e.message} — cannot rate an unreachable feed (P4)\n`); process.exit(1); }
   const text = items.map((i) => `${i.title} ${i.content}`).join(' ');
   const newest = items.map((i) => i.published).filter(Boolean).sort().pop();
   console.error(`\nrate-source · ${url}`);
@@ -98,5 +99,8 @@ async function smoke() {
   process.exit(ok ? 0 : 1);
 }
 
-if (process.argv.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
-else run().catch((e) => { console.error(e.message); process.exit(1); });
+// only run the CLI when invoked directly — safe to `import { fitScore, ... }` elsewhere
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
+  else run().catch((e) => { console.error(e.message); process.exit(1); });
+}
