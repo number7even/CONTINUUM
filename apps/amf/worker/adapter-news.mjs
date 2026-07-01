@@ -38,7 +38,10 @@ function stableId(seed) {
 // ── minimal RSS/Atom parser (no dep) — handles the common well-formed case ──────
 function decodeXml(s) {
   return String(s).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return ''; } })
+    .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return ''; } })
+    .replace(/&amp;/g, '&')
     .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 function xmlTag(block, name) {
@@ -195,7 +198,39 @@ const reddit = {
   },
 };
 
-const PROVIDERS = { worldmonitor, feedly, rss, hackernews, reddit };
+// ── OWN feeds — first-party platform content to PULL / REWORK / SYNDICATE ─────
+// Not intelligence to draft FROM — it's your own published content to repurpose INTO
+// new formats/channels. Written as type='own_content' so the engine treats it as ours
+// (syndicate, not fact-check). Driven by --brand → the product's own_feeds[] in the universe.
+const own = {
+  id: 'own',
+  obsType: 'own_content',
+  gate: () => (process.env.AMF_OWN_FEEDS ? null : 'set AMF_OWN_FEEDS or pass --brand with own_feeds[] in portfolio-universe.json'),
+  async fetch() {
+    const items = [];
+    for (const url of String(process.env.AMF_OWN_FEEDS).split(',').map((s) => s.trim()).filter(Boolean)) {
+      try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'continuum-adapter-news/0.1' } });
+        if (!res.ok) { console.error(`[own] ${url} → HTTP ${res.status}`); continue; }
+        const parsed = parseFeed(await res.text());
+        for (const it of parsed.slice(0, Number(process.env.AMF_OWN_COUNT || 20))) items.push({ ...it, category: 'own' });
+        console.error(`[own] ${url} → ${parsed.length} items`);
+      } catch (e) { console.error(`[own] ${url} failed: ${e.message}`); }
+    }
+    return items;
+  },
+};
+
+const PROVIDERS = { worldmonitor, feedly, rss, hackernews, reddit, own };
+
+/** Derive AMF_OWN_FEEDS from a product's own_feeds[] in the universe (--brand). */
+function deriveOwnFeeds(slug) {
+  try {
+    const uni = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'portfolio-universe.json'), 'utf8'));
+    const p = (uni.products || []).find((x) => x.slug === slug);
+    return (p?.own_feeds || []).map((f) => f.url).filter(Boolean);
+  } catch { return []; }
+}
 
 /** Derive AMF_SIGNAL_QUERY from a product's Portfolio-Universe keywords (--brand). */
 function deriveSignalQuery(slug) {
@@ -232,6 +267,10 @@ async function run(which, projectId, brand) {
   if (brand && !process.env.AMF_SIGNAL_QUERY) {
     const q = deriveSignalQuery(brand);
     if (q.length) { process.env.AMF_SIGNAL_QUERY = q.join(','); console.error(`[adapter-news] signal query for "${brand}": ${q.join(', ')}`); }
+  }
+  if (brand && !process.env.AMF_OWN_FEEDS) {
+    const of = deriveOwnFeeds(brand);
+    if (of.length) { process.env.AMF_OWN_FEEDS = of.join(','); console.error(`[adapter-news] own feeds for "${brand}": ${of.length} (incl. any YouTube channel RSS)`); }
   }
   const { openStorage } = await import(resolve(REPO_ROOT, 'packages/core/dist/index.js'));
   const storage = openStorage(projectId);

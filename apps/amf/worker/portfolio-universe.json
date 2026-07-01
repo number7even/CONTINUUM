@@ -28,7 +28,9 @@
         {"url": "https://skift.com/feed/", "tier": 1, "name": "Skift"},
         {"url": "https://www.phocuswire.com/RSS", "tier": 1, "name": "PhocusWire", "status": "cloudflare-403 to non-browser clients (2026-07-01) — T1 authority stands; needs a browser-UA/proxy fetch to ingest"},
         {"url": "https://www.hospitalitynet.org/rss", "tier": 2, "name": "HospitalityNet"}
-      ]
+      ],
+      "own_feeds": [],
+      "own_feeds_note": "First-party content to PULL / REWORK / SYNDICATE (not intelligence to draft from). Add your platform's site RSS + YouTube channel RSS (https://www.youtube.com/feeds/videos.xml?channel_id=UC…). Operator fills real URLs; ingest via `adapter-news --provider own --brand voicecosmos`, then `syndicate`."
     },
     {
       "slug": "voiceidvault", "priority": 1, "geo": true, "confidence": "high",
