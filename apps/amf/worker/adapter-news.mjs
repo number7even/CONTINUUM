@@ -22,6 +22,7 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
+import './env.mjs'; // load .env.local into process.env first (P1)
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -240,7 +241,7 @@ async function ytOfficial(terms) {
   const key = process.env.YOUTUBE_API_KEY, items = [], seen = new Set();
   for (const q of terms) {
     try {
-      const sr = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(q)}&key=${key}`);
+      const sr = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&relevanceLanguage=en&regionCode=US&q=${encodeURIComponent(q)}&key=${key}`);
       if (!sr.ok) { console.error(`[youtube] search "${q}" → HTTP ${sr.status}`); continue; }
       const sj = await sr.json(); const ids = (sj.items || []).map((i) => i.id?.videoId).filter(Boolean);
       const snip = {}; for (const i of sj.items || []) if (i.id?.videoId) snip[i.id.videoId] = i.snippet || {};
@@ -249,7 +250,8 @@ async function ytOfficial(terms) {
       const stats = {}; if (vr.ok) for (const v of (await vr.json()).items || []) stats[v.id] = v.statistics || {};
       for (const id of ids) {
         if (seen.has(id)) continue; seen.add(id); const sn = snip[id] || {};
-        items.push({ title: sn.title || '', content: (sn.title || '') + (sn.description ? ' — ' + sn.description.slice(0, 200) : ''), category: `youtube:${q}`, sources: [`https://www.youtube.com/watch?v=${id}`], engagement: YT_SCALE(stats[id]?.viewCount), published: sn.publishedAt || new Date().toISOString() });
+        const title = decodeXml(sn.title || '');
+        items.push({ title, content: title + (sn.description ? ' — ' + decodeXml(sn.description).slice(0, 200) : ''), category: `youtube:${q}`, sources: [`https://www.youtube.com/watch?v=${id}`], engagement: YT_SCALE(stats[id]?.viewCount), published: sn.publishedAt || new Date().toISOString() });
       }
       console.error(`[youtube] "${q}" → ${ids.length} videos (official API v3)`);
     } catch (e) { console.error(`[youtube] "${q}" failed: ${e.message}`); }
@@ -268,7 +270,8 @@ async function ytRapid(terms) {
       const j = await res.json();
       for (const c of (j.contents || j.data || [])) {
         const v = c.video || c; const id = v.videoId || v.id; if (!id || seen.has(id) || !v.title) continue; seen.add(id);
-        items.push({ title: v.title, content: v.title + (v.descriptionSnippet ? ' — ' + v.descriptionSnippet : ''), category: `youtube:${q}`, sources: [`https://www.youtube.com/watch?v=${id}`], engagement: YT_SCALE(v.stats?.views ?? v.viewCount), published: v.publishedDateTxt || new Date().toISOString() });
+        const title = decodeXml(v.title);
+        items.push({ title, content: title + (v.descriptionSnippet ? ' — ' + decodeXml(v.descriptionSnippet) : ''), category: `youtube:${q}`, sources: [`https://www.youtube.com/watch?v=${id}`], engagement: YT_SCALE(v.stats?.views ?? v.viewCount), published: v.publishedDateTxt || new Date().toISOString() });
       }
       console.error(`[youtube] "${q}" → ${(j.contents || j.data || []).length} results (RapidAPI)`);
     } catch (e) { console.error(`[youtube] "${q}" failed: ${e.message}`); }
