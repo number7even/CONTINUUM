@@ -26,7 +26,7 @@ import { createHash } from 'node:crypto';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
-const SIGNAL_TYPES = new Set(['world_brief', 'feed_article', 'rss']);
+const SIGNAL_TYPES = new Set(['world_brief', 'feed_article', 'rss', 'engagement_signal']);
 const STOP = new Set(['the', 'and', 'for', 'that', 'this', 'with', 'you', 'your', 'are', 'from', 'into', 'its', 'has', 'have', 'will', 'not']);
 const terms = (t) => [...new Set((t.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !STOP.has(w)))];
 const ftsQuery = (list) => list.slice(0, 30).map((t) => `"${t}"`).join(' OR ');

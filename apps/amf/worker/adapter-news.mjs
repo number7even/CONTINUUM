@@ -23,6 +23,7 @@
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -133,7 +134,79 @@ const rss = {
   },
 };
 
-const PROVIDERS = { worldmonitor, feedly, rss };
+// ── the ENGAGEMENT layer — trending signals with real crowd-scores (key-free) ──
+// Query terms come from AMF_SIGNAL_QUERY (comma list) — run() derives them from a
+// product's Portfolio-Universe keywords when --brand is passed. engagement = a raw
+// crowd-score (points+comments) the matcher's engagementWeight normalises. This is
+// what recovers Feedly-AI's "trending" signal without a paid key.
+const signalTerms = () => String(process.env.AMF_SIGNAL_QUERY || '').split(',').map((s) => s.trim()).filter(Boolean);
+const perQuery = () => Math.max(1, Number(process.env.AMF_SIGNAL_COUNT || 8));
+
+// Hacker News — Algolia search API: real `points` + `num_comments`, no key.
+const hackernews = {
+  id: 'hackernews',
+  obsType: 'engagement_signal',
+  gate: () => (signalTerms().length ? null : 'set AMF_SIGNAL_QUERY="term1,term2" (or pass --brand to derive from the Portfolio Universe)'),
+  async fetch() {
+    const items = [], seen = new Set();
+    for (const q of signalTerms()) {
+      const url = `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=${perQuery()}`;
+      try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'continuum-adapter-news/0.1' } });
+        if (!res.ok) { console.error(`[hackernews] "${q}" → HTTP ${res.status}`); continue; }
+        const j = await res.json();
+        for (const h of j.hits || []) {
+          if (!h.title || seen.has(h.objectID)) continue; seen.add(h.objectID);
+          const points = Number(h.points || 0), comments = Number(h.num_comments || 0);
+          const src = h.url || `https://news.ycombinator.com/item?id=${h.objectID}`;
+          items.push({ title: h.title, content: h.title, category: `hn:${q}`, sources: [src], engagement: points + comments, published: h.created_at || new Date().toISOString() });
+        }
+        console.error(`[hackernews] "${q}" → ${(j.hits || []).length} stories`);
+      } catch (e) { console.error(`[hackernews] "${q}" failed: ${e.message}`); }
+    }
+    return items;
+  },
+};
+
+// Reddit — public search JSON: `score` + `num_comments`, no key (needs a UA header).
+const reddit = {
+  id: 'reddit',
+  obsType: 'engagement_signal',
+  gate: () => (signalTerms().length ? null : 'set AMF_SIGNAL_QUERY="term1,term2" (or pass --brand to derive from the Portfolio Universe)'),
+  async fetch() {
+    const items = [], seen = new Set();
+    const window = process.env.AMF_REDDIT_WINDOW || 'week';
+    for (const q of signalTerms()) {
+      const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=top&t=${window}&limit=${perQuery()}`;
+      try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'continuum-adapter-news/0.1 (by /u/continuum)' } });
+        if (!res.ok) { console.error(`[reddit] "${q}" → HTTP ${res.status}`); continue; }
+        const j = await res.json();
+        for (const c of j.data?.children || []) {
+          const d = c.data || {}; if (!d.title || seen.has(d.id)) continue; seen.add(d.id);
+          const score = Number(d.score || 0), comments = Number(d.num_comments || 0);
+          const body = String(d.selftext || '').replace(/\s+/g, ' ').trim().slice(0, 600);
+          items.push({ title: d.title, content: `${d.title}${body ? ' — ' + body : ''}`, category: `reddit:${d.subreddit || q}`, sources: [`https://www.reddit.com${d.permalink}`], engagement: score + comments, published: d.created_utc ? new Date(d.created_utc * 1000).toISOString() : new Date().toISOString() });
+        }
+        console.error(`[reddit] "${q}" → ${(j.data?.children || []).length} posts`);
+      } catch (e) { console.error(`[reddit] "${q}" failed: ${e.message}`); }
+    }
+    return items;
+  },
+};
+
+const PROVIDERS = { worldmonitor, feedly, rss, hackernews, reddit };
+
+/** Derive AMF_SIGNAL_QUERY from a product's Portfolio-Universe keywords (--brand). */
+function deriveSignalQuery(slug) {
+  try {
+    const uni = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'portfolio-universe.json'), 'utf8'));
+    const p = (uni.products || []).find((x) => x.slug === slug);
+    if (!p) return [];
+    // top signal terms: sales_signals + the tightest keywords (bounded to keep API calls sane)
+    return [...(p.sales_signals || []).slice(0, 3), ...(p.keywords || []).slice(0, 3)];
+  } catch { return []; }
+}
 
 /** The testable core: upsert provider items into the CONTINUUM corpus. Returns count. */
 export function ingest(storage, provider, items) {
@@ -147,14 +220,19 @@ export function ingest(storage, provider, items) {
       content: it.content,
       timestamp: it.published || new Date().toISOString(),
       refs: [],
-      metadata: { provider: provider.id, category: it.category, sources: it.sources || [] },
+      metadata: { provider: provider.id, category: it.category, sources: it.sources || [], ...(it.engagement != null ? { engagement: it.engagement } : {}) },
     };
     if (storage.upsertObservation(obs)) written += 1; // null = privacy-scrubbed
   }
   return written;
 }
 
-async function run(which, projectId) {
+async function run(which, projectId, brand) {
+  // engagement providers need a query — derive it from the product's universe keywords (--brand)
+  if (brand && !process.env.AMF_SIGNAL_QUERY) {
+    const q = deriveSignalQuery(brand);
+    if (q.length) { process.env.AMF_SIGNAL_QUERY = q.join(','); console.error(`[adapter-news] signal query for "${brand}": ${q.join(', ')}`); }
+  }
   const { openStorage } = await import(resolve(REPO_ROOT, 'packages/core/dist/index.js'));
   const storage = openStorage(projectId);
   const targets = which === 'all' ? Object.values(PROVIDERS) : [PROVIDERS[which]].filter(Boolean);
@@ -194,12 +272,21 @@ async function smoke() {
   // rss: prove the parser + ingest (the free, no-key path)
   const rssItems = parseFeed('<?xml version="1.0"?><rss version="2.0"><channel><item><title>Boutique hotel AI concierge</title><description><![CDATA[Hotels recover after-hours bookings.]]></description><link>https://ex/rss/1</link><pubDate>Mon, 01 Jul 2026 08:00:00 GMT</pubDate></item></channel></rss>');
   const r = ingest(storage, rss, rssItems);
-  const hits = storage.searchObservations('"energy" OR "safari" OR "hospitality" OR "concierge" OR "hotel"', 10);
+  // engagement: prove a crowd-scored HN signal carries metadata.engagement through ingest
+  const e = ingest(storage, hackernews, [
+    { title: 'Voice deepfake fraud hits a bank call-centre', content: 'Voice deepfake fraud hits a bank call-centre', category: 'hn:deepfake', sources: ['https://news.ycombinator.com/item?id=1'], engagement: 342, published: new Date().toISOString() },
+  ]);
+  const engObs = storage.getObservations([stableId(`hackernews|Voice deepfake fraud hits a bank call-centre|Voice deepfake fraud hits a bank call-centre`)]);
+  const engWritten = engObs[0]?.metadata?.engagement;
+  const hits = storage.searchObservations('"energy" OR "safari" OR "hospitality" OR "concierge" OR "hotel" OR "deepfake"', 10);
   const types = new Set(hits.map((h) => h.type));
-  const ok = w === 1 && f === 2 && r === 1 && rssItems[0]?.sources[0] === 'https://ex/rss/1' && types.has('world_brief') && types.has('feed_article');
-  console.error(`\nadapter-news smoke — corpus-write path (worldmonitor + feedly)`);
-  console.error(`  worldmonitor ${w}/1 · feedly ${f}/2 · search → ${hits.length} hits, types: ${[...types].join(', ')}`);
-  console.error(`  ${ok ? '✅ PASS' : '❌ FAIL'} — both providers wired + gated; live calls need their keys (untested without, P4)\n`);
+  const ok = w === 1 && f === 2 && r === 1 && e === 1 && engWritten === 342 && rssItems[0]?.sources[0] === 'https://ex/rss/1' && types.has('world_brief') && types.has('feed_article') && types.has('engagement_signal');
+  const q = deriveSignalQuery('voiceidvault');
+  console.error(`\nadapter-news smoke — corpus-write path (worldmonitor + feedly + rss + engagement)`);
+  console.error(`  worldmonitor ${w}/1 · feedly ${f}/2 · rss ${r}/1 · hackernews ${e}/1 (engagement=${engWritten})`);
+  console.error(`  --brand voiceidvault → signal query: ${q.join(', ')}`);
+  console.error(`  search → ${hits.length} hits, types: ${[...types].join(', ')}`);
+  console.error(`  ${ok ? '✅ PASS' : '❌ FAIL'} — providers wired + gated; HN/Reddit engagement flows to metadata; live calls need only a UA (P4)\n`);
   storage.close();
   const dir = process.env.CONTINUUM_DATA_DIR; if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
   process.exit(ok ? 0 : 1);
@@ -208,6 +295,6 @@ async function smoke() {
 const a = process.argv;
 if (a.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
 else {
-  const pi = a.indexOf('--provider'); const pr = a.indexOf('--project');
-  run(pi >= 0 ? a[pi + 1] : 'all', pr >= 0 ? a[pr + 1] : 'worldmonitor').catch((e) => { console.error(e.message); process.exit(1); });
+  const pi = a.indexOf('--provider'); const pr = a.indexOf('--project'); const bi = a.indexOf('--brand');
+  run(pi >= 0 ? a[pi + 1] : 'all', pr >= 0 ? a[pr + 1] : 'worldmonitor', bi >= 0 ? a[bi + 1] : process.env.AMF_BRAND).catch((e) => { console.error(e.message); process.exit(1); });
 }
