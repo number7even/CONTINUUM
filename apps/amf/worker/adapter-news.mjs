@@ -328,7 +328,8 @@ function deriveSignalQuery(slug) {
     const uni = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'portfolio-universe.json'), 'utf8'));
     const p = (uni.products || []).find((x) => x.slug === slug);
     if (!p) return [];
-    // top signal terms: sales_signals + the tightest keywords (bounded to keep API calls sane)
+    // prefer the demand-analysed clusters (analyze.mjs → signal_query); else sales_signals + keywords
+    if (Array.isArray(p.signal_query) && p.signal_query.length) return p.signal_query;
     return [...(p.sales_signals || []).slice(0, 3), ...(p.keywords || []).slice(0, 3)];
   } catch { return []; }
 }

@@ -16,6 +16,7 @@
       "topics": ["booking recovery", "no-show reduction", "after-hours booking", "guest experience", "upsell automation", "direct booking vs OTA", "front-desk labour"],
       "keywords": ["hotel", "spa", "salon", "hospitality", "booking", "concierge", "no-show", "occupancy", "guest", "reservation", "revenue", "OTA", "front desk"],
       "sales_signals": ["revenue leak", "labour shortage", "OTA commission", "direct booking", "guest satisfaction", "staffing cost", "occupancy drop"],
+      "signal_query": ["hotel", "spa", "booking recovery", "no-show", "direct booking", "guest experience"],
       "filters": {
         "_model": "Feedly: (Lodging Industry) AND (Use Cases) AND (AI) NOT (sports). Each must-group is one entity's alias set.",
         "must": [
@@ -27,7 +28,8 @@
       "feeds": [
         {"url": "https://skift.com/feed/", "tier": 1, "name": "Skift"},
         {"url": "https://www.phocuswire.com/RSS", "tier": 1, "name": "PhocusWire", "status": "cloudflare-403 to non-browser clients (2026-07-01) — T1 authority stands; needs a browser-UA/proxy fetch to ingest"},
-        {"url": "https://www.hospitalitynet.org/rss", "tier": 2, "name": "HospitalityNet"}
+        {"url": "https://www.hospitalitynet.org/rss", "tier": 2, "name": "HospitalityNet"},
+        {"url": "https://www.hotelmanagement.net/rss/xml", "tier": 2, "name": "Hotel Management"}
       ],
       "own_feeds": [],
       "own_feeds_note": "First-party content to PULL / REWORK / SYNDICATE (not intelligence to draft from). Add your platform's site RSS + YouTube channel RSS (https://www.youtube.com/feeds/videos.xml?channel_id=UC…). Operator fills real URLs; ingest via `adapter-news --provider own --brand voicecosmos`, then `syndicate`."
@@ -39,6 +41,7 @@
       "topics": ["voice deepfake", "voice fraud / vishing", "biometric authentication", "synthetic voice scam", "identity verification", "AI-enabled fraud", "call-centre fraud"],
       "keywords": ["deepfake", "biometric", "voice fraud", "vishing", "authentication", "identity", "synthetic voice", "kyc", "breach", "voice clone", "impersonation"],
       "sales_signals": ["deepfake fraud incident", "voice scam loss", "biometric / AI-act regulation", "enterprise breach", "call-centre attack", "wire-fraud"],
+      "signal_query": ["voice deepfake", "deepfake detection", "voice biometric", "identity verification", "voice fraud", "vishing"],
       "feeds": [
         {"url": "https://krebsonsecurity.com/feed/", "tier": 1, "name": "KrebsOnSecurity"},
         {"url": "https://www.bleepingcomputer.com/feed/", "tier": 1, "name": "BleepingComputer"},
@@ -52,6 +55,7 @@
       "topics": ["ai agent memory", "hallucination / reliability", "agent context", "verifiable ai", "ai coding assistants", "agent evaluation"],
       "keywords": ["ai agent", "agentic", "memory", "hallucination", "context window", "reliability", "verifiable", "mcp", "coding assistant", "eval"],
       "sales_signals": ["agent reliability failure", "hallucination incident", "enterprise ai trust", "agent memory", "ai evaluation"],
+      "signal_query": ["ai agent memory", "agent context", "agentic", "ai agent memory mcp", "memory layer", "hallucination"],
       "feeds": [
         {"url": "https://simonwillison.net/atom/everything/", "tier": 1, "name": "Simon Willison", "status": "operator-ratified 2026-07-01 as the Braintrust substitute — verifiable AI engineering / prompt-injection / SQLite, aligned to CONTINUUM's verifiable-memory ethos"},
         {"url": "https://github.blog/changelog/feed/", "tier": 1, "name": "GitHub Changelog"},
@@ -101,7 +105,11 @@
       "topics": ["compliance automation", "audit", "regulatory reporting", "risk", "security posture attestation"],
       "keywords": ["compliance", "audit", "regulatory", "attestation", "risk", "governance", "soc2", "iso", "evidence"],
       "sales_signals": ["new regulation", "audit failure", "compliance mandate", "fine / enforcement"],
-      "feeds": []
+      "signal_query": ["audit", "compliance", "regulatory", "compliance automation", "risk management"],
+      "feeds": [
+        {"url": "https://risky.biz/feeds/risky-business", "tier": 1, "name": "Risky Business"},
+        {"url": "https://www.risk.net/feeds/rss", "tier": 2, "name": "Risk.net"}
+      ]
     },
     {
       "slug": "phantaqsm", "priority": 3, "geo": true, "confidence": "tagline",
@@ -162,6 +170,7 @@
       "topics": ["digital perimeter defense", "deception layer", "quantum-risk mitigation", "insider threat", "zero-trust perimeter"],
       "keywords": ["perimeter", "deception", "honeypot", "insider threat", "zero-trust", "quantum-risk", "intrusion", "lateral movement", "breach"],
       "sales_signals": ["insider threat detection", "honeypot", "zero-trust perimeter"],
+      "signal_query": ["deception", "honeypot", "zero-trust", "insider threat", "threat intelligence"],
       "feeds": [
         {"url": "https://krebsonsecurity.com/feed/", "tier": 1, "name": "KrebsOnSecurity"},
         {"url": "https://www.darkreading.com/rss.xml", "tier": 2, "name": "Dark Reading"}
