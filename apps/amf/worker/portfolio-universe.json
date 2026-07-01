@@ -43,7 +43,7 @@
       "keywords": ["ai agent", "agentic", "memory", "hallucination", "context window", "reliability", "verifiable", "mcp", "coding assistant", "eval"],
       "sales_signals": ["agent reliability failure", "hallucination incident", "enterprise ai trust", "agent memory", "ai evaluation"],
       "feeds": [
-        {"url": "https://www.braintrust.dev/blog/rss.xml", "tier": 1, "name": "Braintrust AI Engineering", "status": "no-public-rss-found (2026-07-01) — T1 authority ratified but no feed exists; substitute candidates pending operator ratification: Latent Space (https://www.latent.space/feed), Simon Willison (https://simonwillison.net/atom/everything/), HF Blog (https://huggingface.co/blog/feed.xml)"},
+        {"url": "https://simonwillison.net/atom/everything/", "tier": 1, "name": "Simon Willison", "status": "operator-ratified 2026-07-01 as the Braintrust substitute — verifiable AI engineering / prompt-injection / SQLite, aligned to CONTINUUM's verifiable-memory ethos"},
         {"url": "https://github.blog/changelog/feed/", "tier": 1, "name": "GitHub Changelog"},
         {"url": "https://hnrss.org/newest?q=AI+dev+tools", "tier": 3, "name": "HN (AI/Dev Tools)"}
       ]
@@ -146,17 +146,17 @@
       "feeds": []
     },
     {
-      "slug": "sekago", "priority": 1, "geo": false, "confidence": "sources-ratified",
-      "sector": "personal / identity security",
-      "angle": "Protect what a breach actually puts at risk — identity, data, personal security. ('What is your life worth?')",
-      "topics": ["data breach", "identity theft", "ransomware", "credential leak", "personal security", "account takeover"],
-      "keywords": ["breach", "identity theft", "ransomware", "phishing", "credential", "data leak", "account takeover", "dark web", "scam"],
-      "sales_signals": ["major breach", "ransomware attack", "identity theft surge", "credential dump", "data leak"],
+      "slug": "sekago", "priority": 1, "geo": false, "confidence": "ratified",
+      "sector": "digital perimeter defense / deception",
+      "angle": "The digital perimeter that observes, never strikes.",
+      "topics": ["digital perimeter defense", "deception layer", "quantum-risk mitigation", "insider threat", "zero-trust perimeter"],
+      "keywords": ["perimeter", "deception", "honeypot", "insider threat", "zero-trust", "quantum-risk", "intrusion", "lateral movement", "breach"],
+      "sales_signals": ["insider threat detection", "honeypot", "zero-trust perimeter"],
       "feeds": [
         {"url": "https://krebsonsecurity.com/feed/", "tier": 1, "name": "KrebsOnSecurity"},
         {"url": "https://www.darkreading.com/rss.xml", "tier": 2, "name": "Dark Reading"}
       ],
-      "note": "Priority + security sources ratified by operator 2026-07-01; CATEGORY INFERRED from the ratified sources — confirm topics/keywords with the product owner (P4)."
+      "note": "Category + params fully ratified by operator 2026-07-01: observes-never-strikes perimeter/deception posture."
     }
   ]
 }
