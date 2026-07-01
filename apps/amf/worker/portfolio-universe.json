@@ -69,6 +69,7 @@
       "topics": ["ai governance", "ai safety", "ai regulation", "trust frameworks", "ai ethics", "eu ai act"],
       "keywords": ["ai governance", "ai safety", "ai act", "regulation", "trust", "ethics", "accountability", "alignment"],
       "sales_signals": ["ai regulation", "ai incident", "governance mandate", "eu ai act enforcement"],
+      "signal_query": ["ai governance", "ai safety", "ai act", "ai regulation", "ai ethics", "eu ai act"],
       "feeds": []
     },
     {
@@ -78,6 +79,7 @@
       "topics": ["ai avatars", "digital talent", "likeness rights", "creator economy", "synthetic media consent", "ai actors"],
       "keywords": ["avatar", "digital human", "likeness", "deepfake consent", "creator", "synthetic media", "voice clone rights", "talent", "sag"],
       "sales_signals": ["likeness lawsuit", "ai actor dispute", "deepfake regulation", "creator monetisation", "brand avatar"],
+      "signal_query": ["ai avatars", "digital human", "likeness rights", "digital talent", "creator economy", "deepfake consent"],
       "feeds": []
     },
     {
@@ -87,6 +89,7 @@
       "topics": ["ai podcasting", "creator tools", "audio ai", "content monetisation", "advisory / expertise economy"],
       "keywords": ["podcast", "creator", "audio", "content", "advisory", "expertise", "monetise", "co-host"],
       "sales_signals": ["creator monetisation", "podcast growth", "advisory market", "audio ai launch"],
+      "signal_query": ["ai podcasting", "audio ai", "creator tools", "content monetisation", "podcast software", "podcast editing"],
       "feeds": []
     },
     {
@@ -96,6 +99,7 @@
       "topics": ["talent intelligence", "skills verification", "hiring", "workforce analytics", "credential fraud"],
       "keywords": ["hiring", "recruitment", "skills", "workforce", "talent", "credential", "hr", "people analytics", "resume fraud"],
       "sales_signals": ["hiring fraud", "skills gap", "credential fraud", "workforce shortage", "hr tech"],
+      "signal_query": ["talent intelligence", "skills verification", "workforce analytics", "hiring", "recruitment", "talent intelligence hub"],
       "feeds": []
     },
     {
@@ -118,6 +122,7 @@
       "topics": ["honeypot", "deception technology", "threat intelligence", "ssh attacks", "eu government security"],
       "keywords": ["honeypot", "deception", "threat intel", "ssh", "intrusion", "attacker", "eu gov", "critical infrastructure"],
       "sales_signals": ["government breach", "critical infrastructure attack", "eu cyber regulation (NIS2)", "ransomware"],
+      "signal_query": ["threat intelligence", "honeypot", "deception technology", "ssh attacks", "intrusion detection", "threat intelligence feeds"],
       "feeds": [
         {"url": "https://thehackernews.com/feeds/posts/default", "tier": 1, "name": "TheHackerNews"},
         {"url": "https://www.servethehome.com/feed/", "tier": 1, "name": "ServeTheHome (HPC/infra)"},
@@ -131,6 +136,7 @@
       "topics": ["quantum computing", "quantum hardware reality", "post-quantum crypto", "enterprise quantum"],
       "keywords": ["quantum", "qubit", "post-quantum", "quantum computing", "cryptography", "quantum supremacy"],
       "sales_signals": ["quantum breakthrough hype", "post-quantum mandate", "nist pqc", "quantum funding"],
+      "signal_query": ["quantum computing", "post-quantum cryptography", "qubit", "quantum supremacy", "enterprise quantum", "quantum hardware"],
       "feeds": []
     },
     {
@@ -140,6 +146,7 @@
       "topics": ["ai trading", "market intelligence", "multi-agent finance", "investment research"],
       "keywords": ["trading", "markets", "fintech", "investment", "portfolio", "hedge", "equities", "macro", "analyst"],
       "sales_signals": ["market volatility", "ai in finance", "retail trading", "fintech funding"],
+      "signal_query": ["ai trading", "market intelligence", "ai trading tool", "ai trading bot", "investment research", "multi-agent finance"],
       "feeds": []
     },
     {
@@ -149,6 +156,7 @@
       "topics": ["silicon photonics", "photonic chip design", "eda tools", "ai for chip design", "optical computing"],
       "keywords": ["photonics", "photonic chip", "silicon photonics", "eda", "semiconductor", "optical", "chip design", "foundry"],
       "sales_signals": ["photonics funding", "chip design ai", "optical interconnect", "semiconductor shortage"],
+      "signal_query": ["silicon photonics", "photonic chip design", "eda tools", "optical computing", "ai for chip design", "photonic integrated circuit"],
       "feeds": [
         {"url": "https://www.servethehome.com/feed/", "tier": 1, "name": "ServeTheHome (HPC/infra)"},
         {"url": "https://hnrss.org/newest?q=infrastructure", "tier": 3, "name": "HN (Infrastructure)"}
@@ -161,6 +169,7 @@
       "topics": ["digital transformation", "leadership", "ai adoption", "change management", "executive coaching"],
       "keywords": ["digital transformation", "leadership", "coaching", "consulting", "change management", "ai adoption", "executive"],
       "sales_signals": ["ai adoption struggle", "digital transformation", "leadership gap", "reskilling"],
+      "signal_query": ["digital transformation", "ai adoption", "executive coaching", "change management", "digital leadership", "digital transformation manager"],
       "feeds": []
     },
     {
