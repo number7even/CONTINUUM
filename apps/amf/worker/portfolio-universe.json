@@ -1,0 +1,148 @@
+{
+  "$comment": "The Portfolio Universe — content targeting per product. Each product's SPECIFIC sales-relevant interest pool (not broad 'AI'), rated by priority, with aligned authoritative RSS feeds + tiers, geo-relevance, and sales-intent signals. The personal brand rides on top of all. confidence: 'high' = verified this session/CLAUDE.md; 'tagline' = derived from the site tagline only (ratify + enrich). Feed URLs are best-known RSS; confirm + add your curated OPML feeds.",
+  "personal": {
+    "name": "Riaan Kleynhans",
+    "positioning": "Founder / systems-thinker. Voice is the substrate through which intent becomes operational reality; trust must be verifiable, not asserted.",
+    "themes": ["voice as substrate", "verify-then-dissolve / verifiable trust", "AI that does not hallucinate", "the geopolitics of AI infrastructure", "sovereign / EU AI", "systems thinking across a venture studio"],
+    "keywords": ["voice ai", "agentic ai", "ai trust", "hallucination", "ai governance", "ai sovereignty", "founder", "venture studio", "systems thinking"],
+    "cross_cutting": true,
+    "note": "Riaan's personal brand is the FOUNDER LENS on every product's content — the through-line that ties the portfolio into one point of view."
+  },
+  "products": [
+    {
+      "slug": "voicecosmos", "priority": 1, "geo": false, "confidence": "high",
+      "sector": "hospitality voice AI",
+      "angle": "AI concierge (ARIAN) recovers the revenue hotels/spas quietly lose — no-shows, the 8pm after-hours call, missed upsell. NOT generic AI.",
+      "topics": ["booking recovery", "no-show reduction", "after-hours booking", "guest experience", "upsell automation", "direct booking vs OTA", "front-desk labour"],
+      "keywords": ["hotel", "spa", "salon", "hospitality", "booking", "concierge", "no-show", "occupancy", "guest", "reservation", "revenue", "OTA", "front desk"],
+      "sales_signals": ["revenue leak", "labour shortage", "OTA commission", "direct booking", "guest satisfaction", "staffing cost", "occupancy drop"],
+      "feeds": [
+        {"url": "https://skift.com/feed/", "tier": 1, "name": "Skift"},
+        {"url": "https://www.phocuswire.com/RSS", "tier": 1, "name": "PhocusWire"},
+        {"url": "https://www.hospitalitynet.org/rss/all.xml", "tier": 2, "name": "HospitalityNet"}
+      ]
+    },
+    {
+      "slug": "voiceidvault", "priority": 1, "geo": true, "confidence": "high",
+      "sector": "voice biometric security",
+      "angle": "Voice authentication + deepfake defence for enterprise — riding the AI-fraud / synthetic-voice wave. The security-posture flagship.",
+      "topics": ["voice deepfake", "voice fraud / vishing", "biometric authentication", "synthetic voice scam", "identity verification", "AI-enabled fraud", "call-centre fraud"],
+      "keywords": ["deepfake", "biometric", "voice fraud", "vishing", "authentication", "identity", "synthetic voice", "kyc", "breach", "voice clone", "impersonation"],
+      "sales_signals": ["deepfake fraud incident", "voice scam loss", "biometric / AI-act regulation", "enterprise breach", "call-centre attack", "wire-fraud"],
+      "feeds": [
+        {"url": "https://krebsonsecurity.com/feed/", "tier": 1, "name": "KrebsOnSecurity"},
+        {"url": "https://www.bleepingcomputer.com/feed/", "tier": 1, "name": "BleepingComputer"},
+        {"url": "https://thehackernews.com/feeds/posts/default", "tier": 1, "name": "TheHackerNews"}
+      ]
+    },
+    {
+      "slug": "continuum", "priority": 1, "geo": false, "confidence": "high",
+      "sector": "AI agent memory + verifiable trust (the GAP)",
+      "angle": "The memory + verify-then-dissolve engine that stops AI agents hallucinating their own state. Fills the gap between 'AI can do it' and 'AI can prove it'.",
+      "topics": ["ai agent memory", "hallucination / reliability", "agent context", "verifiable ai", "ai coding assistants", "agent evaluation"],
+      "keywords": ["ai agent", "agentic", "memory", "hallucination", "context window", "reliability", "verifiable", "mcp", "coding assistant", "eval"],
+      "sales_signals": ["agent reliability failure", "hallucination incident", "enterprise ai trust", "agent memory", "ai evaluation"],
+      "feeds": [
+        {"url": "https://hnrss.org/newest?q=AI+agent", "tier": 2, "name": "HN (AI agent)"},
+        {"url": "https://www.bleepingcomputer.com/feed/", "tier": 3, "name": "general tech"}
+      ]
+    },
+    {
+      "slug": "thenine", "priority": 2, "geo": true, "confidence": "high",
+      "sector": "verifiable trust / AI governance",
+      "angle": "A discipline of verifiable trust — the principled backbone under the portfolio's AI. Governance + safety as a differentiator, not a compliance chore.",
+      "topics": ["ai governance", "ai safety", "ai regulation", "trust frameworks", "ai ethics", "eu ai act"],
+      "keywords": ["ai governance", "ai safety", "ai act", "regulation", "trust", "ethics", "accountability", "alignment"],
+      "sales_signals": ["ai regulation", "ai incident", "governance mandate", "eu ai act enforcement"],
+      "feeds": []
+    },
+    {
+      "slug": "studiomunich", "priority": 2, "geo": false, "confidence": "high",
+      "sector": "consented digital talent marketplace",
+      "angle": "Rent a consented digital face + voice, rights + royalties by construction — the ethical answer to the deepfake / avatar economy.",
+      "topics": ["ai avatars", "digital talent", "likeness rights", "creator economy", "synthetic media consent", "ai actors"],
+      "keywords": ["avatar", "digital human", "likeness", "deepfake consent", "creator", "synthetic media", "voice clone rights", "talent", "sag"],
+      "sales_signals": ["likeness lawsuit", "ai actor dispute", "deepfake regulation", "creator monetisation", "brand avatar"],
+      "feeds": []
+    },
+    {
+      "slug": "podgeni", "priority": 2, "geo": false, "confidence": "high",
+      "sector": "AI podcasting / creator",
+      "angle": "A studio that listens while you record — AI co-host + research grounding → RAWPITCH advisory. Content-to-advisory monetisation.",
+      "topics": ["ai podcasting", "creator tools", "audio ai", "content monetisation", "advisory / expertise economy"],
+      "keywords": ["podcast", "creator", "audio", "content", "advisory", "expertise", "monetise", "co-host"],
+      "sales_signals": ["creator monetisation", "podcast growth", "advisory market", "audio ai launch"],
+      "feeds": []
+    },
+    {
+      "slug": "sezine", "priority": 2, "geo": false, "confidence": "high",
+      "sector": "workforce / talent intelligence",
+      "angle": "Humans rate the skills; the system enforces the identity — verified workforce intelligence for hiring + skills.",
+      "topics": ["talent intelligence", "skills verification", "hiring", "workforce analytics", "credential fraud"],
+      "keywords": ["hiring", "recruitment", "skills", "workforce", "talent", "credential", "hr", "people analytics", "resume fraud"],
+      "sales_signals": ["hiring fraud", "skills gap", "credential fraud", "workforce shortage", "hr tech"],
+      "feeds": []
+    },
+    {
+      "slug": "viwago", "priority": 2, "geo": true, "confidence": "high",
+      "sector": "compliance / audit automation",
+      "angle": "Turn the scan you already run into sealed, auditor-ready evidence — compliance as verifiable output.",
+      "topics": ["compliance automation", "audit", "regulatory reporting", "risk", "security posture attestation"],
+      "keywords": ["compliance", "audit", "regulatory", "attestation", "risk", "governance", "soc2", "iso", "evidence"],
+      "sales_signals": ["new regulation", "audit failure", "compliance mandate", "fine / enforcement"],
+      "feeds": []
+    },
+    {
+      "slug": "phantaqsm", "priority": 3, "geo": true, "confidence": "tagline",
+      "sector": "security deception (SSH honeypot, EU gov)",
+      "angle": "Managed SSH honeypot / deception layer for EU government — threat intel from the attacker's own moves.",
+      "topics": ["honeypot", "deception technology", "threat intelligence", "ssh attacks", "eu government security"],
+      "keywords": ["honeypot", "deception", "threat intel", "ssh", "intrusion", "attacker", "eu gov", "critical infrastructure"],
+      "sales_signals": ["government breach", "critical infrastructure attack", "eu cyber regulation (NIS2)", "ransomware"],
+      "feeds": [{"url": "https://thehackernews.com/feeds/posts/default", "tier": 1, "name": "TheHackerNews"}]
+    },
+    {
+      "slug": "qintercept", "priority": 3, "geo": true, "confidence": "tagline",
+      "sector": "quantum (enterprise-realistic)",
+      "angle": "Quantum hardware will disappoint your enterprise — the honest, near-term quantum play.",
+      "topics": ["quantum computing", "quantum hardware reality", "post-quantum crypto", "enterprise quantum"],
+      "keywords": ["quantum", "qubit", "post-quantum", "quantum computing", "cryptography", "quantum supremacy"],
+      "sales_signals": ["quantum breakthrough hype", "post-quantum mandate", "nist pqc", "quantum funding"],
+      "feeds": []
+    },
+    {
+      "slug": "voinista", "priority": 3, "geo": true, "confidence": "tagline",
+      "sector": "AI trading / market intelligence",
+      "angle": "Watch four analysts argue your next trade — multi-agent debate for market decisions.",
+      "topics": ["ai trading", "market intelligence", "multi-agent finance", "investment research"],
+      "keywords": ["trading", "markets", "fintech", "investment", "portfolio", "hedge", "equities", "macro", "analyst"],
+      "sales_signals": ["market volatility", "ai in finance", "retail trading", "fintech funding"],
+      "feeds": []
+    },
+    {
+      "slug": "fluxcore", "priority": 3, "geo": false, "confidence": "tagline",
+      "sector": "photonic chip design (EDA)",
+      "angle": "Design photonic chips in minutes, not months — AI-accelerated silicon photonics design.",
+      "topics": ["silicon photonics", "photonic chip design", "eda tools", "ai for chip design", "optical computing"],
+      "keywords": ["photonics", "photonic chip", "silicon photonics", "eda", "semiconductor", "optical", "chip design", "foundry"],
+      "sales_signals": ["photonics funding", "chip design ai", "optical interconnect", "semiconductor shortage"],
+      "feeds": []
+    },
+    {
+      "slug": "digitalcoaching", "priority": 3, "geo": false, "confidence": "tagline",
+      "sector": "digital leadership coaching / consulting",
+      "angle": "Empowering digital leaders — coaching + consulting for AI-era transformation.",
+      "topics": ["digital transformation", "leadership", "ai adoption", "change management", "executive coaching"],
+      "keywords": ["digital transformation", "leadership", "coaching", "consulting", "change management", "ai adoption", "executive"],
+      "sales_signals": ["ai adoption struggle", "digital transformation", "leadership gap", "reskilling"],
+      "feeds": []
+    },
+    {
+      "slug": "sekago", "priority": 3, "geo": false, "confidence": "unknown",
+      "sector": "UNKNOWN — tagline 'What is your life worth?'",
+      "angle": "TBD — sector not verified. Ratify with the product owner before targeting.",
+      "topics": [], "keywords": [], "sales_signals": [], "feeds": [],
+      "note": "Sector unclear from the tagline. Do not target until confirmed (P4)."
+    }
+  ]
+}
