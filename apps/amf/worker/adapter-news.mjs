@@ -227,38 +227,62 @@ const reddit = {
   },
 };
 
-// ── YouTube (RapidAPI youtube138) — SEARCH + TRENDING with real view/like counts ──
-// What free channel RSS can't do: query ANY topic + real engagement (views/likes/comments).
-// Gated on RAPIDAPI_KEY (put it in .env.local — NEVER in chat/commits, P1). Search terms come
-// from AMF_SIGNAL_QUERY (derived from --brand, shared with hn/reddit). Writes engagement_signal
-// with metadata.engagement scaled to the HN range (views/1000). UNTESTED without the key (P4).
+// ── YouTube — SEARCH + real view/like counts. Google DIRECT (official API v3) preferred ──
+// You do NOT need RapidAPI: the official YouTube Data API v3 is free (10k units/day) and
+// gives the same data straight from Google. This provider prefers YOUTUBE_API_KEY (official)
+// and falls back to RAPIDAPI_KEY (youtube138) only if that's all you have. Keys → .env.local,
+// NEVER chat/commits (P1). Search terms from AMF_SIGNAL_QUERY (--brand). engagement = views/1000
+// (scaled into the HN-points range). Writes engagement_signal.
+const YT_SCALE = (views) => Math.round(Number(views || 0) / 1000);
+
+// Official Google API v3: search.list → video IDs, then videos.list for statistics (1 unit).
+async function ytOfficial(terms) {
+  const key = process.env.YOUTUBE_API_KEY, items = [], seen = new Set();
+  for (const q of terms) {
+    try {
+      const sr = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(q)}&key=${key}`);
+      if (!sr.ok) { console.error(`[youtube] search "${q}" → HTTP ${sr.status}`); continue; }
+      const sj = await sr.json(); const ids = (sj.items || []).map((i) => i.id?.videoId).filter(Boolean);
+      const snip = {}; for (const i of sj.items || []) if (i.id?.videoId) snip[i.id.videoId] = i.snippet || {};
+      if (!ids.length) { console.error(`[youtube] "${q}" → 0`); continue; }
+      const vr = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${ids.join(',')}&key=${key}`);
+      const stats = {}; if (vr.ok) for (const v of (await vr.json()).items || []) stats[v.id] = v.statistics || {};
+      for (const id of ids) {
+        if (seen.has(id)) continue; seen.add(id); const sn = snip[id] || {};
+        items.push({ title: sn.title || '', content: (sn.title || '') + (sn.description ? ' — ' + sn.description.slice(0, 200) : ''), category: `youtube:${q}`, sources: [`https://www.youtube.com/watch?v=${id}`], engagement: YT_SCALE(stats[id]?.viewCount), published: sn.publishedAt || new Date().toISOString() });
+      }
+      console.error(`[youtube] "${q}" → ${ids.length} videos (official API v3)`);
+    } catch (e) { console.error(`[youtube] "${q}" failed: ${e.message}`); }
+  }
+  return items;
+}
+// Fallback: RapidAPI youtube138 (defensive parse; only if no official key).
+async function ytRapid(terms) {
+  const host = process.env.RAPIDAPI_YT_HOST || 'youtube138.p.rapidapi.com';
+  const headers = { 'X-RapidAPI-Key': process.env.RAPIDAPI_KEY, 'X-RapidAPI-Host': host };
+  const items = [], seen = new Set();
+  for (const q of terms) {
+    try {
+      const res = await fetch(`https://${host}/search/?q=${encodeURIComponent(q)}&hl=en&gl=US`, { headers });
+      if (!res.ok) { console.error(`[youtube] "${q}" → HTTP ${res.status}`); continue; }
+      const j = await res.json();
+      for (const c of (j.contents || j.data || [])) {
+        const v = c.video || c; const id = v.videoId || v.id; if (!id || seen.has(id) || !v.title) continue; seen.add(id);
+        items.push({ title: v.title, content: v.title + (v.descriptionSnippet ? ' — ' + v.descriptionSnippet : ''), category: `youtube:${q}`, sources: [`https://www.youtube.com/watch?v=${id}`], engagement: YT_SCALE(v.stats?.views ?? v.viewCount), published: v.publishedDateTxt || new Date().toISOString() });
+      }
+      console.error(`[youtube] "${q}" → ${(j.contents || j.data || []).length} results (RapidAPI)`);
+    } catch (e) { console.error(`[youtube] "${q}" failed: ${e.message}`); }
+  }
+  return items;
+}
 const youtube = {
   id: 'youtube',
   obsType: 'engagement_signal',
-  gate: () => (process.env.RAPIDAPI_KEY ? (signalTerms().length ? null : 'set AMF_SIGNAL_QUERY or pass --brand') : 'set RAPIDAPI_KEY (RapidAPI youtube138) in .env.local — never in chat (P1)'),
-  async fetch() {
-    const host = process.env.RAPIDAPI_YT_HOST || 'youtube138.p.rapidapi.com';
-    const headers = { 'X-RapidAPI-Key': process.env.RAPIDAPI_KEY, 'X-RapidAPI-Host': host };
-    const items = [], seen = new Set();
-    for (const q of signalTerms()) {
-      const url = `https://${host}/search/?q=${encodeURIComponent(q)}&hl=en&gl=US`;
-      try {
-        const res = await fetch(url, { headers });
-        if (!res.ok) { console.error(`[youtube] "${q}" → HTTP ${res.status}`); continue; }
-        const j = await res.json();
-        // defensive: youtube138 returns { contents: [ { type:'video', video:{ videoId, title, stats:{views}, ... } } ] }
-        for (const c of (j.contents || j.data || [])) {
-          const v = c.video || c; const id = v.videoId || v.id; if (!id || seen.has(id)) continue; seen.add(id);
-          const title = v.title || ''; if (!title) continue;
-          const views = Number(v.stats?.views ?? v.viewCount ?? 0);
-          const eng = Math.round(views / 1000); // scale YouTube views into the HN-points range
-          items.push({ title, content: title + (v.descriptionSnippet ? ' — ' + v.descriptionSnippet : ''), category: `youtube:${q}`, sources: [`https://www.youtube.com/watch?v=${id}`], engagement: eng, published: v.publishedDateTxt || new Date().toISOString() });
-        }
-        console.error(`[youtube] "${q}" → ${(j.contents || j.data || []).length} results`);
-      } catch (e) { console.error(`[youtube] "${q}" failed: ${e.message}`); }
-    }
-    return items;
+  gate: () => {
+    if (!process.env.YOUTUBE_API_KEY && !process.env.RAPIDAPI_KEY) return 'set YOUTUBE_API_KEY (free official YouTube Data API v3 — recommended) or RAPIDAPI_KEY, in .env.local — never in chat (P1)';
+    return signalTerms().length ? null : 'set AMF_SIGNAL_QUERY or pass --brand';
   },
+  fetch: () => (process.env.YOUTUBE_API_KEY ? ytOfficial(signalTerms()) : ytRapid(signalTerms())),
 };
 
 // ── OWN feeds — first-party platform content to PULL / REWORK / SYNDICATE ─────
