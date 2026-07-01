@@ -70,7 +70,9 @@
       "keywords": ["ai governance", "ai safety", "ai act", "regulation", "trust", "ethics", "accountability", "alignment"],
       "sales_signals": ["ai regulation", "ai incident", "governance mandate", "eu ai act enforcement"],
       "signal_query": ["ai governance", "ai safety", "ai act", "ai regulation", "ai ethics", "eu ai act"],
-      "feeds": []
+      "feeds": [
+        {"url": "https://newsletter.safe.ai/feed", "tier": 2, "name": "AI Safety Newsletter (safe.ai)"}
+      ]
     },
     {
       "slug": "studiomunich", "priority": 2, "geo": false, "confidence": "high",
@@ -90,7 +92,9 @@
       "keywords": ["podcast", "creator", "audio", "content", "advisory", "expertise", "monetise", "co-host"],
       "sales_signals": ["creator monetisation", "podcast growth", "advisory market", "audio ai launch"],
       "signal_query": ["ai podcasting", "audio ai", "creator tools", "content monetisation", "podcast software", "podcast editing"],
-      "feeds": []
+      "feeds": [
+        {"url": "https://twimlai.com/feed/", "tier": 2, "name": "TWIML AI Podcast"}
+      ]
     },
     {
       "slug": "sezine", "priority": 2, "geo": false, "confidence": "high",
@@ -100,7 +104,10 @@
       "keywords": ["hiring", "recruitment", "skills", "workforce", "talent", "credential", "hr", "people analytics", "resume fraud"],
       "sales_signals": ["hiring fraud", "skills gap", "credential fraud", "workforce shortage", "hr tech"],
       "signal_query": ["talent intelligence", "skills verification", "workforce analytics", "hiring", "recruitment", "talent intelligence hub"],
-      "feeds": []
+      "feeds": [
+        {"url": "https://resources.workable.com/feed/", "tier": 1, "name": "Workable Resources"},
+        {"url": "http://www.hiringlab.org/feed/", "tier": 2, "name": "Indeed Hiring Lab"}
+      ]
     },
     {
       "slug": "viwago", "priority": 2, "geo": true, "confidence": "high",
@@ -137,7 +144,10 @@
       "keywords": ["quantum", "qubit", "post-quantum", "quantum computing", "cryptography", "quantum supremacy"],
       "sales_signals": ["quantum breakthrough hype", "post-quantum mandate", "nist pqc", "quantum funding"],
       "signal_query": ["quantum computing", "post-quantum cryptography", "qubit", "quantum supremacy", "enterprise quantum", "quantum hardware"],
-      "feeds": []
+      "feeds": [
+        {"url": "https://quantumcomputingreport.com/feed/", "tier": 1, "name": "Quantum Computing Report"},
+        {"url": "http://news.mit.edu/rss/topic/quantum-computing", "tier": 2, "name": "MIT News — Quantum"}
+      ]
     },
     {
       "slug": "voinista", "priority": 3, "geo": true, "confidence": "tagline",
@@ -147,7 +157,9 @@
       "keywords": ["trading", "markets", "fintech", "investment", "portfolio", "hedge", "equities", "macro", "analyst"],
       "sales_signals": ["market volatility", "ai in finance", "retail trading", "fintech funding"],
       "signal_query": ["ai trading", "market intelligence", "ai trading tool", "ai trading bot", "investment research", "multi-agent finance"],
-      "feeds": []
+      "feeds": [
+        {"url": "http://feed.zacks.com/commentary/AllStories/rss", "tier": 2, "name": "Zacks Investment Research"}
+      ]
     },
     {
       "slug": "fluxcore", "priority": 3, "geo": false, "confidence": "tagline",
@@ -170,7 +182,9 @@
       "keywords": ["digital transformation", "leadership", "coaching", "consulting", "change management", "ai adoption", "executive"],
       "sales_signals": ["ai adoption struggle", "digital transformation", "leadership gap", "reskilling"],
       "signal_query": ["digital transformation", "ai adoption", "executive coaching", "change management", "digital leadership", "digital transformation manager"],
-      "feeds": []
+      "feeds": [
+        {"url": "http://www.leadershipnow.com/leadingblog/atom.xml", "tier": 1, "name": "Leading Blog"}
+      ]
     },
     {
       "slug": "sekago", "priority": 1, "geo": false, "confidence": "ratified",
