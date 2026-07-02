@@ -1,9 +1,18 @@
-# StudioMunich VAULT ⇄ AMF — Integration (AMF as partner consumer)
+# StudioMunich VAULT ⇄ AMF — Integration Handshake
 
+> **To:** StudioMunich VAULT build side · **From:** AMF / CONTINUUM (`supabase-projects/CONTINUUM`)
+> **Status:** 2026-07-02 · AMF-side spec **complete**; **reciprocal from VAULT pending (§7)**.
+> Serves two ways: if VAULT is a separate build/terminal, this is the reciprocal handshake; if
+> it's the same operator's in-progress build, this is the **target spec VAULT builds toward**.
+>
 > **Authoritative provider contract:** `StudioMunich VAULT — Partner Integration Playbook`
 > (`/api/vault/v1/*`, © Riaan Kleynhans). **This doc is the AMF-side consumer spec** — how the
 > content engine implements that playbook, plus the CONTINUUM render-ledger seam the playbook
 > doesn't cover. The playbook wins on any conflict.
+>
+> ⚠️ **P4 flag:** that playbook is **not on disk anywhere in this workspace** — only our own
+> docs reference `/api/vault/v1`. Our spec is aligned to a contract we cannot verify here; §7
+> is the ask that closes the gap (same pattern as AVATAR_CORE_HANDOVER, which surfaced later).
 >
 > **Supersedes the earlier draft of this file (P4):** it guessed a `book → grant` API that
 > hands AMF a raw `faceSourceRef + voiceId`. **Wrong.** VAULT *renders* and returns
@@ -85,6 +94,30 @@ The playbook's 5-check smoke (catalog → license → signed render + reject-uns
 takedown-stops-serving) **plus**: a CONTINUUM render Observation lands per accepted render and
 reconciles with VAULT on `(tenantId, actorId, signature)`; a `talent.takedown` flips the
 license Observation's verify to fail.
+
+## 7. What we need back from VAULT (the reciprocal — this unblocks the seam)
+
+Same role the XENOS lead-intake contract plays for the CRM seam: until these land, AMF stays
+**in shadow** (declines to synthetic — never serves an unsigned likeness). Please hand back:
+
+1. **The real Partner Integration Playbook** — the authoritative `/api/vault/v1/*` contract
+   (not on disk here; point us to the file or push it, like VC did with `AVATAR_CORE_HANDOVER.md`).
+2. **Live base URL + partner bearer** — `STUDIOMUNICH_VAULT_URL` + `STUDIOMUNICH_VAULT_SECRET`
+   (operator-injected, P1). Until these exist the render path is wired but untested (P4).
+3. **The exact `X-Rights-Signature` spec** — HMAC algorithm + the precise field order/encoding
+   over `[actorId, modality, phraseHash, duration, tier]`, and how `VAULT_RIGHTS_SIGNING_SECRET`
+   is provisioned — so our step-4 recompute matches **byte-for-byte** (any mismatch = hard
+   reject, so this must be exact, not approximate).
+4. **Webhook contract** — the `X-SM-Signature` scheme + `SM_WEBHOOK_SIGNING_SECRET`, and the
+   `talent.takedown` / `license.revoked` payloads (so "takedown-stops-serving" is provable).
+5. **Full-frame vs matted/alpha** — does `/presence/render` return a full frame or an
+   alpha-matted presenter? This decides whether VC's BodyPix matte stays in the path or drops out.
+6. **`/talent` catalog shape** — the JSON for the bookable "Faces by Industry" so the picker maps.
+7. **One live test actor + the 5-check smoke definition** — a bookable actor we can license →
+   render → verify → meter → takedown against, to turn "in shadow" into "green."
+
+When **1–4** land, render→verify→ledger becomes a gated, fail-safe build (identical discipline
+to the XENOS Seam ①). **5–7** make the first real signed short reproducible.
 
 ## Secrets / config (NAMES ONLY — P1, operator-to-operator)
 ```
