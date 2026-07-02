@@ -17,6 +17,19 @@
 > not claim more than it can verify; per P2: claims are tagged to the
 > evidence (or absence thereof). Per P5: when this vision and AGENTS.md
 > conflict, AGENTS.md wins.
+>
+> **Version:** v0.3 · origin 2026-05-29 · last revised 2026-07-02
+>
+> **v0.3 changelog (this revision, 2026-07-02):** Added **§ "The first application on
+> the stack — AMF"** 🟡 — registers the Autonomous Media Factory as the first *consumer*
+> application built on Layer 2 (CONTINUUM), not a new layer. Honest tier: content chain
+> 🟡 built + proven; L6 marketing/ad swarm 🔮 not wired. Full detail →
+> [`../AMF_PROCESS.md`](../AMF_PROCESS.md). No change to the 6-layer model or tier labels.
+> **v0.2 changelog (2026-05-31):** Filed Layer 4 (H-MARA) v0.2 future-state 5-bucket
+> enhancement spec (all 🔮, dependencies footnoted).
+> **v0.1 changelog (2026-05-29):** Initial 6-layer Witness-Native architecture
+> (RVM · CONTINUUM · Vibely · H-MARA · Hyperscale · Perimeter Intelligence) with the
+> tier-labeling discipline above.
 
 ---
 
@@ -411,6 +424,8 @@ This document is updated under these rules (P5 — the rule binds its keeper):
 - A 🟡 → ✅ transition requires production use plus a green verify_command.
 - A ✅ rating cannot be assigned to anything that has not been verified on
   `main` within the prior 30 days.
+- Every material revision **bumps the Version and adds a top-of-doc changelog
+  entry** (aligned with `ARCHITECTURE.md`'s re-versioning discipline).
 
 Stale tiers are worse than honest 🟡 tiers. Audit quarterly.
 
