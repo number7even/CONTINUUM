@@ -10,8 +10,11 @@
   },
   "files": [
     "dist",
+    "!dist/*.test.*",
     "src/gitingest_digest.py"
   ],
+  "publishConfig": { "access": "public" },
+  "prepublishOnly": "npm run build",
   "scripts": {
     "build": "tsc -b && cp src/gitingest_digest.py dist/gitingest_digest.py",
     "start": "node dist/index.js",

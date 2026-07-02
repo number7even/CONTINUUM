@@ -8,6 +8,9 @@
   "bin": {
     "continuum-adapter-export": "./dist/index.js"
   },
+  "files": ["dist", "!dist/*.test.*"],
+  "publishConfig": { "access": "public" },
+  "prepublishOnly": "npm run build",
   "scripts": {
     "build": "tsc -b",
     "start": "node dist/index.js",
