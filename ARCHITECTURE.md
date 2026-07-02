@@ -1,12 +1,18 @@
 # Continuum — Architecture Map
 
-> **Status:** v0.3 draft — RuVector unified persistence layer added (phased V0.5)
-> **Date:** 2026-05-14
+> **Status:** v0.4 draft — AMF registered as the first consumer application (§2, §16); core engine unchanged since v0.3 (RuVector persistence still phased V0.5)
+> **Date:** 2026-05-14 (origin; last revised 2026-07-02)
 > **Authors:** Riaan Kleynhans + Claude
 > **Working name:** Continuum (open — see D1)
 > **Repo:** [github.com/number7even/CONTINUUM](https://github.com/number7even/CONTINUUM) (Option A: standalone, locked 2026-05-14)
 >
-> **v0.3 changelog (this revision):**
+> **v0.4 changelog (this revision, 2026-07-02):**
+> Registered **AMF — Autonomous Media Factory** as the first at-scale **consumer** built ON Continuum (NOT part of the core engine — it is a client of the MCP/storage surface, using `openStorage(tenantId)` for per-product corpora, and does not modify Continuum's contract).
+> Updated **§2 Component Map** — added a "Consumers (external)" note describing AMF.
+> Updated **§16 Related Documents** — added a "Consumer applications" section.
+> Full AMF architecture, verified results, and runbook live in **`docs/AMF_PROCESS.md`** (kept separate so this file stays a *map*, not a manual). No change to Continuum's core, contract, decisions (§14), or roadmap (§15).
+>
+> **v0.3 changelog (previous revision):**
 > Added **§10b Unified Persistence Layer (RuVector integration)** — replaces SQLite+Chroma split with single self-learning engine. Phased V0.5+.
 > Updated **§4 / §4a** — V0 keeps SQLite+Chroma+FTS5 (battle-tested, ships in week 1). V0.5+ supersedes with RuVector path (see §10b).
 > Updated **D2** — phased: SQLite+Chroma V0 → RuVector V0.5+ (locked pending RuVector readiness verification).
