@@ -45,14 +45,16 @@ export function mapDecision(d) {
   };
 }
 
-export async function fetchDecisions(since) {
+export async function fetchDecisions({ since, tenant = process.env.AMF_XENOS_TENANT, limit = 40 } = {}) {
   const base = process.env.XENOS_HITL_URL, key = process.env.XENOS_HITL_KEY;
   if (!base || !key) return { gated: true, decisions: [] };
-  const url = `${base.replace(/\/$/, '')}/api/hitl/recent-decisions${since ? `?since=${encodeURIComponent(since)}` : ''}`;
-  const res = await fetch(url, { headers: { authorization: `Bearer ${key}` } });
+  const qs = new URLSearchParams({ limit: String(limit) });
+  if (tenant) qs.set('tenant_id', tenant);          // XENOS contract: recent-decisions is per-tenant
+  if (since) qs.set('since', since);
+  const res = await fetch(`${base.replace(/\/$/, '')}/api/hitl/recent-decisions?${qs}`, { headers: { 'x-hitl-key': key } });
   if (!res.ok) throw new Error(`XENOS HTTP ${res.status}`);
   const j = await res.json();
-  return { gated: false, decisions: Array.isArray(j) ? j : (j.decisions || j.items || []) };
+  return { gated: false, decisions: Array.isArray(j) ? j : (j.decisions || j.items || []) }; // {success,decisions[],total}
 }
 
 /** Ingest decisions → ground_truth in a CONTINUUM project. Idempotent. Returns count written. */
@@ -65,8 +67,8 @@ export function ingestDecisions(storage, decisions) {
 
 async function run() {
   const a = process.argv, get = (f, d) => { const i = a.indexOf(f); return i >= 0 ? a[i + 1] : d; };
-  const project = get('--project', 'ground-truth'), since = get('--since');
-  let res; try { res = await fetchDecisions(since); } catch (e) { console.error(`[seam2] ${e.message}`); process.exit(1); }
+  const project = get('--project', 'ground-truth');
+  let res; try { res = await fetchDecisions({ since: get('--since'), tenant: get('--tenant') }); } catch (e) { console.error(`[seam2] ${e.message}`); process.exit(1); }
   if (res.gated) { console.error('[seam2] XENOS_HITL_URL/KEY not set — feedback sync gated (P6). Wired + ready to strike.'); process.exit(0); }
   const { openStorage } = await import(resolve(REPO_ROOT, 'packages/core/dist/index.js'));
   const storage = openStorage(project);

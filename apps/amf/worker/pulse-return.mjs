@@ -41,7 +41,7 @@ export async function processDecisions(decisions, { render = true } = {}) {
 
 async function run() {
   const a = process.argv, get = (f, d) => { const i = a.indexOf(f); return i >= 0 ? a[i + 1] : d; };
-  let res; try { res = await fetchDecisions(get('--since')); } catch (e) { console.error(`[return] ${e.message}`); process.exit(1); }
+  let res; try { res = await fetchDecisions({ since: get('--since'), tenant: get('--tenant') }); } catch (e) { console.error(`[return] ${e.message}`); process.exit(1); }
   if (res.gated) { console.error('[return] XENOS_HITL_URL/KEY not set — Pulse return-path gated (P6). Wired + ready to strike.'); process.exit(0); }
   const out = await processDecisions(res.decisions);
   console.error(`[return] rendered ${out.rendered.length} · rejected ${out.rejected.length} · skipped ${out.skipped.length}`);

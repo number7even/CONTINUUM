@@ -15,12 +15,14 @@
  */
 import './env.mjs';
 import { fileURLToPath } from 'node:url';
+import { resolveOwner } from './stage-j.mjs';
 
 /** Map an AMF draft → the XENOS create-approval payload (pure, testable). */
 export function buildApproval({ slug, brief, reviewId }) {
   const b = brief || {};
   const src = (b.sources || []).slice(0, 2).join(', ');
   return {
+    tenant_id: resolveOwner(slug)?.tenant_id ?? null, // OWNER tenant (XENOS contract requires it)
     flow_id: reviewId,
     flow_type: 'marketing',
     decision_type: 'approval',
@@ -42,7 +44,7 @@ export async function surfaceToPulse(draft) {
   if (!base || !key) { console.error('[pulse] XENOS_HITL_URL/KEY not set — approval NOT posted (P6); local review-queue unaffected.'); return { ok: false, reason: 'gated: no XENOS HITL key', payload }; }
   try {
     const res = await fetch(`${base.replace(/\/$/, '')}/api/hitl/create-approval`, {
-      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify(payload),
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-hitl-key': key }, body: JSON.stringify(payload),
     });
     if (!res.ok) return { ok: false, reason: `XENOS HTTP ${res.status}`, payload };
     const j = await res.json().catch(() => ({}));

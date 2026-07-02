@@ -57,7 +57,7 @@ export async function handoffLead(lead) {
   if (!base || !key) { console.error('[stage-j] XENOS_LEADS_URL/KEY not set — lead NOT sent (P6). payload built + ready.'); return { ok: false, reason: 'gated: no XENOS key', payload }; }
   try {
     const res = await fetch(`${base.replace(/\/$/, '')}/api/crm/leads/capture`, {
-      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify(payload),
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-intake-key': key }, body: JSON.stringify(payload),
     });
     if (!res.ok) return { ok: false, reason: `XENOS HTTP ${res.status}`, payload };
     const j = await res.json().catch(() => ({}));
