@@ -45,7 +45,7 @@ export function mapDecision(d) {
   };
 }
 
-async function fetchDecisions(since) {
+export async function fetchDecisions(since) {
   const base = process.env.XENOS_HITL_URL, key = process.env.XENOS_HITL_KEY;
   if (!base || !key) return { gated: true, decisions: [] };
   const url = `${base.replace(/\/$/, '')}/api/hitl/recent-decisions${since ? `?since=${encodeURIComponent(since)}` : ''}`;

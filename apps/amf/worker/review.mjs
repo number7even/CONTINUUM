@@ -46,6 +46,26 @@ function render(rec) {
   return { rendered: r.status === 0, tool: script, note: r.status === 0 ? 'asset in out/' : (r.stderr || '').slice(-160) };
 }
 
+// ── reusable gate actions (CLI + the Pulse return-path both call these) ───────
+export const draftBucket = (id) => { ensure(); return findFile(id)?.bucket || null; };
+
+/** Approve a draft → approved/ (optionally render in-brand). Idempotent: only acts on pending. */
+export function approveDraft(id, { render: doRender = false } = {}) {
+  ensure(); const f = findFile(id);
+  if (!f || f.bucket !== 'pending') return { ok: false, reason: f ? `already ${f.bucket}` : 'not found' };
+  let rec = move(id, 'approved', { status: 'approved', approvedAt: new Date().toISOString() });
+  let render_ = null;
+  if (doRender) { render_ = render(rec); rec = move(id, 'approved', { render: render_ }); }
+  return { ok: true, slug: rec.slug, render: render_ };
+}
+/** Reject a draft → rejected/. Idempotent: only acts on pending. */
+export function rejectDraft(id, reason = 'unspecified') {
+  ensure(); const f = findFile(id);
+  if (!f || f.bucket !== 'pending') return { ok: false, reason: f ? `already ${f.bucket}` : 'not found' };
+  move(id, 'rejected', { status: 'rejected', rejectedAt: new Date().toISOString(), reason });
+  return { ok: true };
+}
+
 function run() {
   ensure();
   const a = process.argv, cmd = a[2], id = a[3];
@@ -59,12 +79,14 @@ function run() {
     const f = findFile(id); if (!f) { console.error(`no such draft: ${id}`); process.exit(1); }
     console.log(readFileSync(f.path, 'utf8'));
   } else if (cmd === '--approve') {
-    const rec = move(id, 'approved', { status: 'approved', approvedAt: new Date().toISOString() });
-    console.error(`[review] ✅ approved ${id} (${rec.slug})`);
-    if (a.includes('--render')) { const res = render(rec); move(id, 'approved', { render: res }); console.error(`[review] render via ${res.tool}: ${res.rendered ? '✅ ' + res.note : '⚠️ ' + res.note}`); }
+    const res = approveDraft(id, { render: a.includes('--render') });
+    if (!res.ok) { console.error(`[review] cannot approve ${id}: ${res.reason}`); process.exit(1); }
+    console.error(`[review] ✅ approved ${id} (${res.slug})`);
+    if (res.render) console.error(`[review] render via ${res.render.tool}: ${res.render.rendered ? '✅ ' + res.render.note : '⚠️ ' + res.render.note}`);
     console.error('[review] NOTE: publish is still manual — approved ≠ published (P7). Push to channel yourself.');
   } else if (cmd === '--reject') {
-    move(id, 'rejected', { status: 'rejected', rejectedAt: new Date().toISOString(), reason: a.slice(4).join(' ') || 'unspecified' });
+    const res = rejectDraft(id, a.slice(4).join(' ') || 'unspecified');
+    if (!res.ok) { console.error(`[review] cannot reject ${id}: ${res.reason}`); process.exit(1); }
     console.error(`[review] ✗ rejected ${id}`);
   } else { console.error('usage: node review.mjs --list | --show <id> | --approve <id> [--render] | --reject <id> [reason]'); process.exit(2); }
 }
@@ -85,5 +107,8 @@ async function smoke() {
   process.exit(ok ? 0 : 1);
 }
 
-if (process.argv.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
-else run();
+// only run the CLI when invoked directly — safe to `import { approveDraft, ... }` (Pulse return-path)
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
+  else run();
+}
