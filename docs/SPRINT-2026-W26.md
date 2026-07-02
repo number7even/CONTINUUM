@@ -233,5 +233,9 @@ A sprint review document `docs/SPRINT-REVIEW-W27.md` written on 2026-07-17 must 
 
 ---
 
+## Related
+
+Sprint chain: [← W25](./SPRINT-2026-W25.md) · [W27 →](./SPRINT-W27.md) · Ledger: [STATUS](./STATUS-2026-05-29.md) · Hub: [INDEX](./INDEX.md)
+
 _Last updated: 2026-06-05._
 _IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._

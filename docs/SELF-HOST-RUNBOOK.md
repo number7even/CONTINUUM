@@ -141,4 +141,8 @@ tenant eventually needs both tracks; we cook them in order.
 _Sources (verified 2026-06-24): [Ghost install — Ubuntu](https://docs.ghost.org/install/ubuntu/).
 claude-blog integration points (§3) are design-intent from the AMF blueprint, flagged unbuilt._
 
+## Related
+
+Fly.io deploy: [DEPLOY_FLY](./DEPLOY_FLY.md) · Self-hosted (Docker): [DEPLOY_SELF_HOSTED](./DEPLOY_SELF_HOSTED.md) · Backup / restore: [RUNBOOK_BACKUP](./RUNBOOK_BACKUP.md) · AMF pipeline: [AMF_PROCESS](./AMF_PROCESS.md) · Hub: [INDEX](./INDEX.md)
+
 _IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._

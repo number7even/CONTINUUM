@@ -165,3 +165,7 @@ fly apps destroy continuum-engine
 Persistent volume backups: enable via `fly volumes snapshots create
 continuum_data` — Fly auto-snapshots daily on paid plans, but explicit
 snapshots before risky deploys are cheap insurance.
+
+## Related
+
+Self-hosted (Docker): [DEPLOY_SELF_HOSTED](./DEPLOY_SELF_HOSTED.md) · Backup / restore: [RUNBOOK_BACKUP](./RUNBOOK_BACKUP.md) · Owned-media runbook: [SELF-HOST-RUNBOOK](./SELF-HOST-RUNBOOK.md) · Ledger: [STATUS](./STATUS-2026-05-29.md) · Hub: [INDEX](./INDEX.md)

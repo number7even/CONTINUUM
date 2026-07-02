@@ -504,4 +504,8 @@ When `@xenova/transformers` publishes a fixed release, bump the pin, re-run `npm
 
 _Bound by The Nine v0.1.0._
 
+## Related
+
+Fly.io deploy: [DEPLOY_FLY](./DEPLOY_FLY.md) · Backup / restore: [RUNBOOK_BACKUP](./RUNBOOK_BACKUP.md) · Owned-media runbook: [SELF-HOST-RUNBOOK](./SELF-HOST-RUNBOOK.md) · Ledger: [STATUS](./STATUS-2026-05-29.md) · Hub: [INDEX](./INDEX.md)
+
 _IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._

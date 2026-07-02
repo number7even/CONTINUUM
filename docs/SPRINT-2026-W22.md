@@ -209,4 +209,8 @@ _Bound by The Nine v0.1.0. Per P5: when this sprint plan and AGENTS.md
 conflict, AGENTS.md wins. Per P9: each ticket above is a proposal; the
 operator chooses what to start, in what order, and when to stop._
 
+## Related
+
+Sprint chain: [W24 →](./SPRINT-2026-W24.md) · Ledger: [STATUS](./STATUS-2026-05-29.md) · Hub: [INDEX](./INDEX.md) · Map: [router.md](../router.md)
+
 _IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._
