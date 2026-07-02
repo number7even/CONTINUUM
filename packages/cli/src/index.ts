@@ -215,7 +215,7 @@ function printStateMdSummary(summary: StateMdImportSummary, stateMdPath: string)
 // ── ICM scaffold — "folders over agents" (created by `continuum init`) ───────────
 
 const ICM_REBOUND =
-  'If you do not find what you need in this floor, return to the root `router.md` (the Map). Never guess or hallucinate across floors — come back to the Map.';
+  'If you do not find what you need in this floor, return to the root [`router.md`](../router.md) (the Map). Never guess or hallucinate across floors — come back to the Map.';
 
 function icmFloor(title: string, purpose: string): string {
   return `# ${title} — local context\n\n${purpose}\n\n> **Rebound rule:** ${ICM_REBOUND}\n`;
@@ -226,13 +226,13 @@ function icmFiles(projectId: string): Record<string, string> {
   return {
     'agents.md':
       `# ${projectId} — Prime Mission (agents.md)\n\n` +
-      `This is the **Lobby**. When you wake up in this workspace, read this file, then the Map (\`router.md\`).\n\n` +
+      `This is the **Lobby**. When you wake up in this workspace, read this file, then the Map ([\`router.md\`](./router.md)).\n\n` +
       `## Identity & laws\n` +
       `- This workspace uses the **Interpretable Context Methodology** — *"folders over agents."* The file system IS the architecture, routing, and memory. No fragile agent framework governs; the folders do.\n` +
       `- **Verify over generate:** nothing is "done" without mechanical proof (a passing command / a checkpoint). The AI shapes language; file-system discipline holds the verifiable truth.\n` +
       `- **Never over-consume context:** fetch skills/reference only when a task needs them (see \`skills/\`).\n\n` +
       `## How to work here\n` +
-      `1. Read \`router.md\` — the Map. It routes you to the right floor by intent.\n` +
+      `1. Read [\`router.md\`](./router.md) — the Map. It routes you to the right floor by intent.\n` +
       `2. Each floor has its own \`agents.md\` (local context) + the rebound rule.\n` +
       `3. "Pick up" = read the current state (\`continuum_get_state\` if the MCP server is registered) + the relevant floor.\n` +
       `4. "Hand off" = write progress to an artifact + (optionally) stamp a checkpoint.\n`,
@@ -244,12 +244,12 @@ function icmFiles(projectId: string): Record<string, string> {
       `If Continuum's MCP server is registered (\`.mcp.json\`), open with \`continuum_get_state\` + \`continuum://session/briefing\` — start warm, not cold. Search before fetching (search → timeline → get_observations).\n\n` +
       `## Floors — route by intent\n` +
       `| If you need to… | Go to |\n|---|---|\n` +
-      `| Onboard / see the build plan & validation gates | \`01-start-here/\` |\n` +
-      `| The deterministic core / execution logic | \`03-code/\` |\n` +
-      `| The app shell / working artifacts | \`app/\` |\n` +
-      `| Reference material, schemas, regression fixtures | \`reference/\` |\n` +
-      `| Fetch-on-demand know-how (don't preload) | \`skills/\` |\n` +
-      `| The audit ledger / hand-offs (append-only) | \`artifacts/\` |\n\n` +
+      `| Onboard / see the build plan & validation gates | [01-start-here](./01-start-here/agents.md) |\n` +
+      `| The deterministic core / execution logic | [03-code](./03-code/agents.md) |\n` +
+      `| The app shell / working artifacts | [app](./app/agents.md) |\n` +
+      `| Reference material, schemas, regression fixtures | [reference](./reference/agents.md) |\n` +
+      `| Fetch-on-demand know-how (don't preload) | [skills](./skills/README.md) |\n` +
+      `| The audit ledger / hand-offs (append-only) | [artifacts](./artifacts/agents.md) |\n\n` +
       `## Artifacts & hand-offs\n` +
       `Working outputs are written to the file that owns them. A hand-off is a documented artifact (+ a checkpoint) so state is verifiable, not remembered.\n`,
     '01-start-here/agents.md': icmFloor('01-start-here (Lobby)', 'Onboarding + the phased build plan. New here? Read `BUILD-PLAN.md`, then return to the Map.'),
