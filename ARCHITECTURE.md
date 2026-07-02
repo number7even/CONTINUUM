@@ -135,6 +135,10 @@ By supporting all four, Continuum runs as a local subprocess for solo devs (V0),
    └─────────────────────────────────────────────────────────────┘
 ```
 
+**Consumers (external — built ON Continuum, not part of the core):**
+
+- **AMF — Autonomous Media Factory** (`apps/amf/`): the first at-scale consumer. A demand-driven, brand-aware content engine for a 14-product portfolio that uses Continuum's storage, observations, and checkpoints as its substrate (`openStorage(tenantId)` → per-product corpora). It ingests intelligence + first-party feeds, filters/ranks against per-product positioning, drafts on-brand content, and runs a scheduled autopilot up to a human approval gate (nothing auto-publishes — P4/P7/P9). AMF is a *client* of the core engine above, exactly like any MCP consumer — it does not modify Continuum's contract. **Full architecture + runbook: [`docs/AMF_PROCESS.md`](docs/AMF_PROCESS.md).** It is the dogfood proof that the memory engine powers a real product.
+
 ---
 
 ## 3. Data Flow
@@ -1061,6 +1065,10 @@ The partner agreement requires that no integration #5+ lands ahead of V0 ship. T
 - `STATE.md` (VC-Hospitality root) — canonical activation state, source for Continuum's first checkpoint snapshot
 - `STATE_DOCS_INDEX.md` (VC-Hospitality root) — canonical /docs map (what `adapters/docs` ingests on first sync)
 - `MEMORY.md` (Claude's project memory) — insights store (complementary to Continuum, not replaced)
+
+### Consumer applications (built on Continuum)
+
+- [**AMF — Autonomous Media Factory**](docs/AMF_PROCESS.md) (`apps/amf/`) — demand-driven content engine for the 14-product portfolio; the first at-scale consumer of Continuum's storage/observations/checkpoints. See §2 (Consumers) and `docs/AMF_PROCESS.md` for the full A→Z process, component inventory, verified results, and runbook. Related AMF specs: `docs/DEMAND_ATLAS_2026-07-01.md`, `docs/AMF-L4-AUDIO-CONTRACT.md`.
 
 ### Memory + AI client primitives
 

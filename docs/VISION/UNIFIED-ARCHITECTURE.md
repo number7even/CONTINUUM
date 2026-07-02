@@ -367,6 +367,29 @@ That is enough for V1 AaaS. Physical operationalization is a 2027+ ambition.
 
 ---
 
+## The first application on the stack — AMF 🟡
+
+> *Not a layer — a consumer.* The Autonomous Media Factory (`apps/amf/`) is the
+> first at-scale application built **on top of** Layer 2 (CONTINUUM). It uses
+> CONTINUUM's storage, observations, and checkpoints as its substrate and adds a
+> demand-driven, brand-aware content engine for the 14-product portfolio.
+
+- **🟡 Content chain (built + proven):** demand analysis → feed discovery/rating →
+  8-provider ingestion (most key-free) → boolean gate + 5-D ranking → on-brand draft →
+  **scheduled autopilot** (BullMQ pulse fans the whole portfolio into per-product chains)
+  → **human approval gate** (nothing auto-publishes — P4/P7/P9). 14/14 products wired,
+  13/14 with tiered authority feeds.
+- **🔮 L6 marketing/ad swarm:** NOT wired — no auto-publish, no autonomous ad-spend.
+  Deliberate boundary at the human gate.
+- **Why it matters to the vision:** AMF is the dogfood proof that the memory engine
+  powers a real product, and the honest demonstration of the two-hands discipline
+  (machine proposes tirelessly; the leap to publish is the human's — P9).
+
+**Full architecture, verified results, honest gaps, and runbook:
+[`docs/AMF_PROCESS.md`](../AMF_PROCESS.md).**
+
+---
+
 ## What this vision lets us do
 
 1. **Talk about the destination** without confusing it with the current state.
