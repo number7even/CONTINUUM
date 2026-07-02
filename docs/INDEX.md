@@ -11,7 +11,8 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
 - [`AMF_ENGINE_MAP.md`](./AMF_ENGINE_MAP.md) — the pipeline **diagram** + module-by-module verified/gated status
 - [`DEMAND_ATLAS_2026-07-01.md`](./DEMAND_ATLAS_2026-07-01.md) — 14-product demand maps (CORE / EXPAND / EDUCATE)
 - [`AMF-XENOS-AMALGAMATION-HANDSHAKE.md`](./AMF-XENOS-AMALGAMATION-HANDSHAKE.md) · [`AMF-XENOS-RECONCILIATION.md`](./AMF-XENOS-RECONCILIATION.md) — the XENOS CRM revenue loop (Seams ① ⑤ ②)
-- [`STUDIOMUNICH-TALENT-HANDSHAKE.md`](./STUDIOMUNICH-TALENT-HANDSHAKE.md) — rented-talent (VAULT) contract
+- [`STUDIOMUNICH-TALENT-HANDSHAKE.md`](./STUDIOMUNICH-TALENT-HANDSHAKE.md) — rented-talent (VAULT)
+- [`PARTNER-INTEGRATION-REQUESTS.md`](./PARTNER-INTEGRATION-REQUESTS.md) — **consolidated "what we need back"** from XENOS + VAULT to unblock every gated seam contract
 - [`AI-GUEST-BOT-CONTRACT.md`](./AI-GUEST-BOT-CONTRACT.md) · [`AMF-L4-AUDIO-CONTRACT.md`](./AMF-L4-AUDIO-CONTRACT.md) · [`POD-GENI-AI-GUEST-HANDOVER-RESPONSE.md`](./POD-GENI-AI-GUEST-HANDOVER-RESPONSE.md) · [`VC-AVATAR-COMPONENT-HANDOVER-REQUEST.md`](./VC-AVATAR-COMPONENT-HANDOVER-REQUEST.md) — avatar / voice contracts
 - [`BRAND_KERNEL.md`](./BRAND_KERNEL.md) — the brand voice source the drafter grounds on
 
