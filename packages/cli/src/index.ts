@@ -95,6 +95,9 @@ COMMANDS
   serve          Run the MCP HTTP/SSE server (V1 — remote / hosted clients).
                  Requires $CONTINUUM_HTTP_TOKEN (Bearer shared secret).
   status         Print current state, todo counts, and data location.
+                 Also nudges if a newer CLI is published (never auto-installs).
+  upgrade        Re-sync the ICM "folders over agents" scaffold into this project
+                 (idempotent; --force refreshes templates) + report engine updates.
   import-state   Parse a STATE.md and record it as a new checkpoint. Always
                  creates a checkpoint (use this to re-snapshot after edits).
   verify         Re-run every verify_command in the latest snapshot. Exit code
@@ -266,22 +269,85 @@ function icmFiles(projectId: string): Record<string, string> {
   };
 }
 
-/** Write the ICM tree into `root`, never overwriting existing files. Returns what changed. */
-function scaffoldIcm(root: string, projectId: string): { created: string[]; skipped: string[] } {
+/**
+ * Write the ICM tree into `root`. Idempotent by default (never clobbers existing files);
+ * `force` refreshes the structural templates. `CLAUDE.md` is NEVER force-overwritten — it may
+ * be the client's customised entry (P8: do not extract/overwrite what's theirs).
+ */
+function scaffoldIcm(root: string, projectId: string, opts: { force?: boolean } = {}): { created: string[]; skipped: string[] } {
   const created: string[] = [];
   const skipped: string[] = [];
-  const files = icmFiles(projectId);
-  files['CLAUDE.md'] =
-    `# ${projectId}\n\n> This workspace uses the Interpretable Context Methodology (*"folders over agents"*).\n` +
-    `> **Read [\`agents.md\`](./agents.md) first** (the Prime Mission), then [\`router.md\`](./router.md) (the Map).\n`;
-  for (const [rel, content] of Object.entries(files)) {
+  for (const [rel, content] of Object.entries(icmFiles(projectId))) {
     const abs = joinPath(root, rel);
-    if (existsSync(abs)) { skipped.push(rel); continue; } // idempotent — never clobber
+    if (existsSync(abs) && !opts.force) { skipped.push(rel); continue; }
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, content);
     created.push(rel);
   }
+  const claudeAbs = joinPath(root, 'CLAUDE.md'); // only-if-absent, even under --force
+  if (!existsSync(claudeAbs)) {
+    writeFileSync(
+      claudeAbs,
+      `# ${projectId}\n\n> This workspace uses the Interpretable Context Methodology (*"folders over agents"*).\n` +
+        `> **Read [\`agents.md\`](./agents.md) first** (the Prime Mission), then [\`router.md\`](./router.md) (the Map).\n`,
+    );
+    created.push('CLAUDE.md');
+  } else skipped.push('CLAUDE.md');
   return { created, skipped };
+}
+
+// ── update nudge + `continuum upgrade` ───────────────────────────────────────
+function installedCliVersion(): string {
+  try {
+    const pkg = joinPath(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+    return (JSON.parse(readFileSync(pkg, 'utf8')).version as string) ?? '0.0.0';
+  } catch { return '0.0.0'; }
+}
+async function latestCliVersion(timeoutMs = 2500): Promise<string | null> {
+  try {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), timeoutMs);
+    const res = await fetch('https://registry.npmjs.org/@number7even/continuum-cli/latest', { signal: ac.signal });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const body = (await res.json()) as { version?: string };
+    return typeof body.version === 'string' ? body.version : null;
+  } catch { return null; }
+}
+function semverGt(a: string, b: string): boolean {
+  const pa = a.split('.').map(n => parseInt(n, 10) || 0);
+  const pb = b.split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) { if ((pa[i] ?? 0) > (pb[i] ?? 0)) return true; if ((pa[i] ?? 0) < (pb[i] ?? 0)) return false; }
+  return false;
+}
+/** Non-blocking, fail-safe update nudge — prints a one-liner, NEVER auto-installs (P7). */
+async function updateNudge(): Promise<void> {
+  const cur = installedCliVersion();
+  const latest = await latestCliVersion();
+  if (latest && semverGt(latest, cur)) {
+    process.stderr.write(
+      `\n  ⬆ Update available: @number7even/continuum-cli ${cur} → ${latest}\n` +
+        `    npm i -g @number7even/continuum-cli@latest   (or run: continuum upgrade)\n`,
+    );
+  }
+}
+async function commandUpgrade(projectId: string): Promise<void> {
+  const force = process.argv.includes('--force');
+  const { created, skipped } = scaffoldIcm(process.cwd(), projectId, { force });
+  process.stdout.write(`✓ ICM scaffold ${force ? 'refreshed (--force)' : 'synced'} — ${created.length} written, ${skipped.length} kept\n`);
+  for (const f of created) process.stdout.write(`    + ${f}\n`);
+  const cur = installedCliVersion();
+  const latest = await latestCliVersion();
+  if (latest && semverGt(latest, cur)) {
+    process.stdout.write(
+      `\n  ⬆ Engine update available: ${cur} → ${latest}\n` +
+        `    npm:    npm i -g @number7even/continuum-cli@latest\n` +
+        `    source: git pull && npm install && npm run build   (in the CONTINUUM checkout)\n` +
+        `    then restart your AI client to reload the MCP server.\n`,
+    );
+  } else {
+    process.stdout.write(`\n  Engine ${cur} is current${latest ? '' : ' (npm check offline)'}.\n`);
+  }
 }
 
 function commandInit(projectId: string, stateMdOverride: string | undefined): void {
@@ -388,7 +454,7 @@ function commandImportState(projectId: string, stateMdOverride: string | undefin
 
 // ── continuum status ──────────────────────────────────────────────────────────
 
-function commandStatus(projectId: string): void {
+async function commandStatus(projectId: string): Promise<void> {
   const storage = openStorage(projectId);
   try {
     const snapshot = storage.getStateAt();
@@ -432,6 +498,7 @@ function commandStatus(projectId: string): void {
   } finally {
     storage.close();
   }
+  await updateNudge(); // fail-safe update nudge (never auto-installs — P7)
 }
 
 // ── continuum adapter <name> [--watch] ────────────────────────────────────────
@@ -909,7 +976,11 @@ async function main(): Promise<void> {
       return;
 
     case 'status':
-      commandStatus(projectId);
+      await commandStatus(projectId);
+      return;
+
+    case 'upgrade':
+      await commandUpgrade(projectId);
       return;
 
     case 'start':
