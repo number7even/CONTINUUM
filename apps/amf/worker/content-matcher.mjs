@@ -121,10 +121,41 @@ async function buildBrief(signal, brand, product) {
   return { brand: brand.name, ...draft, sources: signal.sources || [], fromSignal: signal.id, score: +signal.score.toFixed(3), weights: { relevance: signal.rel, authority: signal.auth, sales: +signal.sales.toFixed(2), engagement: +signal.eng.toFixed(2) }, verify: 'AI-drafted from a sourced signal — verify stats against the source + run continuum_check_brand before publish' };
 }
 
+// ── the REPORT drafter — a multi-section lead-magnet PDF brief (produce-report shape) ─────
+const firstSentence = (s) => (String(s.content || '').split(/(?<=[.!?])\s+/)[0] || s.title || '');
+function draftReportTemplate(signals, brand, product) {
+  return {
+    kicker: brand.kicker || brand.name, title: firstSentence(signals[0]).slice(0, 90),
+    subtitle: `What ${brand.name} is seeing in ${product?.sector || 'the market'} — and why it matters to your numbers.`,
+    author: 'Riaan Kleynhans',
+    sections: signals.slice(0, 4).map((s) => ({ heading: String(s.title || firstSentence(s)).replace(/\s*[-–]\s*[^-–]*$/, '').slice(0, 64), stats: extractStats(s.content), body: String(s.content).replace(/\s+/g, ' ').slice(0, 520) })),
+    cta: { headline: 'See it on your numbers.', body: `Book a ${brand.name} walkthrough and we'll model this against your actual data. ${brand.tagline || ''}`.trim() },
+    drafted: 'template', sources: [...new Set(signals.flatMap((s) => s.sources || []))].slice(0, 8),
+    verify: 'AI-drafted from sourced signals — verify every stat against its source + run continuum_check_brand before publish',
+  };
+}
+async function draftReportViaLLM(signals, brand, product, key) {
+  const corpus = signals.slice(0, 4).map((s, i) => `[${i + 1}] ${String(s.content).slice(0, 900)}  (sources: ${(s.sources || []).join(', ')})`).join('\n\n');
+  const sys = `You write a SHORT multi-section lead-magnet report connecting sourced signals to a brand, in the brand voice. RULES: use ONLY facts/numbers present in the signals (never invent); ground every claim; 3-4 sections; each section body <=600 chars. Return ONLY JSON: {"title":"<=90","subtitle":"","sections":[{"heading":"","stats":[{"stat":"","label":""}],"body":""}],"cta":{"headline":"","body":""}}`;
+  const user = `BRAND: ${brand.name} — ${brand.tagline || ''}\nANGLE: ${product?.angle || ''}\nSIGNALS:\n${corpus}`;
+  const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6', max_tokens: 1500, system: sys, messages: [{ role: 'user', content: user }] }) });
+  if (!res.ok) throw new Error(`Anthropic HTTP ${res.status}`);
+  const text = (await res.json())?.content?.find((c) => c.type === 'text')?.text ?? '';
+  const m = text.match(/\{[\s\S]*\}/); if (!m) throw new Error('no JSON in LLM reply');
+  return { ...JSON.parse(m[0]), author: 'Riaan Kleynhans', kicker: brand.kicker || brand.name, drafted: 'llm', sources: [...new Set(signals.flatMap((s) => s.sources || []))].slice(0, 8), verify: 'LLM-synthesised from sourced signals — verify stats + continuum_check_brand before publish' };
+}
+async function buildReportBrief(signals, brand, product) {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (key) { try { return await draftReportViaLLM(signals, brand, product, key); } catch (e) { console.error(`[matcher] report LLM failed (${e.message}) → template`); } }
+  else console.error('[matcher] ANTHROPIC_API_KEY not set → grounded template report (P6)');
+  return draftReportTemplate(signals, brand, product);
+}
+
 async function run() {
   const a = process.argv; const get = (f, d) => { const i = a.indexOf(f); return i >= 0 ? a[i + 1] : d; };
   const project = get('--project', 'worldmonitor');
   const slug = get('--brand', process.env.AMF_BRAND);
+  const format = get('--format', 'post'); // post → single-signal brief · report → multi-section PDF brief
   const brand = loadBrand(slug);
   const product = getProduct(slug);
   let pillars = (get('--pillars', '') || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -133,9 +164,9 @@ async function run() {
   if (!pillars.length) { console.error('no pillars — add the product to portfolio-universe.json, or pass --pillars "a,b,c"'); process.exit(2); }
   const { openStorage } = await import(resolve(REPO_ROOT, 'packages/core/dist/index.js'));
   const storage = openStorage(project);
-  const ranked = rankSignals(storage, pillars, product, Date.now(), 1);
+  const ranked = rankSignals(storage, pillars, product, Date.now(), format === 'report' ? 4 : 1);
   if (!ranked.length) { console.error('[matcher] no matching signals — run adapter-news first'); storage.close(); process.exit(1); }
-  const brief = await buildBrief(ranked[0], brand, product);
+  const brief = format === 'report' ? await buildReportBrief(ranked, brand, product) : await buildBrief(ranked[0], brand, product);
   storage.close();
   console.log(JSON.stringify(brief, null, 2));
 }
