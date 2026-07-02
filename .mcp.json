@@ -18,6 +18,16 @@
         "serve"
       ],
       "env": {}
+    },
+    "continuum": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/Users/emporiumcollection/Development/supabase-projects/CONTINUUM/packages/mcp-server/dist/index.js"
+      ],
+      "env": {
+        "CONTINUUM_PROJECT_ID": "continuum"
+      }
     }
   }
 }
