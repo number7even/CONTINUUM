@@ -322,6 +322,21 @@ function deriveOwnFeeds(slug) {
   } catch { return []; }
 }
 
+/** Derive AMF_RSS_FEEDS from a product's curated authority feeds[] in the universe (--brand).
+ *  These are the T1/T2 sources (Skift, Krebs, 404 Media…). Ingesting them gives the drafter
+ *  high-authority content directly; the boolean must/not gate downstream drops any off-topic
+ *  items broad publishers carry, so a broad T1 feed stays on-brand. Skips feeds flagged with a
+ *  `status` note that names a non-ingestable block (e.g. Cloudflare-403 to non-browser clients). */
+function deriveAuthorityFeeds(slug) {
+  try {
+    const uni = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'portfolio-universe.json'), 'utf8'));
+    const p = (uni.products || []).find((x) => x.slug === slug);
+    return (p?.feeds || [])
+      .filter((f) => f.url && !/403|blocked|not ingest/i.test(f.status || ''))
+      .map((f) => f.url);
+  } catch { return []; }
+}
+
 /** Derive AMF_SIGNAL_QUERY from a product's Portfolio-Universe keywords (--brand). */
 function deriveSignalQuery(slug) {
   try {
@@ -362,6 +377,10 @@ async function run(which, projectId, brand) {
   if (brand && !process.env.AMF_OWN_FEEDS) {
     const of = deriveOwnFeeds(brand);
     if (of.length) { process.env.AMF_OWN_FEEDS = of.join(','); console.error(`[adapter-news] own feeds for "${brand}": ${of.length} (incl. any YouTube channel RSS)`); }
+  }
+  if (brand && !process.env.AMF_RSS_FEEDS) {
+    const af = deriveAuthorityFeeds(brand);
+    if (af.length) { process.env.AMF_RSS_FEEDS = af.join(','); console.error(`[adapter-news] authority feeds for "${brand}": ${af.length} curated T1/T2 source(s) → ingested as content (gate keeps them on-brand)`); }
   }
   const { openStorage } = await import(resolve(REPO_ROOT, 'packages/core/dist/index.js'));
   const storage = openStorage(projectId);
