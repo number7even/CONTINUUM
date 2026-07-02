@@ -79,6 +79,26 @@ async function once() {
   await queue.close();
 }
 
+// ── the PORTFOLIO pulse — the true-autopilot heartbeat (whole portfolio on a schedule) ──
+const PORTFOLIO_ID = 'amf-portfolio-pulse';
+async function addPortfolio(pattern = process.env.AMF_PORTFOLIO_CRON || '0 8 * * *') {
+  const queue = new Queue(QUEUE, { connection });
+  await queue.upsertJobScheduler(PORTFOLIO_ID, { pattern }, { name: 'portfolio', data: {} });
+  console.error(`[pulse] scheduled "${PORTFOLIO_ID}" · pattern="${pattern}" → worker fans out one chain job per product (ingest → match → draft → review-queue)`);
+  await queue.close();
+}
+async function removePortfolio() {
+  const queue = new Queue(QUEUE, { connection });
+  console.error(`[pulse] removed "${PORTFOLIO_ID}": ${await queue.removeJobScheduler(PORTFOLIO_ID)}`);
+  await queue.close();
+}
+async function pulse() {
+  const queue = new Queue(QUEUE, { connection });
+  const job = await queue.add('portfolio', {}, { removeOnComplete: true, removeOnFail: 50 });
+  console.error(`[pulse] enqueued ONE portfolio pulse ${job.id} — worker will fan out chain jobs for all products.`);
+  await queue.close();
+}
+
 async function smoke() {
   console.error('\nAMF cron-pulse smoke — proving the schedule registers in Redis\n');
   await remove().catch(() => {});
@@ -99,4 +119,7 @@ else if (arg === '--add') add(process.argv[3]).then(() => process.exit(0)).catch
 else if (arg === '--list') list().then(() => process.exit(0)).catch((e) => { console.error(e.message); process.exit(1); });
 else if (arg === '--remove') remove().then(() => process.exit(0)).catch((e) => { console.error(e.message); process.exit(1); });
 else if (arg === '--once') once().then(() => process.exit(0)).catch((e) => { console.error(e.message); process.exit(1); });
-else { console.error('usage: node cron-trigger.mjs --add|--list|--remove|--once|--smoke'); process.exit(2); }
+else if (arg === '--add-portfolio') addPortfolio(process.argv[3]).then(() => process.exit(0)).catch((e) => { console.error(e.message); process.exit(1); });
+else if (arg === '--remove-portfolio') removePortfolio().then(() => process.exit(0)).catch((e) => { console.error(e.message); process.exit(1); });
+else if (arg === '--pulse') pulse().then(() => process.exit(0)).catch((e) => { console.error(e.message); process.exit(1); });
+else { console.error('usage: node cron-trigger.mjs --add|--add-portfolio|--pulse|--list|--remove|--remove-portfolio|--once|--smoke'); process.exit(2); }

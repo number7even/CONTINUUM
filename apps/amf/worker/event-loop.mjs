@@ -21,25 +21,49 @@
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
 import { Queue, Worker, QueueEvents } from 'bullmq';
-import { existsSync } from 'node:fs';
-import { produceShort } from './pipeline.mjs';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { produceShort, runProductChain } from './pipeline.mjs';
 
 const connection = { host: '127.0.0.1', port: 6379, maxRetriesPerRequest: null };
 const QUEUE = 'AMF_Content_Chain';
+const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** The worker: run the faceless pipeline, append the result to the state doc. */
+/** Portfolio = every product with a demand-analysed signal_query (analyze.mjs output). */
+function portfolioSlugs() {
+  try { const uni = JSON.parse(readFileSync(join(HERE, 'portfolio-universe.json'), 'utf8')); return (uni.products || []).filter((p) => Array.isArray(p.signal_query) && p.signal_query.length).map((p) => p.slug); } catch { return []; }
+}
+
+/**
+ * The worker handles three job kinds:
+ *   'portfolio' — the autopilot pulse: fan out one 'chain' job per product (whole portfolio)
+ *   'chain'     — per-product: ingest → match → draft → QUEUE FOR APPROVAL (review-queue)
+ *   'produce'   — the original faceless short from fuel/ (kept)
+ * Render + publish stay downstream of the human gate (review.mjs) — the machine never crosses it.
+ */
 export function startContentWorker() {
+  const queue = new Queue(QUEUE, { connection }); // for portfolio → chain fan-out
   return new Worker(
     QUEUE,
     async (job) => {
+      if (job.name === 'portfolio') {
+        const slugs = portfolioSlugs();
+        for (const slug of slugs) await queue.add('chain', { slug }, { removeOnComplete: true, removeOnFail: 50 });
+        console.error(`[L1] portfolio pulse ${job.id} → fanned out ${slugs.length} chain jobs`);
+        return { fannedOut: slugs.length, slugs };
+      }
+      if (job.name === 'chain') {
+        const r = await runProductChain(job.data.slug, job.data.opts);
+        console.error(`[L2-L3] chain ${job.data.slug}: ${r.ok ? '✅ queued for review → ' + r.reviewId : '— ' + r.reason}`);
+        return r;
+      }
+      // default 'produce' — the proven faceless voice-over-b-roll short from fuel/
       const state = job.data ?? {};
-      console.error(`[L4/L5] job ${job.id} — synthesizing content…`);
+      console.error(`[L4/L5] job ${job.id} — synthesizing short…`);
       const { assetPath } = await produceShort(state.inputs ?? {});
-      // strict, append-only: never mutate prior fields, only append the result
       const next = { ...state, results: [...(state.results ?? []), { stage: 'L4/L5', assetPath, at: 'render-complete' }] };
       console.error(`[L4/L5] job ${job.id} ✅ asset → ${assetPath}`);
-      // L6 handoff point (spec): a real marketing worker would subscribe to completed
-      // jobs here. Not wired — see HONEST SCOPE above.
       return next;
     },
     { connection, concurrency: 1 },
