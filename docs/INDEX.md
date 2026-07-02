@@ -7,7 +7,8 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
 
 ## AMF content engine & amalgamation
 
-- [`AMF_PROCESS.md`](./AMF_PROCESS.md) — the content factory end-to-end (Stages A→L)
+- [`AMF_PROCESS.md`](./AMF_PROCESS.md) — the content factory end-to-end (Stages A→L, prose)
+- [`AMF_ENGINE_MAP.md`](./AMF_ENGINE_MAP.md) — the pipeline **diagram** + module-by-module verified/gated status
 - [`DEMAND_ATLAS_2026-07-01.md`](./DEMAND_ATLAS_2026-07-01.md) — 14-product demand maps (CORE / EXPAND / EDUCATE)
 - [`AMF-XENOS-AMALGAMATION-HANDSHAKE.md`](./AMF-XENOS-AMALGAMATION-HANDSHAKE.md) · [`AMF-XENOS-RECONCILIATION.md`](./AMF-XENOS-RECONCILIATION.md) — the XENOS CRM revenue loop (Seams ① ⑤ ②)
 - [`STUDIOMUNICH-TALENT-HANDSHAKE.md`](./STUDIOMUNICH-TALENT-HANDSHAKE.md) — rented-talent (VAULT) contract
