@@ -192,4 +192,8 @@ empire is built."
 unblocker), and we wire **Seam ① (lead handoff)** as the first real join — gated,
 fail-safe, contract-first. Then the §8 dogfood thread for VoiceCosmos.
 
+## Related
+
+Map: [`../router.md`](../router.md) · Docs hub: [`INDEX.md`](./INDEX.md) · Pipeline: [`AMF_PROCESS.md`](./AMF_PROCESS.md) · Reconciliation: [`AMF-XENOS-RECONCILIATION.md`](./AMF-XENOS-RECONCILIATION.md) · Talent: [`STUDIOMUNICH-TALENT-HANDSHAKE.md`](./STUDIOMUNICH-TALENT-HANDSHAKE.md)
+
 _IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._

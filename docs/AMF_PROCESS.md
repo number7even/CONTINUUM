@@ -177,4 +177,8 @@ node apps/amf/worker/review.mjs --reject <id> "off-brand"
 5. **Publish integration** — keep fully manual, or wire a draft-to-channel step (still human-triggered)?
 6. **Buyer-intent filters** — add `must`/`not` gates to the noisy products?
 
+## Related
+
+Map: [`../router.md`](../router.md) · Docs hub: [`INDEX.md`](./INDEX.md) · Architecture: [`../ARCHITECTURE.md`](../ARCHITECTURE.md) · Demand: [`DEMAND_ATLAS_2026-07-01.md`](./DEMAND_ATLAS_2026-07-01.md) · Brand voice: [`BRAND_KERNEL.md`](./BRAND_KERNEL.md) · XENOS loop: [`AMF-XENOS-AMALGAMATION-HANDSHAKE.md`](./AMF-XENOS-AMALGAMATION-HANDSHAKE.md) · [`AMF-XENOS-RECONCILIATION.md`](./AMF-XENOS-RECONCILIATION.md) · Talent: [`STUDIOMUNICH-TALENT-HANDSHAKE.md`](./STUDIOMUNICH-TALENT-HANDSHAKE.md)
+
 _IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._

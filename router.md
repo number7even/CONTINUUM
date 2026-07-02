@@ -34,13 +34,29 @@ CONTINUUM's own MCP server is registered (`.mcp.json` → project `continuum`). 
 | An architectural decision (what's locked vs pending) | [`ARCHITECTURE.md`](./ARCHITECTURE.md) §14 |
 | The multi-layer product vision (tier-labelled) | [`docs/VISION/UNIFIED-ARCHITECTURE.md`](./docs/VISION/UNIFIED-ARCHITECTURE.md) |
 
-## 2. Artifacts & hand-offs (state lives in the file system)
+## 2. Lifecycle — spec → ship (routed to agent-skills)
+
+The dev lifecycle runs on the **agent-skills** marketplace (Addy Osmani) — CONTINUUM **routes** to it, it does not re-implement it (don't reinvent the wheel). Install once: `/plugin marketplace add addyosmani/agent-skills` then `/plugin install agent-skills@addy-agent-skills`.
+
+| Stage | Command | Principle |
+|---|---|---|
+| Spec what to build | `/spec` | spec before code |
+| Plan how to build it | `/plan` | small atomic tasks |
+| Build a slice | `/build` | one slice at a time |
+| Prove it works | `/test` | tests are proof |
+| Review before merge | `/review` | improve code health |
+| Simplify | `/code-simplify` | clarity over cleverness |
+| Ship | `/ship` | faster is safer |
+
+CONTINUUM contributes the **memory layer beneath** the lifecycle: each stage's output becomes a verifiable checkpoint / hand-off (`scripts/checkpoints/` + `continuum_get_state`), not a remembered claim.
+
+## 3. Artifacts & hand-offs (state lives in the file system)
 
 - **Working artifacts** → the file that owns them (code, docs, a rendered asset, a checkpoint).
 - **Hand-off** → a `docs/*-HANDSHAKE.md` (contract-first) **+** a checkpoint (`scripts/checkpoints/*.mjs`) so the state is verifiable, not remembered. Examples: `AMF-XENOS-AMALGAMATION-HANDSHAKE.md`, `STUDIOMUNICH-TALENT-HANDSHAKE.md`.
 - **"Pick up"** = read `continuum_get_state` + the relevant floor's local context. **"Hand off"** = write a handshake doc + stamp a checkpoint.
 
-## 3. The law (do not violate, do not route around)
+## 4. The law (do not violate, do not route around)
 
 - **Prime Mission:** `AGENTS.md` (The Nine). P5 — the rule binds its keeper. If a floor conflicts with `AGENTS.md`, `AGENTS.md` wins.
 - **Verify over generate (P2/P4):** claims carry a `verifyCommand`; nothing is "done" without mechanical proof.

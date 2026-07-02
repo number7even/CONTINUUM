@@ -89,4 +89,8 @@ dogfood thread end-to-end — first real proof of the amalgamation.
 P4 (verified only) · P9 (Operational Pulse is the human gate; no auto-publish) · P7/P8
 (official APIs, no cookie-scraping) · P1 (scoped keys in env, never chat/commits).
 
+## Related
+
+Map: [`../router.md`](../router.md) · Docs hub: [`INDEX.md`](./INDEX.md) · Pipeline: [`AMF_PROCESS.md`](./AMF_PROCESS.md) · Handshake: [`AMF-XENOS-AMALGAMATION-HANDSHAKE.md`](./AMF-XENOS-AMALGAMATION-HANDSHAKE.md)
+
 _IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._

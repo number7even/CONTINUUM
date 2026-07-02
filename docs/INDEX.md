@@ -2,7 +2,17 @@
 
 This directory holds user-facing documentation. Internal architecture lives at
 the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
-[`AGENTS.md`](../AGENTS.md) (The Nine v0.1.0).
+[`AGENTS.md`](../AGENTS.md) (The Nine v0.1.0); the workspace Map is
+[`router.md`](../router.md).
+
+## AMF content engine & amalgamation
+
+- [`AMF_PROCESS.md`](./AMF_PROCESS.md) — the content factory end-to-end (Stages A→L)
+- [`DEMAND_ATLAS_2026-07-01.md`](./DEMAND_ATLAS_2026-07-01.md) — 14-product demand maps (CORE / EXPAND / EDUCATE)
+- [`AMF-XENOS-AMALGAMATION-HANDSHAKE.md`](./AMF-XENOS-AMALGAMATION-HANDSHAKE.md) · [`AMF-XENOS-RECONCILIATION.md`](./AMF-XENOS-RECONCILIATION.md) — the XENOS CRM revenue loop (Seams ① ⑤ ②)
+- [`STUDIOMUNICH-TALENT-HANDSHAKE.md`](./STUDIOMUNICH-TALENT-HANDSHAKE.md) — rented-talent (VAULT) contract
+- [`AI-GUEST-BOT-CONTRACT.md`](./AI-GUEST-BOT-CONTRACT.md) · [`AMF-L4-AUDIO-CONTRACT.md`](./AMF-L4-AUDIO-CONTRACT.md) · [`POD-GENI-AI-GUEST-HANDOVER-RESPONSE.md`](./POD-GENI-AI-GUEST-HANDOVER-RESPONSE.md) · [`VC-AVATAR-COMPONENT-HANDOVER-REQUEST.md`](./VC-AVATAR-COMPONENT-HANDOVER-REQUEST.md) — avatar / voice contracts
+- [`BRAND_KERNEL.md`](./BRAND_KERNEL.md) — the brand voice source the drafter grounds on
 
 ## Current operating docs (read these first)
 
