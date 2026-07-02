@@ -27,6 +27,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { decideRender, describeDecision } from './vault-guard.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(HERE, 'out');
@@ -42,6 +43,16 @@ const step = (s) => console.log(`  [${++n}] ${s}`);
 const real = [], stub = [];
 
 console.log(`\nAMF one-short producing slice · work=${work}\n`);
+
+// ── Talent gate — the VAULT rights wall (§7): NEVER serve an unsigned human likeness ──
+// Every presenter passes through here first. In shadow (no live VAULT render), a rented
+// `studiomunich:` face declines to synthetic; `digital:` proceeds. The signed-presenter
+// composite is the next build (gated on VAULT §7.1–7.4); this gate is the enforcement now.
+const avatarReq = process.env.AMF_AVATAR || 'digital:default';
+const talent = decideRender({ avatarId: avatarReq }); // no live render in shadow → rented → synthetic
+console.log(`  [talent] ${describeDecision(talent)}`);
+if (talent.securityEvent) console.error('  [talent] ⚠️ rights-signature failure — refused to serve likeness (P4/P8)');
+stub.push(`presenter: rights-wall → ${talent.mode} (face composite = next build, gated on VAULT)`);
 
 // ── L3 (script) — real file or sample ────────────────────────────────────────
 const SCRIPT = process.env.AMF_SCRIPT && existsSync(process.env.AMF_SCRIPT)

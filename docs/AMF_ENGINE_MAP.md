@@ -60,7 +60,7 @@
 | **C · Sources** | `discover.mjs` · `opml-import.mjs` · `rate-source.mjs` | ✅ built + validated (Simon Willison; 404 Media locked live 2026-07-02) |
 | **D · Ingest** | `adapter-news.mjs` (8) · `pillars-ingest.mjs` | ✅ key-free path proven (googlenews + rss + HN); youtube keyed; **reddit 403** (uses public `/search.json` — needs a free OAuth token to fix); feedly / worldmonitor gated |
 | **E/F/G · Match** | `content-matcher.mjs` | ✅ **proven live 2026-07-02**: 85 → 17 (80% noise gated) → 5-D ranked → LLM-drafted |
-| **H · Produce** | `produce-*` · `render` · `broll` · `voice_pipeline.py` | 🟡 **partially proven** — one 9:16 voiced MP4 + one 6-page PDF verified on disk; a path, not yet a factory. **VAULT rented-talent path is contract-only** (see below) |
+| **H · Produce** | `produce-*` · `render` · `broll` · `voice_pipeline.py` · **`vault-guard`** | 🟡 **partially proven** — one 9:16 voiced MP4 + one 6-page PDF verified on disk; a path, not yet a factory. **VAULT rights wall now built + verified** — `vault-guard.mjs` (decline-to-synthetic, 9/9 branches) is wired into `produce-short`; the signed-presenter *render/composite* is the remaining VAULT-gated build (see below) |
 | **I · Review** | `review.mjs` | ✅ human gate, idempotent (approve ≠ publish — P7/P9) |
 | **J · Handoff** | `stage-j.mjs` | 🟡 **built + gated** — replaces the dead `DEMO_WEBHOOK_URL`; awaiting `XENOS_LEADS_KEY` + XENOS's `meta` passthrough (blocker B1) so leads route to the owner tenant UUID |
 | **K · Memory** | CONTINUUM | ✅ live (dogfooded — this repo's own checkpoints) |
@@ -69,16 +69,18 @@
 
 ### Gating detail (verified in code 2026-07-03)
 
-- **Stage H — StudioMunich VAULT is a contract, not yet code (P4).** The intended guard
-  — *decline to synthetic avatars, never serve an unsigned human likeness* — and the
-  `X-Rights-Signature` / webhook spec live in
-  [`STUDIOMUNICH-TALENT-HANDSHAKE.md`](./STUDIOMUNICH-TALENT-HANDSHAKE.md) **only**. The
-  `STUDIOMUNICH_VAULT_*` env keys appear (commented) in `.env.local.example`; they are
-  **not referenced by any worker module**, and `produce-short.mjs` has no decline logic.
-  Until the VAULT team ships the authoritative playbook, base URLs, bearer secret, the
-  precise `X-Rights-Signature` spec, the webhook contract, and a live test actor — **and**
-  the decline-to-synthetic guard is implemented — the produce path uses synthetic avatars
-  only. Today the rented-talent path is "in shadow": designed, not wired.
+- **Stage H — the VAULT rights wall is now built (2026-07-03).** `vault-guard.mjs` is the
+  single enforcement point every presenter passes through: `studiomunich:<actorId>` (rented
+  human) requires a verified `X-Rights-Signature` — recomputed HMAC-SHA256 over
+  `[actorId, modality, phraseHash, duration, tier]`, **hard-reject on mismatch, timing-safe**;
+  `digital:<id>` (synthetic) serves freely. Fail-safe: no secret (VAULT in shadow) / 404 /
+  forged / tampered / takedown → **decline → synthetic**, never the unsigned likeness. Proven
+  9/9 branches + a real `produce-short` run (requested `studiomunich:astrid` → declined to
+  synthetic; MP4 still built). **Still gated (the render half):** the guard clears/declines,
+  but the *signed-presenter render + composite* needs VAULT's playbook, base URL + bearer,
+  the exact `X-Rights-Signature` encoding (§7.3 — must match byte-for-byte), the webhook
+  contract, and a live test actor. Until those land the wall keeps the path in shadow —
+  designed to serve rented talent, wired to refuse it until it's provably signed.
 - **Stage J — lead hook.** `stage-j.mjs` `buildLeadPayload()` sets `tenant_id` = the OWNER
   tenant (VoiceCosmos's CRM, not the prospect) via `xenos-registry.json`, and passes the
   prospect's product interest + AMF asset refs through `meta`. Gated on
