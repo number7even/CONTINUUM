@@ -82,7 +82,18 @@
       "keywords": ["avatar", "digital human", "likeness", "deepfake consent", "creator", "synthetic media", "voice clone rights", "talent", "sag"],
       "sales_signals": ["likeness lawsuit", "ai actor dispute", "deepfake regulation", "creator monetisation", "brand avatar"],
       "signal_query": ["ai avatars", "digital human", "likeness rights", "digital talent", "creator economy", "deepfake consent"],
-      "feeds": []
+      "filters": {
+        "_model": "Feedly: (Avatar/synthetic-media entity) AND (rights/consent/creator/talent context) NOT (sports/collectibles). must-B separates studiomunich (consented likeness/talent) from voiceidvault (fraud/detection).",
+        "must": [
+          ["avatar", "digital human", "digital humans", "likeness", "deepfake", "synthetic media", "synthetic voice", "voice clone", "voice cloning", "ai actor", "ai actors", "digital twin", "digital double", "ai-generated", "generative", "virtual influencer", "digital talent"],
+          ["consent", "rights", "royalt", "licensing", "license", "sag-aftra", "sag aftra", "union", "creator", "talent", "actor", "performer", "likeness", "monetiz", "monetis", "contract", "ownership", "opt-in", "ethics", "regulation"]
+        ],
+        "not": ["trading card", "pokemon", "world cup", "fifa", "football", "soccer", "olympic"]
+      },
+      "feeds": [
+        {"url": "https://www.404media.co/rss/", "tier": 1, "name": "404 Media", "status": "operator authority for likeness / synthetic-media / consent — validated live 2026-07-02 (15 items). Broad source: gated by the must/not filter above."},
+        {"url": "https://www.theverge.com/rss/index.xml", "tier": 2, "name": "The Verge", "status": "secondary — strong deepfake / creator-economy coverage; validated live 2026-07-02 (10 items). Broad: gated by filter."}
+      ]
     },
     {
       "slug": "podgeni", "priority": 2, "geo": false, "confidence": "high",
@@ -117,6 +128,14 @@
       "keywords": ["compliance", "audit", "regulatory", "attestation", "risk", "governance", "soc2", "iso", "evidence"],
       "sales_signals": ["new regulation", "audit failure", "compliance mandate", "fine / enforcement"],
       "signal_query": ["audit", "compliance", "regulatory", "compliance automation", "risk management"],
+      "filters": {
+        "_model": "Feedly: (Compliance/Audit) AND (Security/IT/Regulatory context) NOT (energy/tax/election/SEO audits + sports). must-B separates security-compliance 'audit' from financial/energy/movie 'audit'.",
+        "must": [
+          ["compliance", "audit", "auditor", "audit-ready", "audit trail", "regulatory", "regulation", "governance", "attestation", "grc", "soc2", "soc 2", "iso 27001", "iso27001", "controls", "certification", "risk management", "security posture"],
+          ["security", "cyber", "cybersecurity", "infosec", "data", "privacy", "software", "cloud", "saas", "information", "risk", "posture", "vendor", "policy", "enterprise", "regulation", "regulatory", "governance", "framework", "certification", "ai"]
+        ],
+        "not": ["energy audit", "tax audit", "irs audit", "election audit", "seo audit", "content audit", "audit the fed", "world cup", "fifa", "football", "soccer", "olympic", "olympics", "box office", "tournament", "playoff"]
+      },
       "feeds": [
         {"url": "https://risky.biz/feeds/risky-business", "tier": 1, "name": "Risky Business"},
         {"url": "https://www.risk.net/feeds/rss", "tier": 2, "name": "Risk.net"}
@@ -157,6 +176,13 @@
       "keywords": ["trading", "markets", "fintech", "investment", "portfolio", "hedge", "equities", "macro", "analyst"],
       "sales_signals": ["market volatility", "ai in finance", "retail trading", "fintech funding"],
       "signal_query": ["ai trading", "market intelligence", "ai trading tool", "ai trading bot", "investment research", "multi-agent finance"],
+      "filters": {
+        "_model": "Feedly: (Financial-market entity) NOT (sports trading / collectibles / housing-job-market). Bare 'market' excluded so housing/job/farmers markets don't leak; specific finance anchors required.",
+        "must": [
+          ["trading", "trader", "stock market", "financial market", "capital market", "stocks", "equities", "equity", "investment", "investing", "investor", "portfolio", "hedge fund", "fintech", "forex", "securities", "wall street", "nasdaq", "s&p", "earnings", "interest rate", "federal reserve", "central bank", "macro", "bonds", "commodities", "asset management", "volatility"]
+        ],
+        "not": ["trading card", "trading cards", "transfer market", "trade rumor", "trade rumour", "trade deadline", "free agent", "pokemon", "pokémon", "world cup", "fifa", "football", "soccer", "olympic", "sports betting", "housing market", "job market", "farmers market", "flea market", "labor market", "labour market", "meat market"]
+      },
       "feeds": [
         {"url": "http://feed.zacks.com/commentary/AllStories/rss", "tier": 2, "name": "Zacks Investment Research"}
       ]
