@@ -1,0 +1,21 @@
+{
+  "$comment": "AMF↔XENOS product registry reconciliation (D1/B3). Per XENOS response: ProductTarget.key is the join key; each engine holds a synced copy (federate, not migrate). owner_tenant_id is XENOS's to fill — the OWNER tenant (whose CRM the lead lands in), not the prospect. Confirmed matches keyed; drift + mismatches flagged for operator ratification (P4).",
+  "join_key": "xenos_key",
+  "map": {
+    "voicecosmos":    { "xenos_key": "VoiceCosmos",  "owner_tenant_id": null, "status": "confirmed" },
+    "voiceidvault":   { "xenos_key": "VoiceIDVault", "owner_tenant_id": null, "status": "confirmed" },
+    "studiomunich":   { "xenos_key": "StudioMunich", "owner_tenant_id": null, "status": "confirmed" },
+    "viwago":         { "xenos_key": "Viwago",       "owner_tenant_id": null, "status": "confirmed" },
+    "qintercept":     { "xenos_key": "Q-Intercept",  "owner_tenant_id": null, "status": "confirmed" },
+    "sekago":         { "xenos_key": "Sekago",       "owner_tenant_id": null, "status": "confirm-sector", "note": "slug matches but sector differs: AMF='digital perimeter defense/deception' vs XENOS selector='WiFi DensePose Security'. Same product? Confirm before campaigning." },
+    "fluxcore":       { "xenos_key": "Photonflow",   "owner_tenant_id": null, "status": "confirm-match", "note": "AMF fluxcore='photonic chip design/EDA' vs XENOS Photonflow='Photonic Compute' — likely the same product, different name. Confirm." },
+    "continuum":      { "xenos_key": null, "owner_tenant_id": null, "status": "amf-only", "note": "no XENOS campaign yet (B3 drift)" },
+    "thenine":        { "xenos_key": null, "owner_tenant_id": null, "status": "amf-only" },
+    "podgeni":        { "xenos_key": null, "owner_tenant_id": null, "status": "amf-only" },
+    "sezine":         { "xenos_key": null, "owner_tenant_id": null, "status": "amf-only" },
+    "voinista":       { "xenos_key": null, "owner_tenant_id": null, "status": "amf-only" },
+    "digitalcoaching":{ "xenos_key": null, "owner_tenant_id": null, "status": "amf-only" }
+  },
+  "xenos_only": ["Mantopus", "Vibely"],
+  "_note": "XENOS campaigns 9 products; AMF targets 14. Overlap = 7 (5 confirmed + 2 confirm). AMF-only = 6 (no XENOS campaign). XENOS-only = 2 (Mantopus/Vibely, no AMF universe entry). Drift is explicit, not silent (B3)."
+}
