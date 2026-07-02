@@ -13,6 +13,8 @@ import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { surfaceToPulse } from './pulse.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, 'produce-short.mjs');
 const ASSET = join(HERE, 'out', 'one-short.mp4');
@@ -47,7 +49,9 @@ export async function runProductChain(slug, { project, ingest = true } = {}) {
   if (m.code !== 0 || !match) return { slug, ok: false, reason: 'no on-brand signal this tick' };
   let brief; try { brief = JSON.parse(match[0]); } catch { return { slug, ok: false, reason: 'brief parse error' }; }
   const reviewId = enqueueForReview({ slug, brief });
-  return { slug, ok: true, reviewId, headline: brief.headline };
+  // Seam ⑤ — also surface into the ONE cockpit (XENOS Operational Pulse); best-effort, gated, never blocks the queue
+  const pulse = await surfaceToPulse({ slug, brief, reviewId }).catch((e) => ({ ok: false, reason: e.message }));
+  return { slug, ok: true, reviewId, headline: brief.headline, pulse: pulse?.ok ? 'surfaced' : pulse?.reason };
 }
 
 /**
