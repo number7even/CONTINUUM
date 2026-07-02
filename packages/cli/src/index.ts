@@ -23,8 +23,8 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
-import { basename, join as joinPath, resolve as resolvePath } from 'node:path';
-import { copyFileSync, existsSync, readFileSync, watch as fsWatch } from 'node:fs';
+import { basename, dirname, join as joinPath, resolve as resolvePath } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, watch as fsWatch, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
 import {
@@ -209,6 +209,81 @@ function printStateMdSummary(summary: StateMdImportSummary, stateMdPath: string)
 
 // ── continuum init ────────────────────────────────────────────────────────────
 
+// ── ICM scaffold — "folders over agents" (created by `continuum init`) ───────────
+
+const ICM_REBOUND =
+  'If you do not find what you need in this floor, return to the root `router.md` (the Map). Never guess or hallucinate across floors — come back to the Map.';
+
+function icmFloor(title: string, purpose: string): string {
+  return `# ${title} — local context\n\n${purpose}\n\n> **Rebound rule:** ${ICM_REBOUND}\n`;
+}
+
+/** The standard ICM file tree Continuum scaffolds into a project on init. */
+function icmFiles(projectId: string): Record<string, string> {
+  return {
+    'agents.md':
+      `# ${projectId} — Prime Mission (agents.md)\n\n` +
+      `This is the **Lobby**. When you wake up in this workspace, read this file, then the Map (\`router.md\`).\n\n` +
+      `## Identity & laws\n` +
+      `- This workspace uses the **Interpretable Context Methodology** — *"folders over agents."* The file system IS the architecture, routing, and memory. No fragile agent framework governs; the folders do.\n` +
+      `- **Verify over generate:** nothing is "done" without mechanical proof (a passing command / a checkpoint). The AI shapes language; file-system discipline holds the verifiable truth.\n` +
+      `- **Never over-consume context:** fetch skills/reference only when a task needs them (see \`skills/\`).\n\n` +
+      `## How to work here\n` +
+      `1. Read \`router.md\` — the Map. It routes you to the right floor by intent.\n` +
+      `2. Each floor has its own \`agents.md\` (local context) + the rebound rule.\n` +
+      `3. "Pick up" = read the current state (\`continuum_get_state\` if the MCP server is registered) + the relevant floor.\n` +
+      `4. "Hand off" = write progress to an artifact + (optionally) stamp a checkpoint.\n`,
+    'router.md':
+      `# router.md — The Map (Interpretable Context Methodology)\n\n` +
+      `> Read \`agents.md\` first (the Prime Mission). This is the Map — it routes you to the right *floor* by intent.\n` +
+      `> **Rebound rule:** if a floor's local context doesn't answer your question, return HERE. Never guess across floors.\n\n` +
+      `## Session start\n` +
+      `If Continuum's MCP server is registered (\`.mcp.json\`), open with \`continuum_get_state\` + \`continuum://session/briefing\` — start warm, not cold. Search before fetching (search → timeline → get_observations).\n\n` +
+      `## Floors — route by intent\n` +
+      `| If you need to… | Go to |\n|---|---|\n` +
+      `| Onboard / see the build plan & validation gates | \`01-start-here/\` |\n` +
+      `| The deterministic core / execution logic | \`03-code/\` |\n` +
+      `| The app shell / working artifacts | \`app/\` |\n` +
+      `| Reference material, schemas, regression fixtures | \`reference/\` |\n` +
+      `| Fetch-on-demand know-how (don't preload) | \`skills/\` |\n` +
+      `| The audit ledger / hand-offs (append-only) | \`artifacts/\` |\n\n` +
+      `## Artifacts & hand-offs\n` +
+      `Working outputs are written to the file that owns them. A hand-off is a documented artifact (+ a checkpoint) so state is verifiable, not remembered.\n`,
+    '01-start-here/agents.md': icmFloor('01-start-here (Lobby)', 'Onboarding + the phased build plan. New here? Read `BUILD-PLAN.md`, then return to the Map.'),
+    '01-start-here/BUILD-PLAN.md':
+      `# Build Plan — phased ledger (validation gates)\n\n` +
+      `> The master feature-status ledger. **No new code is written until the current phase is validated.**\n` +
+      `> Append-only. Each phase lists: goal · hard precondition · deliverables · the gate that must pass to advance.\n\n` +
+      `## Phase 0 — <name>\n- [ ] goal:\n- [ ] gate (verify):\n`,
+    '03-code/agents.md': icmFloor('03-code (Execution Floor)', 'The deterministic core — hard-coded logic that maintains verifiable truth. Keep AI generation OUT of this floor; it is protected from hallucination by construction.'),
+    'app/agents.md': icmFloor('app (Working Artifacts / Shell)', 'The application shell + human-in-the-loop surfaces (auth, UI, consent gates). Working artifacts land here.'),
+    'skills/README.md':
+      `# skills — fetch on demand\n\n` +
+      `How-to knowledge lives here as separate files, **fetched only when a task needs them** — never preloaded. This keeps the context window small and token cost low. Add one skill per file; reference it from a floor's \`agents.md\` when that floor needs it.\n`,
+    'reference/agents.md': icmFloor('reference (Reference Material & Regression)', 'Input schemas, config, and `fixtures/` — the append-only deterministic baseline for regression testing.'),
+    'reference/fixtures/.gitkeep': '',
+    'artifacts/agents.md': icmFloor('artifacts (Audit Ledger)', 'Append-only working outputs, run metrics, and hand-off documents. The audit trail of what was produced and proven.'),
+  };
+}
+
+/** Write the ICM tree into `root`, never overwriting existing files. Returns what changed. */
+function scaffoldIcm(root: string, projectId: string): { created: string[]; skipped: string[] } {
+  const created: string[] = [];
+  const skipped: string[] = [];
+  const files = icmFiles(projectId);
+  files['CLAUDE.md'] =
+    `# ${projectId}\n\n> This workspace uses the Interpretable Context Methodology (*"folders over agents"*).\n` +
+    `> **Read [\`agents.md\`](./agents.md) first** (the Prime Mission), then [\`router.md\`](./router.md) (the Map).\n`;
+  for (const [rel, content] of Object.entries(files)) {
+    const abs = joinPath(root, rel);
+    if (existsSync(abs)) { skipped.push(rel); continue; } // idempotent — never clobber
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, content);
+    created.push(rel);
+  }
+  return { created, skipped };
+}
+
 function commandInit(projectId: string, stateMdOverride: string | undefined): void {
   const storage = openStorage(projectId);
   const dataPath = storage.dataLocation();
@@ -231,6 +306,16 @@ function commandInit(projectId: string, stateMdOverride: string | undefined): vo
   }
 
   storage.close();
+
+  // ICM scaffold — "folders over agents" is Continuum's standard project structure.
+  // Idempotent (never clobbers existing files); opt out with `continuum init --no-icm`.
+  let icmNote = '';
+  if (!process.argv.includes('--no-icm')) {
+    const { created, skipped } = scaffoldIcm(process.cwd(), projectId);
+    icmNote = created.length
+      ? `\n  ICM structure scaffolded (${created.length} new: agents.md · router.md · CLAUDE.md · 01-start-here · 03-code · app · skills · reference · artifacts).`
+      : `\n  ICM structure already present (${skipped.length} files) — left untouched.`;
+  }
 
   // Find the MCP server binary so the registration snippet is copy-paste ready.
   // Resolve through node's module resolution rather than guessing paths — this
@@ -261,7 +346,7 @@ function commandInit(projectId: string, stateMdOverride: string | undefined): vo
       `✓ Continuum initialised`,
       ``,
       `  Project ID:  ${projectId}`,
-      `  Data path:   ${dataPath}${stateMdNote}`,
+      `  Data path:   ${dataPath}${stateMdNote}${icmNote}`,
       ``,
       `MCP registration — add to ~/.claude.json or .mcp.json:`,
       ``,
