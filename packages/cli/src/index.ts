@@ -250,6 +250,18 @@ function icmFiles(projectId: string): Record<string, string> {
       `| Reference material, schemas, regression fixtures | [reference](./reference/agents.md) |\n` +
       `| Fetch-on-demand know-how (don't preload) | [skills](./skills/README.md) |\n` +
       `| The audit ledger / hand-offs (append-only) | [artifacts](./artifacts/agents.md) |\n\n` +
+      `## Lifecycle — spec → ship (routed to agent-skills)\n` +
+      `The dev lifecycle runs on the **agent-skills** marketplace (Addy Osmani) — Continuum ROUTES to it, it does not re-implement it (don't reinvent the wheel). Install once:\n` +
+      `\`\`\`\n/plugin marketplace add addyosmani/agent-skills\n/plugin install agent-skills@addy-agent-skills\n\`\`\`\n\n` +
+      `| Stage | Command | Principle |\n|---|---|---|\n` +
+      `| Spec what to build | \`/spec\` | spec before code |\n` +
+      `| Plan how to build it | \`/plan\` | small atomic tasks |\n` +
+      `| Build a slice | \`/build\` | one slice at a time |\n` +
+      `| Prove it works | \`/test\` | tests are proof |\n` +
+      `| Review before merge | \`/review\` | improve code health |\n` +
+      `| Simplify | \`/code-simplify\` | clarity over cleverness |\n` +
+      `| Ship | \`/ship\` | faster is safer |\n\n` +
+      `Skills auto-activate on detected work; fetch a skill only when the task needs it ([skills](./skills/README.md)). Continuum records each stage's output as a verifiable artifact (checkpoint / hand-off) — the memory layer beneath the lifecycle.\n\n` +
       `## Artifacts & hand-offs\n` +
       `Working outputs are written to the file that owns them. A hand-off is a documented artifact (+ a checkpoint) so state is verifiable, not remembered.\n`,
     '01-start-here/agents.md': icmFloor('01-start-here (Lobby)', 'Onboarding + the phased build plan. New here? Read `BUILD-PLAN.md`, then return to the Map.'),
@@ -262,7 +274,11 @@ function icmFiles(projectId: string): Record<string, string> {
     'app/agents.md': icmFloor('app (Working Artifacts / Shell)', 'The application shell + human-in-the-loop surfaces (auth, UI, consent gates). Working artifacts land here.'),
     'skills/README.md':
       `# skills — fetch on demand\n\n` +
-      `How-to knowledge lives here as separate files, **fetched only when a task needs them** — never preloaded. This keeps the context window small and token cost low. Add one skill per file; reference it from a floor's \`agents.md\` when that floor needs it.\n`,
+      `How-to knowledge lives here as separate files, **fetched only when a task needs them** — never preloaded. This keeps the context window small and token cost low.\n\n` +
+      `## The spec → ship lifecycle (routed, not duplicated)\n` +
+      `Continuum routes the dev lifecycle to the **agent-skills** marketplace — see the Map ([\`../router.md\`](../router.md)). Install: \`/plugin marketplace add addyosmani/agent-skills\` then \`/plugin install agent-skills@addy-agent-skills\`. That provides /spec /plan /build /test /review /code-simplify /ship + personas.\n\n` +
+      `## Project skills\n` +
+      `Add PROJECT-specific skills here as separate files; reference each from a floor's \`agents.md\` when that floor needs it. Rebound to the [Map](../router.md) if unsure.\n`,
     'reference/agents.md': icmFloor('reference (Reference Material & Regression)', 'Input schemas, config, and `fixtures/` — the append-only deterministic baseline for regression testing.'),
     'reference/fixtures/.gitkeep': '',
     'artifacts/agents.md': icmFloor('artifacts (Audit Ledger)', 'Append-only working outputs, run metrics, and hand-off documents. The audit trail of what was produced and proven.'),
