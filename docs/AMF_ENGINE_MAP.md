@@ -26,8 +26,9 @@
   │                worldmonitor · feedly · reddit    → CONTINUUM observations (FTS5)
   ▼
   E/F/G MATCH + RANK + DRAFT   content-matcher.mjs
-  │                boolean must/not GATE → 5-D rank
-  │                (relevance × recency × authority × sales × engagement)
+  │                boolean must/not GATE → 6-D rank
+  │                (relevance × recency × authority × sales × engagement × FEEDBACK)
+  │                feedback = Seam ② learning: approved topics ↑ · rejected ↓ (bounded 0.8–1.3)
   │                → draftViaLLM (grounded, no invented stats)   format: post | report
   ▼
   H  PRODUCE       produce-post · produce-report · produce-short · render · broll ·
@@ -64,7 +65,7 @@
 | **J · Handoff** | `stage-j.mjs` | 🟡 **built + gated** — replaces the dead `DEMO_WEBHOOK_URL`; awaiting `XENOS_LEADS_KEY` + XENOS's `meta` passthrough (blocker B1) so leads route to the owner tenant UUID |
 | **K · Memory** | CONTINUUM | ✅ live (dogfooded — this repo's own checkpoints) |
 | **L · Autopilot** | `event-loop.mjs` · `cron-trigger.mjs` · `pipeline.mjs` | 🟡 built; **not yet run unattended** |
-| **↺ · Return loop** | `pulse.mjs` · `feedback-sync.mjs` · `pulse-return.mjs` | 🟡 **built + gated** — awaiting `XENOS_HITL_KEY` + XENOS exposing the `/api/hitl/recent-decisions` read-feed |
+| **↺ · Return loop** | `pulse.mjs` · `feedback-sync.mjs` · `pulse-return.mjs` · **`content-matcher` (fb)** | 🟡 **built + gated** on `XENOS_HITL_KEY` + `/api/hitl/recent-decisions` — but the **learning half is now closed in code** (2026-07-03): `content-matcher` reads `ground_truth` rewards and re-weights ranking. Co-locate `feedback-sync` output with the content pool to activate |
 
 ### Gating detail (verified in code 2026-07-03)
 

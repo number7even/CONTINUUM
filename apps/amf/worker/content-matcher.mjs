@@ -61,6 +61,26 @@ function salesWeight(content, salesTerms) {
   return 1 + Math.min(hit, 2) * 0.25; // up to +50% for buying-intent signals
 }
 function engagementWeight(meta) { const e = Number((meta || {}).engagement || 0); return e > 0 ? 1 + Math.min(e / 200, 0.5) : 1; }
+/**
+ * Feedback weight — Seam ② closing into ranking (the learning half). Prior XENOS HITL
+ * decisions arrive (via feedback-sync.mjs) as type='ground_truth' Observations carrying
+ * metadata.reward (approve 1.0 · modify 0.7 · reject 0.2). For a candidate signal, prior
+ * decisions on TOPICALLY-SIMILAR content nudge its score: approved topics ↑, rejected ↓.
+ * Bounded to [0.8, 1.3] so feedback is a NUDGE — the boolean gate + relevance still lead;
+ * one reject cannot erase a strong fresh signal, one approve cannot resurrect off-topic noise.
+ * `gt` = [{ reward:Number, terms:string[] }] (pre-tokenised). Empty → 1 (backward compatible).
+ */
+function feedbackWeight(content, gt) {
+  if (!gt || !gt.length) return 1;
+  const ct = new Set(terms(content)); if (!ct.size) return 1;
+  let nudge = 0, matched = 0;
+  for (const g of gt) {
+    const r = Number(g.reward); if (!Number.isFinite(r)) continue;
+    const overlap = g.terms.filter((t) => ct.has(t)).length;
+    if (overlap >= 2) { nudge += (r - 0.5) * Math.min(overlap / 4, 1); matched += 1; } // r-0.5: approve→+.5, modify→+.2, reject→−.3, scaled by topic overlap
+  }
+  return matched ? Math.max(0.8, Math.min(1.3, 1 + nudge / matched)) : 1;
+}
 
 /**
  * Boolean pre-score gate (the Feedly AND/NOT model). product.filters = { must, not }:
@@ -90,10 +110,19 @@ export function rankSignals(storage, pillarTerms, product, nowMs, k = 5) {
   const byId = new Map(full.map((o) => [o.id, o]));
   const domTier = {}; for (const f of (product?.feeds || [])) domTier[domainOf(f.url)] = f.tier;
   const salesTerms = (product?.sales_signals || []).map((s) => s.toLowerCase());
+  // Seam ② feedback (the learning half): prior XENOS HITL decisions land as type='ground_truth'
+  // Observations (via feedback-sync.mjs) in the SAME project as the content pool. Co-locate them
+  // to close the loop — approved topics get boosted next run, rejected topics dampened.
+  const gtHits = storage.searchObservations(q, 40).filter((h) => h.type === 'ground_truth');
+  const gtFull = gtHits.length ? storage.getObservations(gtHits.map((h) => h.id)) : [];
+  const slug = String(product?.slug || '').toLowerCase();
+  const gt = gtFull.map((o) => ({ reward: o?.metadata?.reward, product: String(o?.metadata?.product || '').toLowerCase(), terms: terms(o?.content || '') }))
+    .filter((g) => g.reward != null && (!slug || !g.product || g.product === slug || g.product.includes(slug) || slug.includes(g.product)));
   return hits.map((h) => {
     const o = byId.get(h.id); const meta = o?.metadata || {}; const content = o?.content || h.title; const sources = meta.sources || [];
     const rec = recencyWeight(h.timestamp, nowMs), auth = authorityWeight(sources, domTier), sales = salesWeight(content, salesTerms), eng = engagementWeight(meta);
-    return { id: h.id, type: h.type, title: h.title, ts: h.timestamp, rel: +h.score.toFixed(3), content, sources, auth, sales, eng, score: h.score * rec * auth * sales * eng };
+    const fb = feedbackWeight(content, gt); // Seam ② — approved topics ↑, rejected ↓ (bounded)
+    return { id: h.id, type: h.type, title: h.title, ts: h.timestamp, rel: +h.score.toFixed(3), content, sources, auth, sales, eng, fb, score: h.score * rec * auth * sales * eng * fb };
   }).filter((x) => passesFilters(x.content, product)) // Feedly AND/NOT gate — drop noise before ranking
     .sort((a, b) => b.score - a.score).slice(0, k);
 }
@@ -127,7 +156,7 @@ async function buildBrief(signal, brand, product) {
   const key = process.env.ANTHROPIC_API_KEY; let draft;
   if (key) { try { draft = await draftViaLLM(signal, brand, product, key); } catch (e) { console.error(`[matcher] LLM failed (${e.message}) → template`); draft = draftTemplate(signal, brand); } }
   else { console.error('[matcher] ANTHROPIC_API_KEY not set → grounded template draft (P6)'); draft = draftTemplate(signal, brand); }
-  return { brand: brand.name, ...draft, sources: signal.sources || [], fromSignal: signal.id, score: +signal.score.toFixed(3), weights: { relevance: signal.rel, authority: signal.auth, sales: +signal.sales.toFixed(2), engagement: +signal.eng.toFixed(2) }, verify: 'AI-drafted from a sourced signal — verify stats against the source + run continuum_check_brand before publish' };
+  return { brand: brand.name, ...draft, sources: signal.sources || [], fromSignal: signal.id, score: +signal.score.toFixed(3), weights: { relevance: signal.rel, authority: signal.auth, sales: +signal.sales.toFixed(2), engagement: +signal.eng.toFixed(2), feedback: +(signal.fb ?? 1).toFixed(2) }, verify: 'AI-drafted from a sourced signal — verify stats against the source + run continuum_check_brand before publish' };
 }
 
 // ── the REPORT drafter — a multi-section lead-magnet PDF brief (produce-report shape) ─────
