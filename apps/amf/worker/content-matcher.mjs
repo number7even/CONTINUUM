@@ -31,6 +31,15 @@ const SIGNAL_TYPES = new Set(['world_brief', 'feed_article', 'rss', 'engagement_
 const STOP = new Set(['the', 'and', 'for', 'that', 'this', 'with', 'you', 'your', 'are', 'from', 'into', 'its', 'has', 'have', 'will', 'not']);
 const terms = (t) => [...new Set((t.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !STOP.has(w)))];
 const ftsQuery = (list) => list.slice(0, 30).map((t) => `"${t}"`).join(' OR ');
+// decode HTML entities (named + numeric), 2 passes → handles double-encoding (F&amp;amp;B, &amp;nbsp;)
+const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', hellip: '…' };
+function cleanText(s) {
+  const once = (t) => String(t)
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return ''; } })
+    .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return ''; } })
+    .replace(/&([a-zA-Z]+);/g, (m, n) => ENT[n.toLowerCase()] ?? m);
+  return once(once(s)).replace(/\s+/g, ' ').trim();
+}
 
 // ── the Portfolio Universe (targeting per product) ───────────────────────────
 function loadUniverse() { try { return JSON.parse(readFileSync(resolve(HERE, 'portfolio-universe.json'), 'utf8')); } catch { return { products: [] }; }
@@ -124,20 +133,31 @@ async function buildBrief(signal, brand, product) {
 // ── the REPORT drafter — a multi-section lead-magnet PDF brief (produce-report shape) ─────
 const firstSentence = (s) => (String(s.content || '').split(/(?<=[.!?])\s+/)[0] || s.title || '');
 function draftReportTemplate(signals, brand, product) {
+  const angle = cleanText(product?.angle || `${brand.name} — ${brand.tagline || ''}`);
+  const evidence = signals.slice(0, 4).map((s) => ({
+    heading: cleanText(String(s.title || firstSentence(s)).replace(/\s*[-–|]\s*[^-–|]*$/, '')).slice(0, 64), // strip " - Publisher" suffix
+    stats: extractStats(cleanText(s.content)),
+    body: cleanText(s.content).slice(0, 480),
+  })).filter((sec) => sec.heading && sec.heading.length > 8);
   return {
-    kicker: brand.kicker || brand.name, title: firstSentence(signals[0]).slice(0, 90),
-    subtitle: `What ${brand.name} is seeing in ${product?.sector || 'the market'} — and why it matters to your numbers.`,
+    kicker: brand.kicker || brand.name,
+    title: cleanText(`The ${product?.sector || 'Market'} Signal — What ${brand.name} Is Watching Now`).slice(0, 90),
+    subtitle: angle.slice(0, 160), // the product's ARGUMENT leads, not an echoed headline
     author: 'Riaan Kleynhans',
-    sections: signals.slice(0, 4).map((s) => ({ heading: String(s.title || firstSentence(s)).replace(/\s*[-–]\s*[^-–]*$/, '').slice(0, 64), stats: extractStats(s.content), body: String(s.content).replace(/\s+/g, ' ').slice(0, 520) })),
-    cta: { headline: 'See it on your numbers.', body: `Book a ${brand.name} walkthrough and we'll model this against your actual data. ${brand.tagline || ''}`.trim() },
-    drafted: 'template', sources: [...new Set(signals.flatMap((s) => s.sources || []))].slice(0, 8),
-    verify: 'AI-drafted from sourced signals — verify every stat against its source + run continuum_check_brand before publish',
+    sections: [
+      { heading: 'Why this matters now', stats: [], body: angle },              // brand argument up front
+      ...evidence,                                                              // signals as supporting evidence
+    ],
+    cta: { headline: 'See it on your numbers.', body: cleanText(`Book a ${brand.name} walkthrough and we'll model this against your actual data. ${brand.tagline || ''}`) },
+    drafted: 'template',
+    sources: [...new Set(signals.flatMap((s) => s.sources || []))].slice(0, 8),
+    verify: 'Template SKELETON grounded in sourced signals — the LLM (ANTHROPIC_API_KEY) authors the full brand argument. Verify stats + run continuum_check_brand before publish.',
   };
 }
 async function draftReportViaLLM(signals, brand, product, key) {
-  const corpus = signals.slice(0, 4).map((s, i) => `[${i + 1}] ${String(s.content).slice(0, 900)}  (sources: ${(s.sources || []).join(', ')})`).join('\n\n');
-  const sys = `You write a SHORT multi-section lead-magnet report connecting sourced signals to a brand, in the brand voice. RULES: use ONLY facts/numbers present in the signals (never invent); ground every claim; 3-4 sections; each section body <=600 chars. Return ONLY JSON: {"title":"<=90","subtitle":"","sections":[{"heading":"","stats":[{"stat":"","label":""}],"body":""}],"cta":{"headline":"","body":""}}`;
-  const user = `BRAND: ${brand.name} — ${brand.tagline || ''}\nANGLE: ${product?.angle || ''}\nSIGNALS:\n${corpus}`;
+  const corpus = signals.slice(0, 4).map((s, i) => `[${i + 1}] ${cleanText(s.content).slice(0, 900)}  (sources: ${(s.sources || []).join(', ')})`).join('\n\n');
+  const sys = `You write a lead-magnet report as a BRAND ARGUMENT (not a news digest), in the brand voice. Structure: open with the brand's thesis/angle, then 3-4 sections that use the signals as EVIDENCE for that argument, close with the CTA. RULES: use ONLY facts/numbers present in the signals (never invent); ground every claim; each section body <=600 chars. Return ONLY JSON: {"title":"<=90","subtitle":"","sections":[{"heading":"","stats":[{"stat":"","label":""}],"body":""}],"cta":{"headline":"","body":""}}`;
+  const user = `BRAND: ${brand.name} — ${brand.tagline || ''}\nARGUMENT/ANGLE (lead with this): ${product?.angle || ''}\nEVIDENCE SIGNALS:\n${corpus}`;
   const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6', max_tokens: 1500, system: sys, messages: [{ role: 'user', content: user }] }) });
   if (!res.ok) throw new Error(`Anthropic HTTP ${res.status}`);
   const text = (await res.json())?.content?.find((c) => c.type === 'text')?.text ?? '';
