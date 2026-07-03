@@ -30,8 +30,9 @@ the code refuses rather than fakes — leads aren't invented, likenesses aren't 
 
 ### What we need back
 
-1. **`XENOS_LEADS_URL` + `XENOS_LEADS_KEY`** — base URL + the scoped `x-intake-key` for
-   `POST /api/crm/leads/capture` (Seam ①).
+1. **`XENOS_LEADS_URL` + `XENOS_LEADS_KEY` + the lead-intake payload schema** — base URL, the
+   scoped `x-intake-key`, and the exact `POST /api/crm/leads/capture` request schema so
+   `buildLeadPayload()` maps field-for-field (Seam ①).
 2. **`XENOS_HITL_URL` + `XENOS_HITL_KEY`** — base URL + the scoped `x-hitl-key` for the HITL
    endpoints (Seams ⑤ + ② + return path). One key, all three.
 3. **Expose `GET /api/hitl/recent-decisions`** — per-tenant, `x-hitl-key`, query
@@ -39,10 +40,14 @@ the code refuses rather than fakes — leads aren't invented, likenesses aren't 
    Seam ② has nothing to poll.
 4. **The `meta` passthrough on `/capture`** (blocker B1) — echo our `meta` (product_interest +
    AMF asset refs) back on the lead so it routes to the right owner and attaches our media.
-5. **Owner `tenant_id` UUIDs** — `xenos-registry.json` has **0 of 13** filled. We need the real
-   UUIDs for the 5 confirmed products (and please ratify the `sekago` / `fluxcore` rows).
+5. **Owner `tenant_id` UUIDs + your canonical 9-product mapping** — `xenos-registry.json` has
+   **0 of 13** filled. We need the real UUIDs for the 5 confirmed products, your authoritative
+   9-product → canonical map to reconcile against, and a ratify on the `sekago` / `fluxcore` rows.
 6. **Confirm the reward mapping is canonical** — we hard-coded `HITL_REWARD =
    {approve:1.0, modify:0.7, reject:0.2}` from `contracts.ts`. Confirm, or send the source of truth.
+7. **The SONA event schema** (optional enrichment) — the shape of your SONA reward/event signals
+   beyond the single `reward` scalar. Our loop already learns from `reward`; a richer schema lets
+   `feedbackWeight` weigh *why* a draft won/lost, not just that it did. Nice-to-have, not a blocker.
 
 ### Secret names only (P1)
 ```
