@@ -5,7 +5,8 @@
 > module-by-module, with honest verified-vs-gated status per stage (P4 — never
 > claim more than you can verify).
 >
-> Grounded in the 22 worker modules on disk at `apps/amf/worker/`, not from memory.
+> Grounded in the 26 worker modules on disk at `apps/amf/worker/` (see the Project Map
+> [`apps/amf/worker/AGENTS.md`](../apps/amf/worker/AGENTS.md)), not from memory.
 
 ---
 
@@ -59,13 +60,13 @@
 | **B · Demand** | `analyze.mjs` | ✅ ran full portfolio → Demand Atlas ([`DEMAND_ATLAS_2026-07-01.md`](./DEMAND_ATLAS_2026-07-01.md)) |
 | **C · Sources** | `discover.mjs` · `opml-import.mjs` · `rate-source.mjs` | ✅ built + validated (Simon Willison; 404 Media locked live 2026-07-02) |
 | **D · Ingest** | `adapter-news.mjs` (8) · `pillars-ingest.mjs` | ✅ key-free path proven (googlenews + rss + HN); youtube keyed; **reddit 403** (uses public `/search.json` — needs a free OAuth token to fix); feedly / worldmonitor gated |
-| **E/F/G · Match** | `content-matcher.mjs` | ✅ **proven live 2026-07-02**: 85 → 17 (80% noise gated) → 5-D ranked → LLM-drafted |
+| **E/F/G · Match** | `content-matcher.mjs` | ✅ **proven live 2026-07-02**: 85 → 17 (80% noise gated) → **6-D ranked** (relevance × recency × authority × sales × engagement × **feedback**) → LLM-drafted |
 | **H · Produce** | `produce-*` · `render` · `broll` · `voice_pipeline.py` · **`vault-guard`** | 🟡 **partially proven** — one 9:16 voiced MP4 + one 6-page PDF verified on disk; a path, not yet a factory. **VAULT rights wall now built + verified** — `vault-guard.mjs` (decline-to-synthetic, 9/9 branches) is wired into `produce-short`; the signed-presenter *render/composite* is the remaining VAULT-gated build (see below) |
 | **I · Review** | `review.mjs` | ✅ human gate, idempotent (approve ≠ publish — P7/P9) |
 | **J · Handoff** | `stage-j.mjs` | 🟡 **built + gated** — replaces the dead `DEMO_WEBHOOK_URL`; awaiting `XENOS_LEADS_KEY` + XENOS's `meta` passthrough (blocker B1) so leads route to the owner tenant UUID |
 | **K · Memory** | CONTINUUM | ✅ live (dogfooded — this repo's own checkpoints) |
 | **L · Autopilot** | `event-loop.mjs` · `cron-trigger.mjs` · `pipeline.mjs` | 🟡 built; **not yet run unattended** |
-| **↺ · Return loop** | `pulse.mjs` · `feedback-sync.mjs` · `pulse-return.mjs` · **`content-matcher` (fb)** | 🟡 **built + gated** on `XENOS_HITL_KEY` + `/api/hitl/recent-decisions` — but the **learning half is now closed in code** (2026-07-03): `content-matcher` reads `ground_truth` rewards and re-weights ranking. Co-locate `feedback-sync` output with the content pool to activate |
+| **↺ · Return loop** | `pulse.mjs` · `feedback-sync.mjs` · `pulse-return.mjs` · **`content-matcher` (fb)** | ✅ **learning loop CLOSED in code** (2026-07-03, `516d3a1`): `content-matcher.feedbackWeight` reads `ground_truth` rewards → re-weights the 6-D rank (approved topics ↑, rejected ↓, bounded). 🟡 **gated only on live fuel** — `XENOS_HITL_KEY` + `/api/hitl/recent-decisions` supply the decisions; co-locate `feedback-sync` output with the content pool to activate |
 
 ### Gating detail (verified in code 2026-07-03)
 
@@ -95,8 +96,10 @@ The engine keeps signal on-brand with two coordinated mechanisms:
 
 - **Hand-1 (human, encoded once):** feed tiers + the boolean `must` / `not` gate in
   `portfolio-universe.json`. Curation the operator ratifies, not re-decided per run.
-- **Hand-2 (machine, every run):** the 5-D rank in `content-matcher.mjs`
-  (`relevance × recency × authority × sales × engagement`). The gate runs **before**
+- **Hand-2 (machine, every run):** the **6-D rank** in `content-matcher.mjs`
+  (`relevance × recency × authority × sales × engagement × feedback`). The 6th factor,
+  **feedback**, is Seam ②'s closed learning loop — prior XENOS `ground_truth` rewards nudge
+  future ranking (approved topics ↑, rejected ↓, bounded 0.8–1.3). The gate runs **before**
   scoring, so noise is dropped before it can win.
 
 Live proof (studiomunich, a product with zero sources until 2026-07-02): 85 ingested
@@ -106,17 +109,37 @@ keeps were dead-on (Senate AI Likeness Bill · AI-music royalties · name/likene
 ## The one-line truth
 
 **A→I runs end-to-end today and is verified** (position → demand → sources → ingest →
-gated 5-D match → grounded LLM draft → produce → human gate). **J, L, and the return
-loop are built but gated** on two XENOS keys + one endpoint. Nothing autonomously
-publishes: the human gate at **I** holds (P9), and approved ≠ published (P7).
+gated 6-D match → grounded LLM draft → produce → human gate). **J, L, and the return
+loop are built but gated** on XENOS credentials. Nothing autonomously publishes: the
+human gate at **I** holds (P9), and approved ≠ published (P7).
 
-## What blocks full autopilot (inputs, not code)
+## Blockers — layered by owner (what each actually gates)
 
-1. `XENOS_LEADS_KEY` + `XENOS_HITL_KEY` + XENOS exposing `/api/hitl/recent-decisions`
-   → unlocks Stage J + the return loop.
-2. Owner tenant UUIDs (5 confirmed products) → leads route to the right tenant.
-3. Brand Kernel fuel — a 30–60 min origin monologue + 50 best posts
-   (**P9-blocked, cannot be synthesised** — see [`BRAND_KERNEL.md`](./BRAND_KERNEL.md)).
+Everything below is an **input**, not code — our side is built + verified. Full checklist:
+[`PARTNER-INTEGRATION-REQUESTS.md`](./PARTNER-INTEGRATION-REQUESTS.md).
+
+**① XENOS — gates the single green thread (Seams ①/⑤/② → J, L, return loop):**
+- `XENOS_LEADS_KEY` + URL **+ the `/capture` payload schema**
+- `XENOS_HITL_KEY` + URL
+- expose **`GET /api/hitl/recent-decisions`**
+- the **`meta` passthrough** (blocker B1)
+- **13 owner tenant UUIDs** (0 filled)
+
+**② VAULT — gates rented talent ONLY (NOT the green thread — it runs synthetic):**
+- playbook · base URL + bearer · exact `X-Rights-Signature` encoding · webhook · live test actor.
+  The rights wall already declines to synthetic, so a green-thread short renders without VAULT.
+
+**③ Operator (P9) — gates voice, not the mechanism:**
+- the 30–60 min Brand Kernel monologue + 50 posts (**cannot be synthesised** —
+  [`BRAND_KERNEL.md`](./BRAND_KERNEL.md)).
+
+**④ Internal (non-partner, self-clearable, parked):**
+- Reddit OAuth (7-of-8 providers work) · Stage L watchdog (never run unattended) ·
+  the flat→folder migration (13 hardcoded paths — after the green thread).
+
+**Critical path to the VoiceCosmos dogfood:** only **4 XENOS items** — the leads key (+ payload
+schema), the `/recent-decisions` endpoint, the `meta` passthrough, and **one** VoiceCosmos owner
+UUID. VAULT, Brand Kernel, and the internal tasks are **off** the first-thread path.
 
 ## Related
 
