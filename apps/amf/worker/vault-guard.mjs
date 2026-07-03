@@ -22,10 +22,11 @@
  */
 import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { AVATAR } from './contracts.mjs'; // avatarId scheme — single source of truth
 
-const RENTED_PREFIX = 'studiomunich:';
-const SYNTH_PREFIX = 'digital:';
-export const SYNTHETIC_FALLBACK = 'digital:synthetic';
+const RENTED_PREFIX = AVATAR.RENTED_PREFIX;
+const SYNTH_PREFIX = AVATAR.SYNTH_PREFIX;
+export const SYNTHETIC_FALLBACK = AVATAR.SYNTHETIC_FALLBACK; // re-export (API-stable)
 
 /** Classify an avatarId into { kind: 'rented'|'synthetic'|'unknown', actorId, raw }. */
 export function parseAvatarId(avatarId) {

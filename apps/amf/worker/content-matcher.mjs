@@ -24,10 +24,10 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { SIGNAL_TYPES } from './contracts.mjs'; // rankable obs-types — single source of truth
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
-const SIGNAL_TYPES = new Set(['world_brief', 'feed_article', 'rss', 'engagement_signal']);
 const STOP = new Set(['the', 'and', 'for', 'that', 'this', 'with', 'you', 'your', 'are', 'from', 'into', 'its', 'has', 'have', 'will', 'not']);
 const terms = (t) => [...new Set((t.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !STOP.has(w)))];
 const ftsQuery = (list) => list.slice(0, 30).map((t) => `"${t}"`).join(' OR ');

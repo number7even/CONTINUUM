@@ -29,7 +29,10 @@ export function resolveOwner(slug) {
   return m && m.owner_tenant_id ? { tenant_id: m.owner_tenant_id, xenos_key: m.xenos_key || slug } : null;
 }
 
-/** Pure map: AMF lead shape + resolved owner → the XENOS /capture payload (testable). */
+/**
+ * Pure map: AMF lead shape + resolved owner → the XENOS /capture payload (testable).
+ * @returns {import('./contracts.mjs').LeadPayload} the canonical shape (single source of truth)
+ */
 export function buildLeadPayload(lead, owner) {
   const c = lead.contact || {};
   return {

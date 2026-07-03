@@ -22,9 +22,10 @@ import './env.mjs';
 import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { HITL_REWARD } from './contracts.mjs'; // canonical shape lives in the contract anchor
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
-export const HITL_REWARD = { approve: 1.0, modify: 0.7, reject: 0.2 }; // XENOS canonical (contracts.ts)
+export { HITL_REWARD }; // re-export for existing importers (API-stable)
 const stableId = (seed) => { const h = createHash('sha256').update(seed).digest('hex'); return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`; };
 
 /** Pure: a XENOS HITL decision/review → a CONTINUUM ground_truth Observation (testable). */
