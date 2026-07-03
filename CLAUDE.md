@@ -54,6 +54,49 @@
 
 ---
 
+## AMF content engine — latest session state (2026-07-03, checkpoint `49bd2613`)
+
+The **AMF (Autonomous Media Factory)** content engine lives at `apps/amf/worker/`
+(Stages A→L) — a consumer built **on top of** the CONTINUUM engine. Start at
+**`docs/AMF_ENGINE_MAP.md`** (the A→L diagram + module-by-module verified/gated
+status); prose companion `docs/AMF_PROCESS.md`. Latest checkpoint **`49bd2613`**
+(8 entries verify-green, hash `c0001e359e…`), reproducible via
+`scripts/checkpoints/amf-engine-session-2026-07-03.mjs`.
+
+**Built + verified our-side (2026-07-03):**
+- **Seam ② feedback loop CLOSES into ranking** — `content-matcher.mjs`
+  `feedbackWeight()` reads co-located `ground_truth` rewards (approve 1.0 /
+  modify 0.7 / reject 0.2) and nudges the 6-D rank (bounded 0.8–1.3; a nudge,
+  not an override). Was ingest-only; now learns.
+- **VAULT rights wall BUILT** — `vault-guard.mjs` `decideRender()`:
+  `studiomunich:<actorId>` (rented human) needs a verified `X-Rights-Signature`
+  (HMAC over `[actorId,modality,phraseHash,duration,tier]`, hard-reject,
+  timing-safe); `digital:` serves freely; no-secret / 404 / forged / tampered /
+  takedown → **decline → synthetic**. Never serves an unsigned likeness. 9/9
+  branches + a real produce run. Wired into `produce-short.mjs`.
+- **Engine sharpened** — `portfolio-universe.json` must/not gates on voicecosmos,
+  viwago, voinista, studiomunich; studiomunich feed locked (404 Media T1 + Verge
+  T2, validated live); `adapter-news.mjs` auto-ingests curated authority `feeds[]`
+  as content. 80% live noise-drop on studiomunich (85→17).
+- **Docs = one connected knowledge graph** — INDEX hub + AMF cluster + sprint
+  spine + deploy cluster (real markdown links, 0 broken). The ICM scaffold routes
+  the dev lifecycle to the agent-skills marketplace (no duplication).
+
+**Gated — the line we hold (P4/P9, no partner key issued). Full checklist:
+`docs/PARTNER-INTEGRATION-REQUESTS.md`:**
+- **XENOS** (Seams ① ⑤ ②): `XENOS_LEADS_KEY` + `XENOS_HITL_KEY`, expose
+  `/api/hitl/recent-decisions`, the `meta` passthrough, 13 owner tenant UUIDs.
+- **VAULT** (Stage H render): the playbook, base URL + bearer, the exact
+  `X-Rights-Signature` encoding, webhook contract, one live test actor.
+- **Operator** (Layer-3 voice): the 30–60 min Brand Kernel monologue + 50 posts
+  — **P9-blocked, cannot be synthesised.**
+
+The machine is built and safely gated: the loops close in code, the walls enforce,
+nothing is claimed live beyond what a `verifyCommand` proves. Flip the switches when
+the keys and the voice fuel land.
+
+---
+
 ## What's true RIGHT NOW (verify in code before claiming)
 
 - **Repo:** `github.com/number7even/CONTINUUM`
@@ -304,8 +347,8 @@ The architecture is identical across all three. Only configuration changes.
 
 ---
 
-_Last updated: 2026-05-15._
-_Update this file whenever V0 polish lands, V0.5 begins, or any partner
-agreement clause is revised._
+_Last updated: 2026-07-03 — AMF engine session · checkpoint `49bd2613` (8 verify-green)._
+_Update this file whenever V0 polish lands, V0.5 begins, an AMF milestone lands, or any
+partner agreement clause is revised._
 
 _IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._
