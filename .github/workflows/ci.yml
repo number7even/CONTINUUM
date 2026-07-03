@@ -78,3 +78,20 @@ jobs:
         # up. Per-workspace test scripts call `node --test dist/` — the
         # canonical pattern established in W23-2 (Issue #11).
         run: npm test
+
+      - name: AMF worker smokes — the "validates" edge
+        # The AMF content engine proves itself through per-module --smoke runs.
+        # These were manual until now; CI validates them on every push (the
+        # pattern a mature codegraph map draws as CI --validates--> code).
+        # All four are DETERMINISTIC, NETWORK-FREE, and NEED NO SECRETS — each
+        # uses inline mocks + a throwaway sqlite dir, and exits non-zero on
+        # regression. core is already built above; vault-guard needs no build.
+        #   vault-guard     → the rights wall (9/9 branches: decline-to-synthetic)
+        #   feedback-sync   → Seam ② XENOS decisions → ground_truth (canonical rewards, idempotent)
+        #   content-matcher → boolean gate + 6-D rank incl. the closed feedback loop
+        #   adapter-news    → 8-provider ingest → corpus (mocked providers, no live calls)
+        run: |
+          node apps/amf/worker/vault-guard.mjs --smoke
+          node apps/amf/worker/feedback-sync.mjs --smoke
+          node apps/amf/worker/content-matcher.mjs --smoke
+          node apps/amf/worker/adapter-news.mjs --smoke
