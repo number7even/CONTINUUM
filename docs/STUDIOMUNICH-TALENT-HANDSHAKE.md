@@ -1,5 +1,7 @@
 # StudioMunich VAULT ⇄ AMF — Integration Handshake
 
+> **⚡ Live-blockers → [`PARTNER-INTEGRATION-REQUESTS.md`](./PARTNER-INTEGRATION-REQUESTS.md)** — the consolidated, current checklist of exactly what VAULT must send to take the rights wall from "in shadow" to live (the playbook · base URL + bearer · the exact `X-Rights-Signature` encoding · webhook contract · live test actor). **This doc = the contract; that doc = the checklist.** The rights wall (`vault-guard.mjs`) is already built + verified our side.
+
 > **To:** StudioMunich VAULT build side · **From:** AMF / CONTINUUM (`supabase-projects/CONTINUUM`)
 > **Status:** 2026-07-02 · AMF-side spec **complete**; **reciprocal from VAULT pending (§7)**.
 > Serves two ways: if VAULT is a separate build/terminal, this is the reciprocal handshake; if

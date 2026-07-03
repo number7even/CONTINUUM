@@ -1,5 +1,7 @@
 # AMF ⇄ XENOS CRM — Amalgamation Handshake
 
+> **⚡ Live-blockers → [`PARTNER-INTEGRATION-REQUESTS.md`](./PARTNER-INTEGRATION-REQUESTS.md)** — the consolidated, current checklist of exactly what XENOS must send to flip Seams ① ⑤ ② from gated to live (leads/HITL keys · expose `/api/hitl/recent-decisions` · the `meta` passthrough · 13 owner tenant UUIDs). **This doc = the architecture; that doc = the checklist.**
+
 > **To:** VoiceCosmos / `number7evencrm` team (the XENOS CRM + Campaign Engine side)
 > **From:** CONTINUUM / AMF (`supabase-projects/CONTINUUM`) — the memory + content-discovery side
 > **Date:** 2026-07-02 · **Status:** proposal for reciprocal handover
