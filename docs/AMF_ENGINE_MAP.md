@@ -23,8 +23,10 @@
   │                Hand-1 human curation → feed tiers (T1 / T2 / T3)
   ▼
   D  INGEST        adapter-news.mjs (8 providers) · pillars-ingest.mjs
-  │                googlenews · rss(authority feeds[]) · hackernews · youtube · own ·
-  │                worldmonitor · feedly · reddit    → CONTINUUM observations (FTS5)
+  │                LIVE key-free: googlenews · rss(authority feeds[]) · hackernews
+  │                LIVE keyed:    youtube (key present)     WIRED-empty: own (needs own_feeds[])
+  │                GATED 3:       reddit (403→OAuth) · feedly (Enterprise token) · worldmonitor (API key)
+  │                → CONTINUUM observations (FTS5)   ⚠️ it is 4 live / 3 gated, NOT "7/8"
   ▼
   E/F/G MATCH + RANK + DRAFT   content-matcher.mjs
   │                boolean must/not GATE → 6-D rank
@@ -59,7 +61,7 @@
 | **A · Position** | `portfolio-universe.json` | ✅ 14 products ratified · **4 gated** (voicecosmos, viwago, voinista, studiomunich) · 14 with feeds + signal_query |
 | **B · Demand** | `analyze.mjs` | ✅ ran full portfolio → Demand Atlas ([`DEMAND_ATLAS_2026-07-01.md`](./DEMAND_ATLAS_2026-07-01.md)) |
 | **C · Sources** | `discover.mjs` · `opml-import.mjs` · `rate-source.mjs` | ✅ built + validated (Simon Willison; 404 Media locked live 2026-07-02) |
-| **D · Ingest** | `adapter-news.mjs` (8) · `pillars-ingest.mjs` | ✅ key-free path proven (googlenews + rss + HN); youtube keyed; **reddit 403** (uses public `/search.json` — needs a free OAuth token to fix); feedly / worldmonitor gated |
+| **D · Ingest** | `adapter-news.mjs` (8) · `pillars-ingest.mjs` | ✅ **4 live** — googlenews · rss · hackernews (key-free) + youtube (keyed, key present). `own` wired but empty (no `own_feeds[]`). 🔴 **3 gated: reddit** (403 → OAuth), **feedly** (`FEEDLY_ACCESS_TOKEN`+`STREAM_ID` — absent, Enterprise), **worldmonitor** (`WORLDMONITOR_API_KEY` — absent). **NOT "7/8" — Feedly + worldmonitor are gated, not live** (the "Reddit 403" story keeps eclipsing them). |
 | **E/F/G · Match** | `content-matcher.mjs` | ✅ **proven live 2026-07-02**: 85 → 17 (80% noise gated) → **6-D ranked** (relevance × recency × authority × sales × engagement × **feedback**) → LLM-drafted |
 | **H · Produce** | `produce-*` · `render` · `broll` · `voice_pipeline.py` · **`vault-guard`** | 🟡 **partially proven** — one 9:16 voiced MP4 + one 6-page PDF verified on disk; a path, not yet a factory. **VAULT rights wall now built + verified** — `vault-guard.mjs` (decline-to-synthetic, 9/9 branches) is wired into `produce-short`; the signed-presenter *render/composite* is the remaining VAULT-gated build (see below) |
 | **I · Review** | `review.mjs` | ✅ human gate, idempotent (approve ≠ publish — P7/P9) |
