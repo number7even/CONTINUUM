@@ -25,6 +25,7 @@ import type {
   TimelineHit,
   Todo,
 } from './types.js';
+import type { GraphOptions, ObservationGraph } from './graph.js';
 
 // ── Input types for write operations ────────────────────────────────────────
 
@@ -146,6 +147,15 @@ export interface StorageBackend {
    * dropped — caller should batch.
    */
   getObservations(ids: string[]): Observation[];
+
+  /**
+   * The observation provenance graph — nodes (observations) + edges (refs[]
+   * links) — for the 3D "brain" visualization and voice-driven traversal.
+   * Most-recent-first, capped by `opts.limit` (default 2000, max 10000). This
+   * is a whole-graph read, distinct from Progressive-Disclosure retrieval; use
+   * search/timeline/getObservations for token-efficient reading.
+   */
+  getObservationGraph(opts?: GraphOptions): ObservationGraph;
 
   // — Lifecycle —
   close(): void;

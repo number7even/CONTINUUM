@@ -31,6 +31,8 @@ import {
   getTodo as _getTodo,
   updateTodo as _updateTodo,
 } from './todo.js';
+import { buildObservationGraph } from './graph.js';
+import type { GraphOptions, ObservationGraph } from './graph.js';
 import type {
   Observation,
   SearchHit,
@@ -256,6 +258,34 @@ export class SQLiteStorageBackend implements StorageBackend {
         ? (JSON.parse(r.metadata) as Record<string, unknown>)
         : undefined,
     }));
+  }
+
+  // ── Observation graph (nodes + edges for the 3D brain viz) ────────────────
+
+  getObservationGraph(opts: GraphOptions = {}): ObservationGraph {
+    const cap = Math.min(opts.limit ?? 2000, 10000);
+    const rows = this.db.prepare(`
+      SELECT id, source_id, type, content, timestamp, refs
+      FROM observations
+      ORDER BY timestamp DESC
+      LIMIT ?
+    `).all(cap) as Array<{
+      id: string;
+      source_id: string;
+      type: string;
+      content: string;
+      timestamp: string;
+      refs: string;
+    }>;
+    const observations: Observation[] = rows.map(r => ({
+      id: r.id,
+      sourceId: r.source_id,
+      type: r.type,
+      content: r.content,
+      timestamp: r.timestamp,
+      refs: JSON.parse(r.refs || '[]') as string[],
+    }));
+    return buildObservationGraph(observations, opts);
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────

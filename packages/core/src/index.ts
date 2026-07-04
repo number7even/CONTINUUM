@@ -44,6 +44,10 @@ export { SQLiteStorageBackend } from './storage-sqlite.js';
 export { HybridStorageBackend } from './storage-hybrid.js';
 export { openStorage } from './factory.js';
 
+// — Observation graph (the 3D "brain" viz data: nodes + refs edges)
+export { buildObservationGraph, sourceOf } from './graph.js';
+export type { GraphNode, GraphEdge, ObservationGraph, GraphOptions } from './graph.js';
+
 // Embedder — exposed so adapters / scripts can pre-compute embeddings
 // outside the storage backend if they need to (V0.5 stub primitive).
 export { embed, embeddingDimensions } from './embedder.js';

@@ -55,6 +55,7 @@ import type {
   TimelineOptions,
   UpdateTodoInput,
 } from './storage.js';
+import type { GraphOptions, ObservationGraph } from './graph.js';
 
 // Narrow shape we actually need from the ruvector VectorDB class.
 // Keeping this local avoids importing ruvector's full type tree into core
@@ -332,6 +333,11 @@ export class HybridStorageBackend implements StorageBackend {
   getObservations(ids: string[]): Observation[] {
     // Layer-3 batch fetch is a simple SELECT IN (...) — SQLite's job.
     return this.sqlite.getObservations(ids);
+  }
+
+  getObservationGraph(opts?: GraphOptions): ObservationGraph {
+    // Graph is relational (nodes + refs edges) — read from the SQLite side.
+    return this.sqlite.getObservationGraph(opts);
   }
 
   close(): void {
