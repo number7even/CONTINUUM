@@ -48,6 +48,8 @@ export interface DocFile {
   content: string;
   /** mtime as ISO string. */
   timestamp: string;
+  /** Observation IDs of the docs this file links to (real provenance edges). */
+  refs?: string[];
 }
 
 export interface DocsSwarmResult {
@@ -247,7 +249,7 @@ export async function ingestViaMeshSwarm(
             type: 'doc',
             content: file.content,
             timestamp: file.timestamp,
-            refs: [],
+            refs: file.refs ?? [],
             metadata: {
               adapter: '@number7even/continuum-adapter-docs',
               path: file.relativePath,

@@ -33,7 +33,7 @@
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { join, relative, resolve, sep, posix } from 'node:path';
 import { createHash } from 'node:crypto';
 import { openStorage } from '@number7even/continuum-core';
 import { ingestViaMeshSwarm, type DocFile } from './swarm.js';
@@ -75,6 +75,34 @@ function pathToObservationId(relativePath: string): string {
   const normalized = relativePath.split(sep).join('/');
   const hex = createHash('sha256').update(normalized).digest('hex');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+// ── Provenance edges — resolve internal markdown links to observation IDs ────
+
+/**
+ * Turn a doc's internal markdown links into refs to the observation IDs of the
+ * docs they point at — the REAL provenance edges that light up the 3D brain
+ * graph. Only links to files present in the ingested set become refs; external
+ * URLs, anchors, and links that escape the docs root are dropped (same
+ * dangling-drop discipline the graph builder enforces). No fabricated edges (P4).
+ */
+function linkRefs(file: DocFile, knownPaths: Set<string>): string[] {
+  const refs = new Set<string>();
+  const linkRe = /\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g; // [text](target "optional title")
+  let m: RegExpExecArray | null;
+  while ((m = linkRe.exec(file.content)) !== null) {
+    let target = m[1]!.trim();
+    if (/^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) continue; // protocol / protocol-relative / pure-anchor
+    target = target.split('#')[0]!.split('?')[0]!; // strip anchor + query
+    if (!target || !/\.mdx?$/i.test(target)) continue; // markdown targets only
+    const base = target.startsWith('/')
+      ? target.slice(1)
+      : posix.join(posix.dirname(file.relativePath), target);
+    const resolved = posix.normalize(base);
+    if (resolved.startsWith('..') || resolved === file.relativePath) continue; // escaped root / self
+    if (knownPaths.has(resolved)) refs.add(pathToObservationId(resolved));
+  }
+  return [...refs];
 }
 
 // ── Recursive markdown walker ────────────────────────────────────────────────
@@ -163,6 +191,12 @@ async function main() {
     if (file) docFiles.push(file);
   }
   console.log(`[docs] scanned ${docFiles.length} markdown file${docFiles.length === 1 ? '' : 's'}`);
+
+  // Resolve internal doc-to-doc markdown links into refs — the graph edges.
+  const knownPaths = new Set(docFiles.map(f => f.relativePath));
+  for (const f of docFiles) f.refs = linkRefs(f, knownPaths);
+  const edgeCount = docFiles.reduce((n, f) => n + (f.refs?.length ?? 0), 0);
+  console.log(`[docs] resolved ${edgeCount} internal doc-link edge(s) across ${docFiles.length} file(s)`);
 
   const result = await ingestViaMeshSwarm(docFiles, {
     storage,
