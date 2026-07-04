@@ -143,6 +143,35 @@ Everything below is an **input**, not code — our side is built + verified. Ful
 schema), the `/recent-decisions` endpoint, the `meta` passthrough, and **one** VoiceCosmos owner
 UUID. VAULT, Brand Kernel, and the internal tasks are **off** the first-thread path.
 
+## Vision vs. Verified Gap (the honest ledger — audited 2026-07-04)
+
+> **Why this section exists.** A "7-Layer AMF" marketing narrative circulates alongside
+> this engine. Much of it is aspirational. Per P4 (never claim more than you can verify)
+> and partner-clause #1 (no silent overrides), this section pins the grand vision against
+> what a `grep` of the worker's **own source** (`apps/amf/worker/*.mjs`, `*.py` — node_modules
+> excluded) actually finds, so a cold-start session inherits the real distance, not the pitch.
+> Method: evidence-based grep + file:line, 2026-07-04.
+
+| Layer (as pitched) | Verified in the worker's own source | Tier |
+|---|---|---|
+| **1 · Control Plane** (ECC / Supacode) | Orchestration substrate **real + proven**: `event-loop.mjs`, `cron-trigger.mjs`, `pipeline.mjs`, `supervisor.mjs`, nightly portfolio pulse running unattended. "ECC/Supacode" branding: **not in code.** | ✅ substrate · 🔮 branding |
+| **2 · Social Intelligence** (last30days-skill, Agent-Reach, Fun Judge, cookie-bypass scraping) | `adapter-news.mjs` real — **4 providers live, 3 gated**. `agent-reach`: 1 ref. `fun judge` / `last30days`: **0 in code.** Reddit is **403-gated (needs OAuth)** — the *opposite* of "bypassing walls." | 🟡 ingest · 🔮 virality-scorer |
+| **3 · Scripting** (Addictive Storytelling AI Director, neuro-pacing, 5-Gate Delivery Contract) | `content-matcher.mjs` drafting seam real but **template-grade** (no LLM key). AI Director, neuro-pacing loop, 5-Gate blocker: **0 in code.** | 🟡 seam · 🔮 quality-gates |
+| **4 · Asset Synthesis** (ComfyUI GPU swarm, ElevenLabs, Auphonic) | `voice_pipeline.py` real — **own-stack (VoxCPM / Supertonic), NOT ElevenLabs**. `vault-guard.mjs` rights wall proven 9/9. `comfyui`(2) / `auphonic`(3) referenced, **not verified working**. Render path **hangs** (open finding). | 🟡 partial |
+| **5 · Assembly** (FFmpeg, Remotion, hyperframes, Hermes Video Judge) | `broll` / `compose-broll` / `render.mjs` real (ffmpeg). `hyperframes`(3) / `gsap`(2) referenced. **Hermes recursive video-judge: 0 in worker** — separate `hermes-agent` repo, unintegrated. | 🟡 assembly · 🟠 judge |
+| **6 · Paid Amplification** (15-agent media-buying swarm) | **The code disclaims it itself** — `event-loop.mjs:9-13`: *"the Layer-6 marketing swarm is NOT here — @metaharness/router does not exist, there are no ad accounts."* No autonomous spend without a human (P6/P9). | 🔮 explicitly absent |
+| **7 · Lead Conversion** (AiToEarn, LeeAAD CRM, comment-miner, Pod-Geni RAWPITCH) | `stage-j.mjs` lead handoff real but **XENOS-gated (not LeeAAD)**. `aitoearn` / `vigola` / comment-miner: **0 in worker.** `podcast-pod-geni-ai` exists as a repo. | 🟡 handoff · 🔮 comment-to-revenue |
+
+### Five ratified corrections (marketing → verified odometer)
+
+1. **Token savings:** the "10x" number is **dead**. Progressive disclosure yields a **measured ~2.85x** (up to 5.3x single-record) — `README.md:98`.
+2. **Reddit ingestion:** not "bypassing API walls." The provider hits the public JSON endpoint and is **currently 403-gated** (free fix = OAuth token).
+3. **Voice synthesis:** **no ElevenLabs.** Own-stack **VoxCPM / Supertonic** for synthetic; **StudioMunich VAULT** for rented human talent (gated).
+4. **CRM handoff:** Stage J hands off to **XENOS**, not LeeAAD Flow.
+5. **Video judging:** the recursive **Hermes AI Video Judge is a separate repo, unintegrated** with this worker.
+
+**Takeaway (hold the line):** we have a genuinely rare, key-independent, **self-driving A→L skeleton (Layers 1–5 substrate + a publish seam)** — not the "impressive organs" (AI Director, ComfyUI swarm, Hermes judge, 15-agent paid swarm, AiToEarn comment-miner). Complete the **single VoiceCosmos green thread** (4 XENOS items) before wiring any of the aspirational organs. The vision is the destination; this table is the odometer.
+
 ## Related
 
 Prose walkthrough: [`AMF_PROCESS.md`](./AMF_PROCESS.md) · Demand: [`DEMAND_ATLAS_2026-07-01.md`](./DEMAND_ATLAS_2026-07-01.md) · Brand voice: [`BRAND_KERNEL.md`](./BRAND_KERNEL.md) · XENOS loop: [`AMF-XENOS-AMALGAMATION-HANDSHAKE.md`](./AMF-XENOS-AMALGAMATION-HANDSHAKE.md) · [`AMF-XENOS-RECONCILIATION.md`](./AMF-XENOS-RECONCILIATION.md) · Docs hub: [`INDEX.md`](./INDEX.md) · Map: [`../router.md`](../router.md)
