@@ -28,12 +28,20 @@ export const graphTool: ToolDefinition = {
         type: 'number',
         description: 'Max nodes, most-recent-first. Default 2000, max 10000.',
       },
+      concepts: {
+        type: 'boolean',
+        description:
+          'Fold in the CONCEPT layer: deterministic concept-nodes (backtick-quoted ' +
+          'identifiers spanning >= 2 observations) + mention-edges to the docs that name ' +
+          'them. Adds source="concept" nodes. Every concept/edge is grep-verifiable (no ' +
+          'inferred relationships). Default false (docs-only provenance graph).',
+      },
     },
   },
 };
 
 export const handleGraph: ToolHandler = async (args, storage) => {
-  const opts = (args ?? {}) as { limit?: number };
-  const graph = storage.getObservationGraph(opts);
+  const { limit, concepts } = (args ?? {}) as { limit?: number; concepts?: boolean };
+  const graph = storage.getObservationGraph({ limit, includeConcepts: concepts });
   return { content: [{ type: 'text', text: JSON.stringify(graph) }] };
 };

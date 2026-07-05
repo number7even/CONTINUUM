@@ -24,6 +24,7 @@ const SOURCE_COLOR: Record<string, string> = {
   sona: '#fbbf24',       // amber
   export: '#f472b6',     // pink
   googlenews: '#22d3ee', // cyan
+  concept: '#f59e0b',    // amber — the noun/entity layer
 };
 const colorFor = (source: string) => SOURCE_COLOR[source] ?? '#9ca3af';
 

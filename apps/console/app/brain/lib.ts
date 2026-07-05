@@ -80,7 +80,7 @@ export async function fetchGraph(limit = 3000): Promise<GraphData> {
   try {
     await client.connect(transport);
     const res = await client
-      .callTool({ name: 'continuum_graph', arguments: { limit } })
+      .callTool({ name: 'continuum_graph', arguments: { limit, concepts: true } })
       .catch(() => null);
     const g = parseToolText<{ nodes?: GraphNode[]; edges?: GraphEdge[]; stats?: GraphStats }>(res, {});
     return {
