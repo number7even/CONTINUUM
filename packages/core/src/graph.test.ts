@@ -61,6 +61,16 @@ test('limit caps nodes and edges follow the surviving set', () => {
   }
 });
 
+test('authored metadata.relations become typed verb-edges; untitled stay plain', () => {
+  const a: Observation = {
+    id: 'a', sourceId: 'docs:a', type: 'doc', content: 'x', timestamp: '2026-07-05T00:00:00Z',
+    refs: ['b', 'c'], metadata: { relations: [{ to: 'b', as: 'enforces' }] },
+  };
+  const g = buildObservationGraph([a, obs('b'), obs('c')]);
+  assert.equal(g.edges.find((e) => e.source === 'a' && e.target === 'b')!.verb, 'enforces');
+  assert.equal(g.edges.find((e) => e.source === 'a' && e.target === 'c')!.verb, undefined);
+});
+
 test('label is a trimmed 60-char excerpt; sourceOf reads the ID prefix', () => {
   const long = 'x'.repeat(200);
   const g = buildObservationGraph([obs('a', [], { content: long })]);

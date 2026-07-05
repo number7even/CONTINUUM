@@ -11,7 +11,7 @@
  * with ssr:false. Data arrives from the server via fetchGraph() over MCP/SSE.
  */
 import dynamic from 'next/dynamic';
-import { useMemo, useState, useRef, useCallback } from 'react';
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import type { GraphData, GraphNode } from './lib';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,13 +29,28 @@ const SOURCE_COLOR: Record<string, string> = {
 const colorFor = (source: string) => SOURCE_COLOR[source] ?? '#9ca3af';
 
 interface FGNode extends GraphNode { }
-interface FGLink { source: string; target: string; }
+interface FGLink { source: string; target: string; verb?: string; }
 
 export function BrainGraph({ data }: { data: GraphData }) {
   const fgRef = useRef<unknown>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [dims, setDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [pathEnds, setPathEnds] = useState<string[]>([]);
+
+  // Explicit canvas dimensions — react-force-graph-3d measures its container
+  // once at mount and, inside a flex child, often reads 0×0 and renders nothing.
+  // A ResizeObserver keeps width/height correct through layout + window resize.
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const measure = () => setDims({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Adjacency (undirected) for path-tracing + fast neighbour lookups.
   const adjacency = useMemo(() => {
@@ -86,7 +101,7 @@ export function BrainGraph({ data }: { data: GraphData }) {
     const nodes: FGNode[] = visible.map((n) => ({ ...n }));
     const links: FGLink[] = data.edges
       .filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target))
-      .map((e) => ({ source: e.source, target: e.target }));
+      .map((e) => ({ source: e.source, target: e.target, verb: e.verb }));
     return { nodes, links };
   }, [data.nodes, data.edges, hidden]);
 
@@ -161,9 +176,12 @@ export function BrainGraph({ data }: { data: GraphData }) {
       </aside>
 
       {/* CENTER — the 3D field */}
-      <div style={panel.canvas}>
+      <div ref={canvasRef} style={panel.canvas}>
+        {dims.w > 0 && dims.h > 0 && (
         <ForceGraph3D
           ref={fgRef}
+          width={dims.w}
+          height={dims.h}
           graphData={graphData}
           backgroundColor="#05070a"
           nodeLabel={(n: FGNode) => `${n.label} (${n.source}, deg ${n.degree})`}
@@ -173,18 +191,24 @@ export function BrainGraph({ data }: { data: GraphData }) {
               ? (tracedPath.nodes.has(n.id) ? '#ffffff' : 'rgba(120,130,150,0.25)')
               : colorFor(n.source)
           }
-          linkColor={(l: { source: FGNode | string; target: FGNode | string }) => {
-            const s = typeof l.source === 'object' ? l.source.id : l.source;
-            const t = typeof l.target === 'object' ? l.target.id : l.target;
-            return pathEnds.length === 2 && tracedPath.links.has(`${s}|${t}`) ? '#34d399' : 'rgba(80,120,110,0.28)';
+          linkColor={(l: FGLink) => {
+            const s = typeof l.source === 'object' ? (l.source as FGNode).id : l.source;
+            const t = typeof l.target === 'object' ? (l.target as FGNode).id : l.target;
+            if (pathEnds.length === 2) return tracedPath.links.has(`${s}|${t}`) ? '#34d399' : 'rgba(120,130,150,0.15)';
+            return l.verb ? 'rgba(245,158,11,0.55)' : 'rgba(80,120,110,0.28)'; // verbs = amber, meaningful
           }}
-          linkWidth={(l: { source: FGNode | string; target: FGNode | string }) => {
-            const s = typeof l.source === 'object' ? l.source.id : l.source;
-            const t = typeof l.target === 'object' ? l.target.id : l.target;
-            return pathEnds.length === 2 && tracedPath.links.has(`${s}|${t}`) ? 2 : 0.5;
+          linkWidth={(l: FGLink) => {
+            const s = typeof l.source === 'object' ? (l.source as FGNode).id : l.source;
+            const t = typeof l.target === 'object' ? (l.target as FGNode).id : l.target;
+            if (pathEnds.length === 2 && tracedPath.links.has(`${s}|${t}`)) return 2;
+            return l.verb ? 1.5 : 0.5; // typed edges stand out
           }}
+          linkLabel={(l: FGLink) => (l.verb ? `<b style="color:#f59e0b">${l.verb}</b>` : '')}
+          linkDirectionalArrowLength={(l: FGLink) => (l.verb ? 3 : 0)}
+          linkDirectionalArrowRelPos={1}
           onNodeClick={onNodeClick}
         />
+        )}
       </div>
 
       {/* RIGHT — filter */}

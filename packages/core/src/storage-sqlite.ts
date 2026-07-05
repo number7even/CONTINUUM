@@ -265,7 +265,7 @@ export class SQLiteStorageBackend implements StorageBackend {
   getObservationGraph(opts: GraphOptions = {}): ObservationGraph {
     const cap = Math.min(opts.limit ?? 2000, 10000);
     const rows = this.db.prepare(`
-      SELECT id, source_id, type, content, timestamp, refs
+      SELECT id, source_id, type, content, timestamp, refs, metadata
       FROM observations
       ORDER BY timestamp DESC
       LIMIT ?
@@ -276,6 +276,7 @@ export class SQLiteStorageBackend implements StorageBackend {
       content: string;
       timestamp: string;
       refs: string;
+      metadata: string | null;
     }>;
     const observations: Observation[] = rows.map(r => ({
       id: r.id,
@@ -284,6 +285,7 @@ export class SQLiteStorageBackend implements StorageBackend {
       content: r.content,
       timestamp: r.timestamp,
       refs: JSON.parse(r.refs || '[]') as string[],
+      metadata: r.metadata ? (JSON.parse(r.metadata) as Record<string, unknown>) : undefined,
     }));
     return buildObservationGraph(observations, opts);
   }

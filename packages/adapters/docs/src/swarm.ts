@@ -50,6 +50,8 @@ export interface DocFile {
   timestamp: string;
   /** Observation IDs of the docs this file links to (real provenance edges). */
   refs?: string[];
+  /** Authored typed relationships: target observation ID → verb (from link titles). */
+  relations?: Array<{ to: string; as: string }>;
 }
 
 export interface DocsSwarmResult {
@@ -255,6 +257,8 @@ export async function ingestViaMeshSwarm(
               path: file.relativePath,
               bytes: file.content.length,
               title,
+              // Authored typed edges (link-title verbs) — the graph's "meaning".
+              ...(file.relations?.length ? { relations: file.relations } : {}),
               // Audit: how was this title chosen?
               titleAgreement:
                 vote.winners.find(w => w.inputId === file.id)?.quorum ?? 0,

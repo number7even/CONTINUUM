@@ -174,6 +174,6 @@ UUID. VAULT, Brand Kernel, and the internal tasks are **off** the first-thread p
 
 ## Related
 
-Prose walkthrough: [`AMF_PROCESS.md`](./AMF_PROCESS.md) · Demand: [`DEMAND_ATLAS_2026-07-01.md`](./DEMAND_ATLAS_2026-07-01.md) · Brand voice: [`BRAND_KERNEL.md`](./BRAND_KERNEL.md) · XENOS loop: [`AMF-XENOS-AMALGAMATION-HANDSHAKE.md`](./AMF-XENOS-AMALGAMATION-HANDSHAKE.md) · [`AMF-XENOS-RECONCILIATION.md`](./AMF-XENOS-RECONCILIATION.md) · Docs hub: [`INDEX.md`](./INDEX.md) · Map: [`../router.md`](../router.md)
+Prose walkthrough: [`AMF_PROCESS.md`](./AMF_PROCESS.md "detailed in") · Demand: [`DEMAND_ATLAS_2026-07-01.md`](./DEMAND_ATLAS_2026-07-01.md "feeds") · Brand voice: [`BRAND_KERNEL.md`](./BRAND_KERNEL.md "grounded on") · XENOS loop: [`AMF-XENOS-AMALGAMATION-HANDSHAKE.md`](./AMF-XENOS-AMALGAMATION-HANDSHAKE.md "hands off to") · [`AMF-XENOS-RECONCILIATION.md`](./AMF-XENOS-RECONCILIATION.md) · Docs hub: [`INDEX.md`](./INDEX.md "indexed by") · Map: [`../router.md`](../router.md)
 
 _IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._

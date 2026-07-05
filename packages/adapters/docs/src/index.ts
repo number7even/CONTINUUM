@@ -86,12 +86,17 @@ function pathToObservationId(relativePath: string): string {
  * URLs, anchors, and links that escape the docs root are dropped (same
  * dangling-drop discipline the graph builder enforces). No fabricated edges (P4).
  */
-function linkRefs(file: DocFile, knownPaths: Set<string>): string[] {
+function linkRefs(file: DocFile, knownPaths: Set<string>): { refs: string[]; relations: Array<{ to: string; as: string }> } {
   const refs = new Set<string>();
-  const linkRe = /\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g; // [text](target "optional title")
+  const relations = new Map<string, string>(); // target id → verb (last wins)
+  // [text](target "optional title") — the TITLE, when a short verb phrase, becomes
+  // the edge's meaning: `[VAULT](./x.md "enforces")` → this —enforces→ x. Authored,
+  // deterministic — never inferred (P4).
+  const linkRe = /\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g;
   let m: RegExpExecArray | null;
   while ((m = linkRe.exec(file.content)) !== null) {
     let target = m[1]!.trim();
+    const title = (m[2] ?? '').trim();
     if (/^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) continue; // protocol / protocol-relative / pure-anchor
     target = target.split('#')[0]!.split('?')[0]!; // strip anchor + query
     if (!target || !/\.mdx?$/i.test(target)) continue; // markdown targets only
@@ -100,9 +105,15 @@ function linkRefs(file: DocFile, knownPaths: Set<string>): string[] {
       : posix.join(posix.dirname(file.relativePath), target);
     const resolved = posix.normalize(base);
     if (resolved.startsWith('..') || resolved === file.relativePath) continue; // escaped root / self
-    if (knownPaths.has(resolved)) refs.add(pathToObservationId(resolved));
+    if (!knownPaths.has(resolved)) continue;
+    const id = pathToObservationId(resolved);
+    refs.add(id);
+    // A title of 1–3 words with a letter is treated as a verb phrase (the meaning).
+    if (title && /^[a-z][\w -]{1,28}$/i.test(title) && title.split(/\s+/).length <= 3) {
+      relations.set(id, title.toLowerCase());
+    }
   }
-  return [...refs];
+  return { refs: [...refs], relations: [...relations].map(([to, as]) => ({ to, as })) };
 }
 
 // ── Recursive markdown walker ────────────────────────────────────────────────
@@ -194,9 +205,14 @@ async function main() {
 
   // Resolve internal doc-to-doc markdown links into refs — the graph edges.
   const knownPaths = new Set(docFiles.map(f => f.relativePath));
-  for (const f of docFiles) f.refs = linkRefs(f, knownPaths);
+  for (const f of docFiles) {
+    const { refs, relations } = linkRefs(f, knownPaths);
+    f.refs = refs;
+    f.relations = relations;
+  }
   const edgeCount = docFiles.reduce((n, f) => n + (f.refs?.length ?? 0), 0);
-  console.log(`[docs] resolved ${edgeCount} internal doc-link edge(s) across ${docFiles.length} file(s)`);
+  const verbCount = docFiles.reduce((n, f) => n + (f.relations?.length ?? 0), 0);
+  console.log(`[docs] resolved ${edgeCount} internal doc-link edge(s) (${verbCount} typed with a verb) across ${docFiles.length} file(s)`);
 
   const result = await ingestViaMeshSwarm(docFiles, {
     storage,

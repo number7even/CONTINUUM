@@ -23,6 +23,8 @@ export interface GraphNode {
 export interface GraphEdge {
   source: string;
   target: string;
+  /** Authored relationship verb (e.g. 'enforces', 'feeds'), when declared. */
+  verb?: string;
 }
 export interface GraphStats {
   nodeCount: number;
