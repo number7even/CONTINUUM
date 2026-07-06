@@ -89,11 +89,13 @@ export function BrainGraph({ data }: { data: GraphData }) {
   const [pathEnds, setPathEnds] = useState<string[]>([]);
   const [depth, setDepth] = useState(1);
   const [search, setSearch] = useState('');
+  const [isolate, setIsolate] = useState(false); // proximity snapshot: show ONLY the neighbourhood
   const highlightRef = useRef<Set<string> | null>(null);
 
   // Fly the camera to frame just one lobe's nodes (click a cluster → drill in).
   const focusLobe = (lobe: LobeKey | null) => {
     setFocused(lobe);
+    setIsolate(false); // flying to a whole cluster exits the proximity snapshot
     const g = graphRef.current;
     if (!g) return;
     try {
@@ -146,10 +148,13 @@ export function BrainGraph({ data }: { data: GraphData }) {
       const term = m[1].replace(/[.?!]+$/, '').trim();
       const hit = data.nodes.find((n) => n.label.toLowerCase().includes(term));
       if (hit) {
+        // Proximity snapshot: select it, show its relationships, isolate + frame.
         setSelected(hit);
-        const lb = nodeLobe.get(hit.id) ?? null;
-        if (lb) focusLobe(lb);
-        voice.speak(`Found ${truncate(hit.label, 60)} in the ${lb ? LOBES[lb].name : 'graph'}.`);
+        setDepth(1);
+        setIsolate(true);
+        const lb = nodeLobe.get(hit.id);
+        const nbrs = adjacency.get(hit.id)?.size ?? 0;
+        voice.speak(`Here is ${truncate(hit.label, 60)}${lb ? ' in ' + LOBES[lb].name : ''}, with its ${nbrs} relationship${nbrs === 1 ? '' : 's'}.`);
       } else {
         voice.speak(`Nothing matching ${term}.`);
       }
@@ -223,8 +228,10 @@ export function BrainGraph({ data }: { data: GraphData }) {
 
   // Filtered graph — nodes DETERMINISTICALLY pinned to their lobe (fx/fy/fz), so
   // they cluster by domain instead of drifting into a uniform force cloud.
+  // ISOLATE (proximity snapshot): when on, render ONLY the highlighted neighbourhood.
   const graphData = useMemo(() => {
-    const visible = data.nodes.filter((n) => !hidden.has(nodeLobe.get(n.id) ?? 'parietal'));
+    const snap = isolate && highlighted ? highlighted : null;
+    const visible = data.nodes.filter((n) => !hidden.has(nodeLobe.get(n.id) ?? 'parietal') && (!snap || snap.has(n.id)));
     const visibleIds = new Set(visible.map((n) => n.id));
     return {
       nodes: visible.map((n) => {
@@ -234,7 +241,7 @@ export function BrainGraph({ data }: { data: GraphData }) {
       }),
       links: data.edges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target)).map((e) => ({ source: e.source, target: e.target, verb: e.verb })) as FGLink[],
     };
-  }, [data.nodes, data.edges, hidden, nodeLobe]);
+  }, [data.nodes, data.edges, hidden, nodeLobe, isolate, highlighted]);
 
   // Track canvas size.
   useEffect(() => {
@@ -245,6 +252,17 @@ export function BrainGraph({ data }: { data: GraphData }) {
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  // Keyboard: i = isolate the snapshot · Esc = clear everything.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.tagName === 'INPUT') return; // don't hijack the search box
+      if (e.key === 'i' || e.key === 'I') setIsolate((v) => !v);
+      else if (e.key === 'Escape') { setSelected(null); setIsolate(false); setSearch(''); setPathEnds([]); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   // Node renderer — reads highlightRef so it can DIM non-highlighted nodes.
@@ -392,7 +410,9 @@ export function BrainGraph({ data }: { data: GraphData }) {
                 <button key={d} type="button" onClick={() => setDepth(d)}
                   style={{ width: 24, height: 22, borderRadius: 4, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', background: depth === d ? '#34d399' : 'transparent', color: depth === d ? '#05070a' : '#cbd5e1', fontWeight: 600 }}>{d}</button>
               ))}
-              <span style={{ cursor: 'pointer', color: '#9ca3af', marginLeft: 6 }} onClick={() => setSelected(null)}>✕ clear</span>
+              <button type="button" onClick={() => setIsolate((v) => !v)}
+                style={{ marginLeft: 4, height: 22, padding: '0 8px', borderRadius: 4, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', background: isolate ? '#f59e0b' : 'transparent', color: isolate ? '#05070a' : '#cbd5e1', fontWeight: 600, fontSize: 11 }}>isolate</button>
+              <span style={{ cursor: 'pointer', color: '#9ca3af', marginLeft: 4 }} onClick={() => { setSelected(null); setIsolate(false); }}>✕</span>
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>{highlighted ? `${highlighted.size} node(s) highlighted` : ''}</div>
           </div>
