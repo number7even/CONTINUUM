@@ -17,9 +17,10 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@number7even/continuum-core": "0.0.1",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "express": "^4.21.0",
+    "@number7even/continuum-core": "0.0.1",
+    "array-flatten": "^3.0.0",
+    "express": "^4.22.2",
     "jose": "^5.9.6"
   },
   "devDependencies": {
