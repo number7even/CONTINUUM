@@ -12,7 +12,7 @@
  * failure modes that left the canvas blank. Data arrives from the server via
  * fetchGraph() over MCP/SSE.
  */
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import type { GraphData, GraphNode } from './lib';
@@ -52,27 +52,124 @@ function hash(s: string, salt: number): number {
   return h / 0xffffffff;
 }
 
-// Each lobe is its OWN region in space (a pentagon of cluster centers), so the
-// five clusters read as distinct lobes you can isolate + fly into — not one
-// overlapping cloud. Nodes scatter deterministically around their lobe center.
-const LOBE_CENTER: Record<LobeKey, [number, number, number]> = {
-  frontal: [190, 40, 20],
-  parietal: [-190, 40, -20],
-  temporal: [100, -150, 160],
-  occipital: [-100, -120, -160],
-  cerebellum: [10, 180, -40],
-};
-const LOBE_SPREAD = 62;
-function positionForLobe(id: string, lobe: LobeKey): [number, number, number] {
-  const [cx, cy, cz] = LOBE_CENTER[lobe];
-  return [
-    cx + (hash(id, 2) * 2 - 1) * LOBE_SPREAD,
-    cy + (hash(id, 3) * 2 - 1) * LOBE_SPREAD,
-    cz + (hash(id, 4) * 2 - 1) * LOBE_SPREAD,
-  ];
+// Harmonic (cymatics-inspired) layout. Each source is a PHYLLOTAXIS spiral —
+// nodes placed by the GOLDEN ANGLE (~137.5°), nature's resonance pattern (the
+// sunflower / Chladni order) — and the five spirals arrange into a symmetric
+// mandala around the centre. Deterministic + PINNED, so the galaxy is structured
+// and CALM (no never-settling force scatter, no jittery travelling nodes), yet
+// the clusters stay distinct and drillable.
+const LOBE_ORDER: LobeKey[] = ['frontal', 'parietal', 'temporal', 'occipital', 'cerebellum'];
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ≈ 137.507°
+const CLUSTER_RING = 430; // radius of the mandala the cluster-spheres sit on
+/** Position node #j (of `n`) within its source cluster — a 3D Fibonacci SPHERE
+ *  (spherical phyllotaxis): a volumetric ball of nodes, not a flat disk. */
+function harmonicPos(lobe: LobeKey, j: number, n: number): [number, number, number] {
+  const si = Math.max(0, LOBE_ORDER.indexOf(lobe));
+  const clusterAngle = (si / LOBE_ORDER.length) * Math.PI * 2;
+  const cx = Math.cos(clusterAngle) * CLUSTER_RING;
+  const cy = Math.sin(clusterAngle) * CLUSTER_RING;
+  const N = Math.max(2, n);
+  const yy = 1 - ((j + 0.5) / N) * 2;            // 1 → -1 (latitude)
+  const rad = Math.sqrt(Math.max(0, 1 - yy * yy));
+  const theta = j * GOLDEN_ANGLE;                // golden-angle longitude → even
+  const CR = 70 + Math.sqrt(N) * 5;              // cluster sphere radius
+  return [cx + Math.cos(theta) * rad * CR, cy + yy * CR, Math.sin(theta) * rad * CR];
 }
 
-interface FGNode extends GraphNode { __lobe?: LobeKey; fx?: number; fy?: number; fz?: number; }
+// ── FORM engine: arrange the whole galaxy into a 3D geometric form ────────────
+// Each form maps a node → a point on/in a shape. Nodes are ordered by source, so
+// same-source nodes sit contiguously → colored bands on the form.
+type Vec3 = [number, number, number];
+type FormCtx = { gi: number; N: number; lobe: LobeKey; j: number; count: number; id: string };
+
+function fibSphere(i: number, N: number, R: number): Vec3 {
+  const y = 1 - ((i + 0.5) / N) * 2;
+  const r = Math.sqrt(Math.max(0, 1 - y * y));
+  const t = i * GOLDEN_ANGLE;
+  return [Math.cos(t) * r * R, y * R, Math.sin(t) * r * R];
+}
+function torusPos(i: number, N: number): Vec3 {
+  const Rmaj = 320, Rmin = 120;
+  const u = (i / N) * Math.PI * 2;      // around the ring
+  const v = i * GOLDEN_ANGLE;           // around the tube
+  return [(Rmaj + Rmin * Math.cos(v)) * Math.cos(u), Rmin * Math.sin(v), (Rmaj + Rmin * Math.cos(v)) * Math.sin(u)];
+}
+function helixPos(i: number, N: number): Vec3 {
+  const H = 820, turns = 7, R = 190;
+  const t = i / Math.max(1, N - 1);
+  const a = t * Math.PI * 2 * turns;
+  return [Math.cos(a) * R, (t - 0.5) * H, Math.sin(a) * R];
+}
+function conePos(i: number, N: number): Vec3 {
+  const H = 720, R = 340;
+  const t = (i + 0.5) / N;
+  const a = i * GOLDEN_ANGLE;
+  const r = R * t;
+  return [Math.cos(a) * r, (0.5 - t) * H, Math.sin(a) * r];
+}
+function cubePos(i: number, N: number): Vec3 {
+  const side = Math.max(1, Math.ceil(Math.cbrt(N)));
+  const s = 620 / side;
+  const x = i % side, y = Math.floor(i / side) % side, z = Math.floor(i / (side * side));
+  return [(x - (side - 1) / 2) * s, (y - (side - 1) / 2) * s, (z - (side - 1) / 2) * s];
+}
+/** Concentric hexagon rings (the hex-map look), lifted into 3D by ring. */
+function hexPos(i: number): Vec3 {
+  if (i === 0) return [0, 0, 0];
+  let ring = 1, start = 1;
+  while (i >= start + 6 * ring) { start += 6 * ring; ring += 1; }
+  const p = i - start, side = Math.floor(p / ring), t = (p % ring) / ring;
+  const A = (k: number): [number, number] => { const ang = (k * Math.PI) / 3; return [Math.cos(ang) * ring * 48, Math.sin(ang) * ring * 48]; };
+  const [x0, y0] = A(side), [x1, y1] = A(side + 1);
+  return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, Math.sin(ring * 1.2) * 26];
+}
+const CHLADNI_SIZE = 640;
+const chladni = (x: number, y: number, m: number, n: number) =>
+  Math.cos(m * Math.PI * x) * Math.cos(n * Math.PI * y) - Math.cos(n * Math.PI * x) * Math.cos(m * Math.PI * y);
+/** Project onto the (m,n) Chladni nodal figure — a cymatic form. */
+function chladniPos(id: string, m: number, n: number): Vec3 {
+  let x = hash(id, 5), y = hash(id, 6);
+  const eps = 1e-3;
+  for (let i = 0; i < 16; i++) {
+    const f = chladni(x, y, m, n);
+    const gx = (chladni(x + eps, y, m, n) - f) / eps;
+    const gy = (chladni(x, y + eps, m, n) - f) / eps;
+    const g2 = gx * gx + gy * gy + 1e-9;
+    const step = (f / g2) * 0.75;
+    x = Math.min(1, Math.max(0, x - step * gx));
+    y = Math.min(1, Math.max(0, y - step * gy));
+  }
+  return [(x - 0.5) * CHLADNI_SIZE, (y - 0.5) * CHLADNI_SIZE, (hash(id, 7) - 0.5) * 28];
+}
+
+// The three top-level VIEW modes: the natural force galaxy, the cymatic
+// frequency figures, and the geometric forms.
+type ViewMode = 'universe' | 'frequency' | 'form';
+
+// Geometric forms — the whole galaxy snaps into a 3D shape.
+const GEO_FORMS: { name: string; place: (c: FormCtx) => Vec3 }[] = [
+  { name: '✦ mandala', place: (c) => harmonicPos(c.lobe, c.j, c.count) },
+  { name: '● sphere', place: (c) => fibSphere(c.gi, c.N, 340) },
+  { name: '◉ torus', place: (c) => torusPos(c.gi, c.N) },
+  { name: '⬡ hex', place: (c) => hexPos(c.gi) },
+  { name: '⟳ helix', place: (c) => helixPos(c.gi, c.N) },
+  { name: '▲ cone', place: (c) => conePos(c.gi, c.N) },
+  { name: '▦ cube', place: (c) => cubePos(c.gi, c.N) },
+];
+
+// Cymatic frequencies — Solfeggio Hz mapped to Chladni plate modes (m,n).
+// Higher Hz = higher mode = more intricate nodal figure.
+const FREQS: { hz: string; m: number; n: number }[] = [
+  { hz: '174', m: 1, n: 2 },
+  { hz: '285', m: 2, n: 3 },
+  { hz: '396', m: 2, n: 5 },
+  { hz: '432', m: 3, n: 4 },
+  { hz: '528', m: 4, n: 5 },
+  { hz: '741', m: 5, n: 7 },
+  { hz: '852', m: 6, n: 8 },
+];
+
+interface FGNode extends GraphNode { __lobe?: LobeKey; fx?: number; fy?: number; fz?: number; x?: number; y?: number; z?: number; }
 interface FGLink { source: string | FGNode; target: string | FGNode; verb?: string; }
 const endId = (e: string | FGNode) => (typeof e === 'object' ? e.id : e);
 const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + '…' : s);
@@ -91,7 +188,63 @@ export function BrainGraph({ data }: { data: GraphData }) {
   const [depth, setDepth] = useState(1);
   const [search, setSearch] = useState('');
   const [isolate, setIsolate] = useState(false); // proximity snapshot: show ONLY the neighbourhood
+  const [mode, setMode] = useState<ViewMode>('form'); // universe | frequency | form
+  const [freqIdx, setFreqIdx] = useState(0); // sub-option index within the active mode
+  const [divePath, setDivePath] = useState<string[]>([]); // breadcrumb of the proximity dive
+  const [askNodes, setAskNodes] = useState<string[] | null>(null); // nodes an /api/ask answer cited
+  const [answer, setAnswer] = useState<{ q: string; text: string; ids: string[] } | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [menuNode, setMenuNode] = useState<GraphNode | null>(null); // radial functions-menu target
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null); // its screen anchor
+  const [reverseNode, setReverseNode] = useState<GraphNode | null>(null); // reverse-engineer diagram target
+  const [dossier, setDossier] = useState<{ node: GraphNode; loading: boolean; content: string | null; meta: Record<string, unknown> | null; error?: string } | null>(null);
+  const [mindmapOn, setMindmapOn] = useState(false); // dossier: content view ⟷ mindmap view
+  const [mermaidText, setMermaidText] = useState<string | null>(null); // dossier: gitreverse-style mermaid map
+  const [copied, setCopied] = useState(false);
   const highlightRef = useRef<Set<string> | null>(null);
+  const didFitRef = useRef(false); // auto-fit ONCE on load; never yank the camera again
+
+  const nodeById = useMemo(() => new Map(data.nodes.map((n) => [n.id, n])), [data.nodes]);
+  // Direct relationships of a node (for the dive panel), with the verb + direction.
+  const neighborsOf = (id: string) => {
+    const out: { node: GraphNode; verb?: string; dir: '→' | '←' }[] = [];
+    for (const e of data.edges) {
+      if (e.source === id) { const n = nodeById.get(e.target); if (n) out.push({ node: n, verb: e.verb, dir: '→' }); }
+      else if (e.target === id) { const n = nodeById.get(e.source); if (n) out.push({ node: n, verb: e.verb, dir: '←' }); }
+    }
+    return out.sort((a, b) => b.node.degree - a.node.degree);
+  };
+  // Reverse-engineer a node's neighbourhood into a Mermaid diagram (gitreverse-style):
+  // callers → node → callees, verbs as edge labels. Paste into GitHub / mermaid.live to render.
+  const graphToMermaid = (node: GraphNode): string => {
+    const rel = neighborsOf(node.id);
+    const callers = rel.filter((r) => r.dir === '←').slice(0, 12);
+    const callees = rel.filter((r) => r.dir === '→').slice(0, 12);
+    const idOf = new Map<string, string>();
+    [node, ...callers.map((r) => r.node), ...callees.map((r) => r.node)].forEach((n, i) => {
+      if (!idOf.has(n.id)) idOf.set(n.id, 'N' + i);
+    });
+    const lbl = (s: string) => truncate(s.replace(/["\n|]/g, ' '), 34);
+    const vb = (v?: string) => (v || 'refs').replace(/[|"\n]/g, ' ');
+    const c = idOf.get(node.id)!;
+    const L = ['graph LR', `  ${c}["${lbl(node.label)}"]`];
+    callers.forEach(({ node: n, verb }) => L.push(`  ${idOf.get(n.id)}["${lbl(n.label)}"] -->|${vb(verb)}| ${c}`));
+    callees.forEach(({ node: n, verb }) => L.push(`  ${c} -->|${vb(verb)}| ${idOf.get(n.id)}["${lbl(n.label)}"]`));
+    L.push(`  style ${c} fill:#0b1220,stroke:#38bdf8,stroke-width:2px,color:#e5e7eb`);
+    return L.join('\n');
+  };
+  // Dive into a node — select it, push the breadcrumb, focus its proximity.
+  const diveTo = (n: GraphNode, extend: boolean) => {
+    setSelected(n);
+    setDepth(1);
+    setDivePath((prev) => (extend ? [...prev, n.id] : [n.id]));
+  };
+  const diveBack = (i: number) => {
+    setDivePath((prev) => prev.slice(0, i + 1));
+    const id = divePath[i];
+    const n = id ? nodeById.get(id) : undefined;
+    if (n) setSelected(n);
+  };
 
   // Fly the camera to frame just one lobe's nodes (click a cluster → drill in).
   const focusLobe = (lobe: LobeKey | null) => {
@@ -117,6 +270,87 @@ export function BrainGraph({ data }: { data: GraphData }) {
     if (/\b(vision|architect|roadmap|unified)\b/.test(t)) return 'cerebellum';
     return null;
   };
+
+  // Resolve ids returned by /api/ask to actual graph nodes (exact, then loose).
+  const resolveAskIds = useCallback((ids: string[]): string[] => {
+    const out: string[] = [];
+    for (const id of ids) {
+      if (nodeById.has(id)) { out.push(id); continue; }
+      const hit = data.nodes.find(
+        (n) => n.id.startsWith(id) || (id.length >= 8 && n.id.slice(0, 8) === id.slice(0, 8)),
+      );
+      if (hit) out.push(hit.id);
+    }
+    return [...new Set(out)];
+  }, [nodeById, data.nodes]);
+
+  // Plain-language question → /api/ask (LLM + CONTINUUM memory) → grounded answer
+  // + the nodes it cited light up and the camera flies to them.
+  const askBrain = useCallback(async (question: string) => {
+    setAsking(true);
+    setAnswer({ q: question, text: '…thinking', ids: [] });
+    voice.setThinking(true);
+    try {
+      const r = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question }),
+      });
+      const data2 = (await r.json()) as { answer?: string; nodeIds?: string[]; error?: string };
+      if (!r.ok || data2.error) throw new Error(data2.error || `ask failed (${r.status})`);
+      const text = data2.answer ?? '(no answer)';
+      const ids = resolveAskIds(data2.nodeIds ?? []);
+      setAnswer({ q: question, text, ids });
+      setAskNodes(ids.length ? ids : null);
+      if (ids.length) {
+        const first = nodeById.get(ids[0]!);
+        if (first) setSelected(first);
+        const idSet = new Set(ids);
+        setTimeout(() => {
+          try { graphRef.current?.zoomToFit(900, 90, (n: FGNode) => idSet.has(n.id)); } catch { /* noop */ }
+        }, 60);
+      }
+      voice.speak(text);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setAnswer({ q: question, text: `⚠ ${msg}`, ids: [] });
+      voice.setThinking(false);
+    } finally {
+      setAsking(false);
+    }
+  }, [voice, resolveAskIds, nodeById]);
+
+  // Open the node DOSSIER — fetch its full verified content (Layer-3), no LLM.
+  const openDossier = useCallback(async (node: GraphNode) => {
+    setDossier({ node, loading: true, content: null, meta: null });
+    setMindmapOn(false);
+    setMermaidText(null);
+    setCopied(false);
+    try {
+      const r = await fetch('/api/observation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [node.id] }),
+      });
+      const d = (await r.json()) as { observations?: Array<{ content?: string; metadata?: Record<string, unknown> }>; error?: string };
+      if (!r.ok || d.error) throw new Error(d.error || `fetch failed (${r.status})`);
+      const obs = (d.observations ?? [])[0];
+      setDossier({ node, loading: false, content: obs?.content ?? '(no full content stored for this node)', meta: obs?.metadata ?? null });
+    } catch (err) {
+      setDossier({ node, loading: false, content: null, meta: null, error: err instanceof Error ? err.message : String(err) });
+    }
+  }, []);
+
+  // The node functions menu — "what do I want to see" (the gitreverse idea, live).
+  const NODE_ACTIONS: { key: string; icon: string; label: string; color: string; run: (n: GraphNode) => void }[] = [
+    { key: 'dossier', icon: '📄', label: 'Dossier', color: '#38bdf8', run: (n) => { void openDossier(n); setSelected(n); } },
+    { key: 'explain', icon: '✦', label: 'Explain', color: '#22d3ee', run: (n) => askBrain(`Explain "${n.label}" — what is it, what is its role, and what does it connect to?`) },
+    { key: 'reverse', icon: '⊹', label: 'Reverse', color: '#a78bfa', run: (n) => { setReverseNode(n); setSelected(n); } },
+    { key: 'relations', icon: '⇄', label: 'Relations', color: '#6ee7b7', run: (n) => { setSelected(n); setDepth(1); setIsolate(true); } },
+    { key: 'history', icon: '◷', label: 'History', color: '#f59e0b', run: (n) => askBrain(`What commits, changes, or history relate to "${n.label}"? Cite the relevant commit nodes.`) },
+    { key: 'trace', icon: '↝', label: 'Trace…', color: '#f472b6', run: (n) => { setPathEnds([n.id]); } },
+  ];
+
   // Route each final transcript to a graph action + a spoken reply.
   useEffect(() => {
     const t = voice.lastFinal.text.toLowerCase().trim();
@@ -161,7 +395,8 @@ export function BrainGraph({ data }: { data: GraphData }) {
       }
       return;
     }
-    voice.setThinking(false); // unrecognized — no reply, return to listening
+    // 6) anything else = a real question → the LLM comprehension agent.
+    void askBrain(voice.lastFinal.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voice.lastFinal.nonce]);
 
@@ -202,6 +437,8 @@ export function BrainGraph({ data }: { data: GraphData }) {
   // Highlight set: search matches, else the selected node + its neighbours out
   // to `depth` hops. null = nothing highlighted (everything shown at full).
   const highlighted = useMemo<Set<string> | null>(() => {
+    // An /api/ask answer highlights exactly the nodes it cited (grounded set).
+    if (askNodes && askNodes.length) return new Set(askNodes);
     const term = search.trim().toLowerCase();
     if (term) return new Set(data.nodes.filter((n) => n.label.toLowerCase().includes(term)).map((n) => n.id));
     if (!selected) return null;
@@ -213,7 +450,28 @@ export function BrainGraph({ data }: { data: GraphData }) {
       frontier = next;
     }
     return set;
-  }, [search, selected, depth, adjacency, data.nodes]);
+  }, [askNodes, search, selected, depth, adjacency, data.nodes]);
+
+  // Glue the radial menu to the node's live screen position (follows orbit/zoom).
+  useEffect(() => {
+    if (!menuNode || !ready) { setMenuPos(null); return; }
+    let raf = 0;
+    const tick = () => {
+      const g = graphRef.current;
+      const el = canvasRef.current;
+      if (g && el) {
+        const live = (g.graphData().nodes as FGNode[]).find((n) => n.id === menuNode.id);
+        if (live && typeof live.x === 'number') {
+          const sc = g.graph2ScreenCoords(live.x, live.y, live.z);
+          const rect = el.getBoundingClientRect();
+          setMenuPos({ x: rect.left + sc.x, y: rect.top + sc.y });
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [menuNode, ready]);
 
   // Lobe per node (the cluster assignment) + counts for the legend/filter.
   const nodeLobe = useMemo(() => {
@@ -235,14 +493,47 @@ export function BrainGraph({ data }: { data: GraphData }) {
     const visible = data.nodes.filter((n) => !hidden.has(nodeLobe.get(n.id) ?? 'parietal') && (!snap || snap.has(n.id)));
     const visibleIds = new Set(visible.map((n) => n.id));
     return {
-      // Un-pinned: the force layout connects everything into ONE galaxy — same-
-      // source nodes clump via their dense internal edges (code↔code, commit→
-      // parent), cross-source edges (concept→doc) bridge them. Colored by source,
-      // not flung into separate universes.
-      nodes: visible.map((n) => ({ ...n, __lobe: nodeLobe.get(n.id) ?? 'parietal' } as FGNode)),
+      // PINNED FORM layout: every node's (fx,fy,fz) is placed onto the selected
+      // geometric form (mandala / sphere / torus / hex / helix / cone / cube /
+      // cymatic figure). Deterministic + pinned → the galaxy snaps into the shape
+      // and stays CALM (no chaotic never-settling force scatter). Nodes are ordered
+      // by source so each form shows colored bands per lobe.
+      nodes: (() => {
+        const lobeOf = (id: string): LobeKey => nodeLobe.get(id) ?? 'cerebellum';
+        // UNIVERSE — no pinning; d3 force lays out the natural connected galaxy
+        // (edges pull related nodes together → proximity = actual relationship).
+        if (mode === 'universe') {
+          return visible.map((n) => ({ ...n, __lobe: lobeOf(n.id) } as FGNode));
+        }
+        // FREQUENCY / FORM — deterministic pinned placement onto the chosen shape.
+        const visLobe = new Map<LobeKey, number>();
+        for (const n of visible) { const l = lobeOf(n.id); visLobe.set(l, (visLobe.get(l) ?? 0) + 1); }
+        // global order = grouped by lobe (source), so same-color nodes are contiguous.
+        const ordered = [...visible].sort(
+          (a, b) => LOBE_ORDER.indexOf(lobeOf(a.id)) - LOBE_ORDER.indexOf(lobeOf(b.id)),
+        );
+        const N = Math.max(1, ordered.length);
+        const counters: Partial<Record<LobeKey, number>> = {};
+        const pos = new Map<string, Vec3>();
+        const freq = FREQS[freqIdx] ?? FREQS[0];
+        const form = GEO_FORMS[freqIdx] ?? GEO_FORMS[0];
+        ordered.forEach((n, gi) => {
+          const lobe = lobeOf(n.id);
+          const j = (counters[lobe] = (counters[lobe] ?? 0) + 1) - 1;
+          const p: Vec3 = mode === 'frequency'
+            ? chladniPos(n.id, freq.m, freq.n)
+            : form.place({ gi, N, lobe, j, count: visLobe.get(lobe) ?? 1, id: n.id });
+          pos.set(n.id, p);
+        });
+        return visible.map((n) => {
+          const lobe = lobeOf(n.id);
+          const [fx, fy, fz] = pos.get(n.id) ?? [0, 0, 0];
+          return { ...n, __lobe: lobe, fx, fy, fz } as FGNode;
+        });
+      })(),
       links: data.edges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target)).map((e) => ({ source: e.source, target: e.target, verb: e.verb })) as FGLink[],
     };
-  }, [data.nodes, data.edges, hidden, nodeLobe, isolate, highlighted]);
+  }, [data.nodes, data.edges, hidden, nodeLobe, isolate, highlighted, mode, freqIdx]);
 
   // Track canvas size.
   useEffect(() => {
@@ -255,12 +546,26 @@ export function BrainGraph({ data }: { data: GraphData }) {
     return () => ro.disconnect();
   }, []);
 
+  // Frame the snapshot when isolate turns on (auto-fit is one-time now).
+  useEffect(() => {
+    if (!ready || !isolate) return;
+    const id = setTimeout(() => { try { graphRef.current?.zoomToFit(600, 60); } catch { /* noop */ } }, 500);
+    return () => clearTimeout(id);
+  }, [isolate, ready]);
+
+  // Reframe when the frequency changes — the resonance figure snaps into view.
+  useEffect(() => {
+    if (!ready) return;
+    const id = setTimeout(() => { try { graphRef.current?.zoomToFit(700, 80); } catch { /* noop */ } }, 450);
+    return () => clearTimeout(id);
+  }, [mode, freqIdx, ready]);
+
   // Keyboard: i = isolate the snapshot · Esc = clear everything.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return; // don't hijack the search box
       if (e.key === 'i' || e.key === 'I') setIsolate((v) => !v);
-      else if (e.key === 'Escape') { setSelected(null); setIsolate(false); setSearch(''); setPathEnds([]); }
+      else if (e.key === 'Escape') { voice.stop(); setSelected(null); setIsolate(false); setSearch(''); setPathEnds([]); setMenuNode(null); setReverseNode(null); setDossier(null); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -317,12 +622,18 @@ export function BrainGraph({ data }: { data: GraphData }) {
         .linkDirectionalParticleColor((l: FGLink) => (l.verb ? 'rgba(245,158,11,0.95)' : 'rgba(110,231,183,0.8)'))
         .onNodeClick((node: FGNode, event: MouseEvent) => {
           if (event.shiftKey) setPathEnds((prev) => (prev.length >= 2 ? [node.id] : [...prev, node.id]));
-          else { setSelected(node); setPathEnds([]); }
+          else { setSelected(node); setDepth(1); setDivePath([node.id]); setPathEnds([]); setMenuNode(node); }
         })
+        .onBackgroundClick(() => { setMenuNode(null); })
         // Frame the whole graph once the force layout settles → the "brain" snaps
         // into view instead of drifting off-centre.
         .cooldownTicks(120)
-        .onEngineStop(() => { try { graphRef.current?.zoomToFit(600, 60); } catch { /* noop */ } });
+        // Fit ONCE, on the first settle — after that the camera is the user's.
+        .onEngineStop(() => {
+          if (didFitRef.current) return;
+          didFitRef.current = true;
+          try { graphRef.current?.zoomToFit(700, 90); } catch { /* noop */ }
+        });
       graphRef.current = g;
       // Spread the galaxy — more charge repulsion + a bit of link distance so 800+
       // nodes breathe instead of collapsing into a dense ball.
@@ -363,6 +674,20 @@ export function BrainGraph({ data }: { data: GraphData }) {
       if (highlighted && highlighted.has(s) && highlighted.has(t)) return 1.2;
       return l.verb ? 1.5 : 0.5;
     });
+    // FLOW FOCUS: when a node/proximity is in focus (isolate, select, search, ask,
+    // or a traced path), the flow particles FREEZE everywhere except the focused
+    // edges — so the eye follows the direction of flow for THAT node alone.
+    g.linkDirectionalParticles((l: FGLink) => {
+      const s = endId(l.source), t = endId(l.target);
+      if (pathEnds.length === 2) return tracedPath.links.has(`${s}|${t}`) ? 4 : 0;
+      if (highlighted) return highlighted.has(s) && highlighted.has(t) ? (l.verb ? 4 : 3) : 0;
+      return l.verb ? 2 : 1; // ambient galaxy flow when nothing is focused
+    }).linkDirectionalArrowLength((l: FGLink) => {
+      const s = endId(l.source), t = endId(l.target);
+      if (pathEnds.length === 2) return tracedPath.links.has(`${s}|${t}`) ? 4 : 0;
+      if (highlighted) return highlighted.has(s) && highlighted.has(t) && l.verb ? 4 : 0;
+      return l.verb ? 3 : 0;
+    });
     // NB: deliberately DON'T move the camera on node select — highlight+dim is the
     // focus; the user keeps their own zoom. Camera flight is an explicit action
     // (clicking a lobe name → focusLobe).
@@ -402,6 +727,27 @@ export function BrainGraph({ data }: { data: GraphData }) {
           style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#e5e7eb', fontSize: 12, padding: '7px 10px', borderRadius: 6, outline: 'none' }}
         />
         {search && <div style={{ fontSize: 11, color: '#6ee7b7', margin: '6px 0' }}>{highlighted?.size ?? 0} match{(highlighted?.size ?? 0) === 1 ? '' : 'es'} · <span style={{ cursor: 'pointer', color: '#9ca3af' }} onClick={() => setSearch('')}>clear</span></div>}
+        {answer && (
+          <div style={{ margin: '10px 0', padding: '10px 12px', borderRadius: 8, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)' }}>
+            <div style={{ fontSize: 10, letterSpacing: 1.5, color: '#38bdf8', marginBottom: 4 }}>
+              ANSWER {asking && <span style={{ color: '#f59e0b' }}>· thinking…</span>}
+            </div>
+            <div style={{ fontSize: 11, color: '#7f8ea3', marginBottom: 6, fontStyle: 'italic' }}>“{truncate(answer.q, 90)}”</div>
+            <div style={{ fontSize: 12.5, color: '#e5e7eb', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{answer.text}</div>
+            {answer.ids.length > 0 && (
+              <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {answer.ids.map((id) => (
+                  <span key={id} onClick={() => { const n = nodeById.get(id); if (n) { setSelected(n); setDepth(1); } }}
+                    style={{ cursor: 'pointer', fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'rgba(56,189,248,0.15)', color: '#bae6fd', border: '1px solid rgba(56,189,248,0.3)' }}>
+                    {truncate(nodeById.get(id)?.label ?? id, 22)}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', cursor: 'pointer' }}
+              onClick={() => { setAnswer(null); setAskNodes(null); }}>✕ clear answer</div>
+          </div>
+        )}
         <div style={panel.sectionLabel}>INSPECTOR</div>
         {selected ? (
           <div style={{ fontSize: 13, color: '#e5e7eb' }}>
@@ -420,6 +766,33 @@ export function BrainGraph({ data }: { data: GraphData }) {
               <span style={{ cursor: 'pointer', color: '#9ca3af', marginLeft: 4 }} onClick={() => { setSelected(null); setIsolate(false); }}>✕</span>
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>{highlighted ? `${highlighted.size} node(s) highlighted` : ''}</div>
+            {/* Breadcrumb — your proximity dive path. */}
+            {divePath.length > 1 && (
+              <div style={{ fontSize: 11, margin: '8px 0', lineHeight: 1.5 }}>
+                {divePath.map((id, i) => (
+                  <span key={id + i}>
+                    {i > 0 && <span style={{ color: '#4b5563' }}> › </span>}
+                    <span style={{ cursor: 'pointer', color: i === divePath.length - 1 ? '#6ee7b7' : '#9ca3af' }} onClick={() => diveBack(i)}>
+                      {truncate(nodeById.get(id)?.label ?? id, 14)}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+            {/* Relationships — dive deeper, proximity by proximity. */}
+            <div style={{ marginTop: 12 }}>
+              <div style={panel.sectionLabel}>RELATIONSHIPS ({neighborsOf(selected.id).length})</div>
+              {neighborsOf(selected.id).slice(0, 24).map(({ node, verb, dir }, k) => (
+                <div key={node.id + k} onClick={() => diveTo(node, true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, margin: '3px 0', cursor: 'pointer' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 4, background: colorFor(nodeLobe.get(node.id) ?? 'cerebellum'), flexShrink: 0 }} />
+                  <span style={{ color: '#6b7280', width: 10, flexShrink: 0 }}>{dir}</span>
+                  {verb && <span style={{ color: '#f59e0b', fontSize: 11, flexShrink: 0 }}>{verb}</span>}
+                  <span style={{ flex: 1, color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{truncate(node.label, 26)}</span>
+                </div>
+              ))}
+              {neighborsOf(selected.id).length === 0 && <div style={{ fontSize: 12, color: '#6b7280' }}>no direct relationships</div>}
+            </div>
           </div>
         ) : (
           <div style={{ color: '#6b7280', fontSize: 12 }}>Click a node to focus it. Shift-click two nodes to trace the path between them.</div>
@@ -466,6 +839,170 @@ export function BrainGraph({ data }: { data: GraphData }) {
         <div style={{ marginTop: 10, fontSize: 11, color: '#6b7280' }}>click a lobe name → fly into that cluster · checkbox → show/hide</div>
       </aside>
 
+      {/* VIEW (top-centre) — switch UNIVERSE (natural galaxy) · FREQUENCY (cymatics) · FORM (geometry). */}
+      <div style={panel.freqBar}>
+        {(['universe', 'frequency', 'form'] as ViewMode[]).map((m) => (
+          <button key={m} type="button" onClick={() => { setMode(m); setFreqIdx(0); }}
+            style={{ padding: '4px 12px', borderRadius: 14, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'ui-monospace, monospace', background: mode === m ? '#38bdf8' : 'transparent', color: mode === m ? '#05070a' : '#cbd5e1', fontWeight: mode === m ? 700 : 400 }}>
+            {m}
+          </button>
+        ))}
+        <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.14)', margin: '0 4px' }} />
+        {mode === 'universe' && (
+          <span style={{ color: '#6b7280', fontSize: 11, fontFamily: 'ui-monospace, monospace' }}>
+            natural galaxy · edges pull related nodes together → proximity = real relationship
+          </span>
+        )}
+        {mode === 'frequency' && FREQS.map((f, i) => (
+          <button key={f.hz} type="button" onClick={() => setFreqIdx(i)}
+            style={{ padding: '4px 11px', borderRadius: 14, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', fontSize: 11, fontFamily: 'ui-monospace, monospace', background: freqIdx === i ? '#6ee7b7' : 'transparent', color: freqIdx === i ? '#05070a' : '#cbd5e1', fontWeight: freqIdx === i ? 700 : 400 }}>
+            {f.hz}Hz
+          </button>
+        ))}
+        {mode === 'form' && GEO_FORMS.map((f, i) => (
+          <button key={f.name} type="button" onClick={() => setFreqIdx(i)}
+            style={{ padding: '4px 11px', borderRadius: 14, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', fontSize: 11, fontFamily: 'ui-monospace, monospace', background: freqIdx === i ? '#6ee7b7' : 'transparent', color: freqIdx === i ? '#05070a' : '#cbd5e1', fontWeight: freqIdx === i ? 700 : 400 }}>
+            {f.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Controls hint (bottom-centre) — first-use orientation. */}
+      <div style={panel.controls}>scroll = zoom · drag = orbit · click a node = ring menu · i = isolate · esc = clear</div>
+
+      {/* Radial FUNCTIONS MENU — fans out around the clicked node; follows the camera. */}
+      {menuNode && menuPos && (
+        <div style={{ position: 'fixed', left: menuPos.x, top: menuPos.y, zIndex: 6, pointerEvents: 'none' }}>
+          {NODE_ACTIONS.map((a, i) => {
+            const ang = (i / NODE_ACTIONS.length) * Math.PI * 2 - Math.PI / 2;
+            const R = 66;
+            const dx = Math.cos(ang) * R, dy = Math.sin(ang) * R;
+            return (
+              <button key={a.key} type="button" title={a.label}
+                onClick={() => { a.run(menuNode); if (a.key !== 'trace') setMenuNode(null); }}
+                style={{ position: 'absolute', left: dx - 27, top: dy - 27, width: 54, height: 54, borderRadius: '50%', pointerEvents: 'auto', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, background: 'radial-gradient(circle at 50% 40%, rgba(20,28,40,0.96), rgba(6,9,14,0.98))', border: `1px solid ${a.color}`, boxShadow: `0 0 14px ${a.color}55`, color: a.color }}>
+                <span style={{ fontSize: 16, lineHeight: 1 }}>{a.icon}</span>
+                <span style={{ fontSize: 8, letterSpacing: 0.5, color: '#cbd5e1' }}>{a.label}</span>
+              </button>
+            );
+          })}
+          {/* centre pip on the node */}
+          <div style={{ position: 'absolute', left: -4, top: -4, width: 8, height: 8, borderRadius: 4, background: '#38bdf8', boxShadow: '0 0 10px #38bdf8' }} />
+        </div>
+      )}
+
+      {/* REVERSE-ENGINEER diagram — called-by → node → calls/depends (live gitreverse slice). */}
+      {reverseNode && (() => {
+        const rel = neighborsOf(reverseNode.id);
+        const callers = rel.filter((r) => r.dir === '←');
+        const callees = rel.filter((r) => r.dir === '→');
+        const col = (title: string, items: typeof rel, accent: string) => (
+          <div style={{ minWidth: 150, maxWidth: 220 }}>
+            <div style={{ fontSize: 10, letterSpacing: 1.5, color: accent, marginBottom: 6 }}>{title} ({items.length})</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 190, overflowY: 'auto' }}>
+              {items.slice(0, 12).map(({ node, verb }, k) => (
+                <div key={node.id + k} onClick={() => { setReverseNode(node); setSelected(node); }}
+                  style={{ cursor: 'pointer', fontSize: 11, padding: '3px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#e5e7eb', display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 4, background: colorFor(nodeLobe.get(node.id) ?? 'cerebellum'), flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{truncate(node.label, 26)}</span>
+                  {verb && <span style={{ marginLeft: 'auto', fontSize: 9, color: '#6b7280' }}>{verb}</span>}
+                </div>
+              ))}
+              {items.length === 0 && <div style={{ fontSize: 11, color: '#6b7280' }}>none</div>}
+            </div>
+          </div>
+        );
+        return (
+          <div style={{ position: 'fixed', left: '50%', bottom: 96, transform: 'translateX(-50%)', zIndex: 6, background: 'rgba(8,11,16,0.96)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: 12, padding: '14px 18px', display: 'flex', gap: 20, alignItems: 'flex-start', boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}>
+            {col('CALLED BY →', callers, '#f59e0b')}
+            <div style={{ minWidth: 150, textAlign: 'center', padding: '0 4px' }}>
+              <div style={{ fontSize: 10, letterSpacing: 1.5, color: '#38bdf8', marginBottom: 6 }}>SYMBOL</div>
+              <div style={{ fontSize: 13, color: '#e5e7eb', fontWeight: 600, wordBreak: 'break-word' }}>{truncate(reverseNode.label, 60)}</div>
+              <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>{reverseNode.source} · {reverseNode.type} · deg {reverseNode.degree}</div>
+              <div style={{ fontSize: 10, color: '#6b7280', marginTop: 8, cursor: 'pointer' }} onClick={() => setReverseNode(null)}>✕ close</div>
+            </div>
+            {col('→ CALLS / USES', callees, '#6ee7b7')}
+          </div>
+        );
+      })()}
+
+      {/* DOSSIER — the node's full verified record (content + code refs + relationships).
+          The node stays in the galaxy; the details live here (docked right). */}
+      {dossier && (
+        <div style={dossierStyle.panel}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 5, background: colorFor(nodeLobe.get(dossier.node.id) ?? 'cerebellum') }} />
+            <span style={{ fontSize: 10, letterSpacing: 1.5, color: '#38bdf8' }}>DOSSIER</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6b7280', cursor: 'pointer' }} onClick={() => setDossier(null)}>✕</span>
+          </div>
+          <div style={{ fontSize: 15, color: '#e5e7eb', fontWeight: 600, marginTop: 8, wordBreak: 'break-word' }}>{dossier.node.label}</div>
+          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>{dossier.node.source} · {dossier.node.type} · degree {dossier.node.degree}</div>
+          {typeof dossier.meta?.file === 'string' && (
+            <div style={{ fontSize: 11, color: '#a78bfa', marginTop: 4, wordBreak: 'break-all' }}>⌂ {dossier.meta.file as string}</div>
+          )}
+
+          {/* action bar */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+            <button type="button" style={{ ...dossierStyle.btn, background: voice.state === 'speaking' ? 'rgba(52,211,153,0.2)' : dossierStyle.btn.background }} disabled={!dossier.content}
+              onClick={() => { if (voice.state === 'speaking') voice.stop(); else if (dossier.content) voice.speak(dossier.content); }}>
+              {voice.state === 'speaking' ? '⏹ Stop' : '🔊 Read aloud'}</button>
+            <button type="button" style={{ ...dossierStyle.btn, background: mindmapOn ? 'rgba(56,189,248,0.2)' : dossierStyle.btn.background }}
+              onClick={() => { setMindmapOn((v) => !v); setMermaidText(null); }}>🧠 Mindmap</button>
+            <button type="button" style={{ ...dossierStyle.btn, background: mermaidText ? 'rgba(56,189,248,0.2)' : dossierStyle.btn.background }}
+              onClick={() => { setMermaidText((v) => (v ? null : graphToMermaid(dossier.node))); setMindmapOn(false); setCopied(false); }}>⤓ Mermaid</button>
+            <button type="button" style={dossierStyle.btn}
+              onClick={() => { setReverseNode(dossier.node); }}>⊹ Reverse</button>
+          </div>
+
+          {/* body: content OR mindmap */}
+          <div style={{ marginTop: 12, flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            {dossier.loading && <div style={{ color: '#f59e0b', fontSize: 12 }}>…loading full record</div>}
+            {dossier.error && <div style={{ color: '#f87171', fontSize: 12 }}>⚠ {dossier.error}</div>}
+            {!dossier.loading && !dossier.error && !mindmapOn && !mermaidText && (
+              <pre style={dossierStyle.content}>{dossier.content}</pre>
+            )}
+            {!dossier.loading && mermaidText && (
+              <div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, letterSpacing: 1, color: '#38bdf8' }}>MERMAID MAP</span>
+                  <button type="button" style={{ ...dossierStyle.btn, fontSize: 10, padding: '3px 8px' }}
+                    onClick={() => { navigator.clipboard?.writeText(mermaidText).then(() => { setCopied(true); }); }}>
+                    {copied ? '✓ copied' : '⧉ copy'}
+                  </button>
+                  <a href="https://mermaid.live" target="_blank" rel="noreferrer" style={{ fontSize: 10, color: '#a78bfa' }}>open mermaid.live ↗</a>
+                </div>
+                <pre style={{ ...dossierStyle.content, fontSize: 11, background: 'rgba(255,255,255,0.03)', padding: 10, borderRadius: 6 }}>{mermaidText}</pre>
+                <div style={{ fontSize: 10, color: '#6b7280', marginTop: 6 }}>paste into GitHub, Notion, or mermaid.live to render the diagram</div>
+              </div>
+            )}
+            {!dossier.loading && mindmapOn && !mermaidText && (() => {
+              const rel = neighborsOf(dossier.node.id);
+              const grp = (title: string, items: typeof rel, accent: string) => (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, letterSpacing: 1, color: accent, marginBottom: 4 }}>{title}</div>
+                  {items.length === 0 && <div style={{ fontSize: 11, color: '#6b7280', paddingLeft: 12 }}>none</div>}
+                  {items.slice(0, 20).map(({ node, verb }, k) => (
+                    <div key={node.id + k} onClick={() => { void openDossier(node); setSelected(node); }}
+                      style={{ cursor: 'pointer', fontSize: 12, color: '#e5e7eb', padding: '2px 0 2px 12px', borderLeft: `2px solid ${accent}`, marginLeft: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: 3, background: colorFor(nodeLobe.get(node.id) ?? 'cerebellum') }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{truncate(node.label, 32)}</span>
+                      {verb && <span style={{ marginLeft: 'auto', fontSize: 9, color: '#6b7280' }}>{verb}</span>}
+                    </div>
+                  ))}
+                </div>
+              );
+              return (
+                <div>
+                  <div style={{ fontSize: 13, color: '#38bdf8', fontWeight: 600, marginBottom: 10 }}>◉ {truncate(dossier.node.label, 40)}</div>
+                  {grp('→ CALLS / USES', rel.filter((r) => r.dir === '→'), '#6ee7b7')}
+                  {grp('← CALLED BY / REFERS', rel.filter((r) => r.dir === '←'), '#f59e0b')}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Voice orb — tap to talk. "show me AMF" · "search vault" · "status" · "read this" */}
       <VoiceOrb voice={voice} />
     </div>
@@ -479,4 +1016,12 @@ const panel: Record<string, React.CSSProperties> = {
   canvas: { flex: 1, position: 'relative', minWidth: 0 },
   sectionLabel: { fontSize: 11, letterSpacing: 1.5, color: '#6b7280', margin: '14px 0 8px' },
   empty: { position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#05070a', gap: 8 },
+  controls: { position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 4, fontSize: 11, color: 'rgba(203,213,225,0.55)', background: 'rgba(10,14,20,0.72)', padding: '6px 14px', borderRadius: 20, fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap' },
+  freqBar: { position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 4, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(10,14,20,0.82)', padding: '6px 12px', borderRadius: 22, border: '1px solid rgba(255,255,255,0.06)' },
+};
+
+const dossierStyle: Record<string, React.CSSProperties> = {
+  panel: { position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, zIndex: 7, background: 'rgba(8,11,16,0.97)', borderLeft: '1px solid rgba(56,189,248,0.25)', padding: '18px 20px', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 40px rgba(0,0,0,0.6)', fontFamily: 'ui-sans-serif, system-ui' },
+  btn: { fontSize: 11, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#e5e7eb' },
+  content: { fontSize: 12, lineHeight: 1.55, color: '#d1d5db', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'ui-monospace, monospace', margin: 0 },
 };
