@@ -87,17 +87,44 @@ export function useVoice(): Voice {
     }
   }, []);
 
-  const speak = useCallback((text: string) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const backToRest = useCallback(() => setState(listeningRef.current ? 'listening' : 'idle'), []);
+
+  const speakBrowser = useCallback((text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) { backToRest(); return; }
     try {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.rate = 1.02; u.pitch = 1.0;
       u.onstart = () => setState('speaking');
-      u.onend = () => setState(listeningRef.current ? 'listening' : 'idle');
+      u.onend = backToRest;
       window.speechSynthesis.speak(u);
-    } catch { /* noop */ }
-  }, []);
+    } catch { backToRest(); }
+  }, [backToRest]);
+
+  const speak = useCallback(async (text: string) => {
+    setState('speaking');
+    // 1) OUR voice — Supertonic via same-origin proxy. 503 when the server's off.
+    try {
+      const r = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (r.ok) {
+        const blob = await r.blob();
+        try { audioRef.current?.pause(); } catch { /* noop */ }
+        const audio = new Audio(URL.createObjectURL(blob));
+        audioRef.current = audio;
+        audio.onended = backToRest;
+        audio.onerror = () => speakBrowser(text);
+        await audio.play();
+        return;
+      }
+    } catch { /* fall through to browser voice */ }
+    // 2) fallback — the browser's built-in voice (key-free, always available).
+    speakBrowser(text);
+  }, [backToRest, speakBrowser]);
 
   const setThinking = useCallback((on: boolean) => {
     setState(on ? 'thinking' : (listeningRef.current ? 'listening' : 'idle'));

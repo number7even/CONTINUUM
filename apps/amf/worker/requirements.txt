@@ -1,6 +1,11 @@
-# AMF L4 voice worker — Python deps (Apache-2.0 stack, runs on Apple Silicon MPS)
+# AMF L4 voice worker — Python deps (own-stack, runs on Apple Silicon)
 # Python >= 3.10
-voxcpm            # TTS (Apache-2.0) — script → speech, 30 languages, voice cloning
+supertonic[serve] # DEFAULT TTS (MIT code / OpenRAIL-M model) — 99M ONNX, on-device,
+                  #   44.1kHz, fast on CPU (RTF ~0.3), OpenAI-compatible `supertonic serve`.
+                  #   The interactive voice (brain + short narration). Was missing here
+                  #   despite voice_pipeline.py defaulting to it.
+voxcpm            # HIGH-END TTS (Apache-2.0) — 2B PyTorch, studio 48kHz, voice cloning.
+                  #   For produced narration where quality > latency (RTF ~1.76 on M-series).
 whisperx          # alignment (Apache-2.0) — audio → word-level timestamps
 soundfile         # wav I/O
 torch>=2.5.0      # MPS on Apple Silicon; CUDA on NVIDIA

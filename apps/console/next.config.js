@@ -64,7 +64,7 @@ const nextConfig = {
       contentSecurityPolicy.replace(
         "script-src 'self' 'unsafe-inline'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
-      ) + "; worker-src 'self' blob:";
+      ) + "; worker-src 'self' blob:; media-src 'self' blob:"; // blob audio = our Supertonic voice
     // /brain also hosts the voice orb (Web Speech API) → needs the microphone,
     // which the app-wide Permissions-Policy disables. Grant it to self on /brain only.
     const brainHeaders = securityHeaders.map((h) => {
