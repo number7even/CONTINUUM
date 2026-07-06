@@ -23,24 +23,25 @@ import { useVoice, VoiceOrb } from './voice';
 // a brain "lobe" region by domain, so same-domain nodes cluster together. The
 // clustering IS the lobe assignment.
 type LobeKey = 'frontal' | 'parietal' | 'temporal' | 'occipital' | 'cerebellum';
+// One lobe per SOURCE — the 5-source aggregation moat made visible.
 const LOBES: Record<LobeKey, { name: string; color: string }> = {
-  frontal: { name: 'AMF / engine', color: '#D4537E' },        // pink
-  parietal: { name: 'deploy / ops', color: '#1D9E75' },       // green
-  temporal: { name: 'sprints / process', color: '#BA7517' },  // amber
-  occipital: { name: 'concepts', color: '#7F77DD' },          // violet
-  cerebellum: { name: 'vision / architecture', color: '#378ADD' }, // blue
+  frontal: { name: 'code · symbols', color: '#D4537E' },   // pink   — codegraph
+  parietal: { name: 'docs', color: '#1D9E75' },            // green  — docs
+  temporal: { name: 'commits · git', color: '#BA7517' },   // amber  — git
+  occipital: { name: 'concepts', color: '#7F77DD' },       // violet — extracted nouns
+  cerebellum: { name: 'memory · other', color: '#378ADD' },// blue   — mem/sona/export
 };
 const colorFor = (lobe: LobeKey) => LOBES[lobe].color;
 
-/** Map one of our nodes to a lobe by source + topic keywords in its label. */
+/** Map a node to a lobe by its SOURCE (docs / git / codegraph / concept / …). */
 function lobeForNode(n: GraphNode): LobeKey {
-  if (n.source === 'concept') return 'occipital';
-  const t = (n.label || '').toLowerCase();
-  if (/amf|engine|media|content|xenos|vault|produce/.test(t)) return 'frontal';
-  if (/deploy|self-host|fly|docker|hybrid|storage|http|sse/.test(t)) return 'parietal';
-  if (/sprint|w2|kaizen|status|ledger|handover|partner/.test(t)) return 'temporal';
-  if (/vision|architect|unified|nine|roadmap|journey|manifest/.test(t)) return 'cerebellum';
-  return 'parietal';
+  switch (n.source) {
+    case 'concept': return 'occipital';
+    case 'git': return 'temporal';
+    case 'codegraph': return 'frontal';
+    case 'docs': return 'parietal';
+    default: return 'cerebellum'; // mem / sona / export / anything else
+  }
 }
 
 /** Stable hash of a string → [0,1). */
