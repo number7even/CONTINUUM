@@ -13,22 +13,64 @@
  * fetchGraph() over MCP/SSE.
  */
 import { useMemo, useState, useRef, useEffect } from 'react';
+import * as THREE from 'three';
+import SpriteText from 'three-spritetext';
 import type { GraphData, GraphNode } from './lib';
 
-const SOURCE_COLOR: Record<string, string> = {
-  docs: '#34d399',       // emerald
-  git: '#60a5fa',        // blue
-  mem: '#a78bfa',        // violet
-  sona: '#fbbf24',       // amber
-  export: '#f472b6',     // pink
-  googlenews: '#22d3ee', // cyan
-  concept: '#f59e0b',    // amber — the noun/entity layer
+// ── Lobe clustering (technique adapted from seo-os) ──────────────────────────
+// Nodes aren't force-simulated into a cloud; each is DETERMINISTICALLY placed in
+// a brain "lobe" region by domain, so same-domain nodes cluster together. The
+// clustering IS the lobe assignment.
+type LobeKey = 'frontal' | 'parietal' | 'temporal' | 'occipital' | 'cerebellum';
+const LOBES: Record<LobeKey, { name: string; color: string }> = {
+  frontal: { name: 'AMF / engine', color: '#D4537E' },        // pink
+  parietal: { name: 'deploy / ops', color: '#1D9E75' },       // green
+  temporal: { name: 'sprints / process', color: '#BA7517' },  // amber
+  occipital: { name: 'concepts', color: '#7F77DD' },          // violet
+  cerebellum: { name: 'vision / architecture', color: '#378ADD' }, // blue
 };
-const colorFor = (source: string) => SOURCE_COLOR[source] ?? '#9ca3af';
+const colorFor = (lobe: LobeKey) => LOBES[lobe].color;
 
-interface FGNode extends GraphNode { }
+/** Map one of our nodes to a lobe by source + topic keywords in its label. */
+function lobeForNode(n: GraphNode): LobeKey {
+  if (n.source === 'concept') return 'occipital';
+  const t = (n.label || '').toLowerCase();
+  if (/amf|engine|media|content|xenos|vault|produce/.test(t)) return 'frontal';
+  if (/deploy|self-host|fly|docker|hybrid|storage|http|sse/.test(t)) return 'parietal';
+  if (/sprint|w2|kaizen|status|ledger|handover|partner/.test(t)) return 'temporal';
+  if (/vision|architect|unified|nine|roadmap|journey|manifest/.test(t)) return 'cerebellum';
+  return 'parietal';
+}
+
+/** Stable hash of a string → [0,1). */
+function hash(s: string, salt: number): number {
+  let h = (2166136261 ^ salt) >>> 0;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h / 0xffffffff;
+}
+
+const SCALE = 120; // seo-os placement is ~unit; scale up for force-graph world coords
+/** Deterministic position inside a lobe region (adapted from seo-os positionForNote). */
+function positionForLobe(id: string, lobe: LobeKey): [number, number, number] {
+  const side: 1 | -1 = hash(id, 1) < 0.5 ? -1 : 1;
+  let su = hash(id, 2) * 2 - 1, sv = hash(id, 3) * 2 - 1, sw = hash(id, 4) * 2 - 1;
+  if (lobe === 'cerebellum') return [su * 0.55 * SCALE, (sv * 0.3 - 0.52) * SCALE, (sw * 0.4 - 0.95) * SCALE];
+  switch (lobe) {
+    case 'frontal': sw = 0.45 + Math.abs(sw) * 0.5; break;
+    case 'parietal': sv = 0.25 + Math.abs(sv) * 0.55; sw = sw * 0.4; break;
+    case 'temporal': su = side * (0.6 + Math.abs(su) * 0.35); sv = -Math.abs(sv) * 0.55; sw = sw * 0.6; break;
+    case 'occipital': sw = -0.45 - Math.abs(sw) * 0.5; break;
+  }
+  const len2 = su * su + sv * sv + sw * sw;
+  if (len2 > 0.92) { const k = Math.sqrt(0.92 / len2); su *= k; sv *= k; sw *= k; }
+  return [(su * 0.5 + side * 0.5) * SCALE, sv * 0.78 * SCALE, sw * 1.05 * SCALE];
+}
+
+interface FGNode extends GraphNode { __lobe?: LobeKey; fx?: number; fy?: number; fz?: number; }
 interface FGLink { source: string | FGNode; target: string | FGNode; verb?: string; }
 const endId = (e: string | FGNode) => (typeof e === 'object' ? e.id : e);
+const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + '…' : s);
 
 export function BrainGraph({ data }: { data: GraphData }) {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -75,15 +117,32 @@ export function BrainGraph({ data }: { data: GraphData }) {
     return { nodes, links };
   }, [pathEnds, adjacency]);
 
-  // Filtered graph — fresh objects each time (the engine mutates link source/target).
+  // Lobe per node (the cluster assignment) + counts for the legend/filter.
+  const nodeLobe = useMemo(() => {
+    const m = new Map<string, LobeKey>();
+    for (const n of data.nodes) m.set(n.id, lobeForNode(n));
+    return m;
+  }, [data.nodes]);
+  const lobeCounts = useMemo(() => {
+    const c = {} as Record<LobeKey, number>;
+    for (const l of nodeLobe.values()) c[l] = (c[l] ?? 0) + 1;
+    return c;
+  }, [nodeLobe]);
+
+  // Filtered graph — nodes DETERMINISTICALLY pinned to their lobe (fx/fy/fz), so
+  // they cluster by domain instead of drifting into a uniform force cloud.
   const graphData = useMemo(() => {
-    const visible = data.nodes.filter((n) => !hidden.has(n.source));
+    const visible = data.nodes.filter((n) => !hidden.has(nodeLobe.get(n.id) ?? 'parietal'));
     const visibleIds = new Set(visible.map((n) => n.id));
     return {
-      nodes: visible.map((n) => ({ ...n })) as FGNode[],
+      nodes: visible.map((n) => {
+        const lobe = nodeLobe.get(n.id) ?? 'parietal';
+        const [fx, fy, fz] = positionForLobe(n.id, lobe);
+        return { ...n, __lobe: lobe, fx, fy, fz } as FGNode;
+      }),
       links: data.edges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target)).map((e) => ({ source: e.source, target: e.target, verb: e.verb })) as FGLink[],
     };
-  }, [data.nodes, data.edges, hidden]);
+  }, [data.nodes, data.edges, hidden, nodeLobe]);
 
   // Track canvas size.
   useEffect(() => {
@@ -109,8 +168,24 @@ export function BrainGraph({ data }: { data: GraphData }) {
       const g = new FG(canvasRef.current as HTMLElement)
         .backgroundColor('#05070a')
         .nodeLabel((n: FGNode) => `${n.label} (${n.source}, deg ${n.degree})`)
-        .nodeVal((n: FGNode) => 1 + Math.sqrt(n.degree) * 2)
-        .nodeOpacity(0.95)
+        // Each node = a lobe-colored sphere (size by degree) + an always-on label.
+        .nodeThreeObject((n: FGNode) => {
+          const lobe = n.__lobe ?? 'parietal';
+          const r = 2 + Math.sqrt(n.degree || 0) * 1.4;
+          const group = new THREE.Group();
+          group.add(new THREE.Mesh(
+            new THREE.SphereGeometry(r, 12, 12),
+            new THREE.MeshBasicMaterial({ color: colorFor(lobe) }),
+          ));
+          const label = new SpriteText(truncate(n.label || '', 18));
+          label.color = 'rgba(215,220,235,0.6)';
+          label.fontFace = 'ui-monospace, monospace';
+          label.textHeight = 3.2;
+          label.position.set(0, r + 4, 0);
+          (label.material as THREE.Material).depthWrite = false;
+          group.add(label);
+          return group;
+        })
         .linkLabel((l: FGLink) => (l.verb ? `<b style="color:#f59e0b">${l.verb}</b>` : ''))
         .linkDirectionalArrowLength((l: FGLink) => (l.verb ? 3 : 0))
         .linkDirectionalArrowRelPos(1)
@@ -140,14 +215,11 @@ export function BrainGraph({ data }: { data: GraphData }) {
     g.graphData(graphData);
   }, [graphData, dims, ready]);
 
-  // Re-apply colors/widths for path-trace + verb emphasis (no data reset → no re-sim).
+  // Re-apply link colors/widths for path-trace + verb emphasis (no data reset → no re-sim).
   useEffect(() => {
     const g = graphRef.current;
     if (!g || !ready) return;
-    g.nodeColor((n: FGNode) =>
-      pathEnds.length === 2 ? (tracedPath.nodes.has(n.id) ? '#ffffff' : 'rgba(120,130,150,0.25)') : colorFor(n.source),
-    )
-      .linkColor((l: FGLink) => {
+    g.linkColor((l: FGLink) => {
         if (pathEnds.length === 2) return tracedPath.links.has(`${endId(l.source)}|${endId(l.target)}`) ? '#34d399' : 'rgba(120,130,150,0.12)';
         return l.verb ? 'rgba(245,158,11,0.55)' : 'rgba(80,120,110,0.28)';
       })
@@ -157,8 +229,8 @@ export function BrainGraph({ data }: { data: GraphData }) {
       });
   }, [pathEnds, tracedPath, ready]);
 
-  const toggleSource = (src: string) =>
-    setHidden((prev) => { const next = new Set(prev); next.has(src) ? next.delete(src) : next.add(src); return next; });
+  const toggleLobe = (lobe: string) =>
+    setHidden((prev) => { const next = new Set(prev); next.has(lobe) ? next.delete(lobe) : next.add(lobe); return next; });
 
   const stats = data.stats;
 
@@ -186,7 +258,7 @@ export function BrainGraph({ data }: { data: GraphData }) {
         <div style={panel.sectionLabel}>INSPECTOR</div>
         {selected ? (
           <div style={{ fontSize: 13, color: '#e5e7eb' }}>
-            <div style={{ color: colorFor(selected.source), fontWeight: 600 }}>{selected.source} · {selected.type}</div>
+            <div style={{ color: colorFor(nodeLobe.get(selected.id) ?? 'parietal'), fontWeight: 600 }}>{LOBES[nodeLobe.get(selected.id) ?? 'parietal'].name} · {selected.source}</div>
             <div style={{ margin: '6px 0', lineHeight: 1.4 }}>{selected.label}</div>
             <div style={{ color: '#9ca3af', fontSize: 12 }}>degree {selected.degree}{selected.timestamp ? ' · ' + selected.timestamp.slice(0, 16) : ''}</div>
             <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4 }}>{selected.id}</div>
@@ -218,15 +290,15 @@ export function BrainGraph({ data }: { data: GraphData }) {
       {/* CENTER — the 3D field (engine mounts here) */}
       <div ref={canvasRef} style={panel.canvas} />
 
-      {/* RIGHT — filter */}
+      {/* RIGHT — lobes (the clusters) */}
       <aside style={panel.right}>
-        <div style={panel.sectionLabel}>FILTER</div>
-        {stats && Object.entries(stats.bySource).sort((a, b) => b[1] - a[1]).map(([src, count]) => (
-          <label key={src} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '4px 0', cursor: 'pointer', opacity: hidden.has(src) ? 0.4 : 1 }}>
-            <input type="checkbox" checked={!hidden.has(src)} onChange={() => toggleSource(src)} />
-            <span style={{ width: 10, height: 10, borderRadius: 5, background: colorFor(src), display: 'inline-block' }} />
-            <span style={{ color: '#e5e7eb', flex: 1 }}>{src}</span>
-            <span style={{ color: '#6b7280' }}>{count}</span>
+        <div style={panel.sectionLabel}>LOBES</div>
+        {(Object.keys(LOBES) as LobeKey[]).sort((a, b) => (lobeCounts[b] ?? 0) - (lobeCounts[a] ?? 0)).map((lobe) => (
+          <label key={lobe} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '6px 0', cursor: 'pointer', opacity: hidden.has(lobe) ? 0.4 : 1 }}>
+            <input type="checkbox" checked={!hidden.has(lobe)} onChange={() => toggleLobe(lobe)} />
+            <span style={{ width: 10, height: 10, borderRadius: 5, background: colorFor(lobe), display: 'inline-block' }} />
+            <span style={{ color: '#e5e7eb', flex: 1 }}>{LOBES[lobe].name}</span>
+            <span style={{ color: '#6b7280' }}>{lobeCounts[lobe] ?? 0}</span>
           </label>
         ))}
       </aside>
