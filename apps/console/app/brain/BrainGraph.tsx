@@ -235,11 +235,11 @@ export function BrainGraph({ data }: { data: GraphData }) {
     const visible = data.nodes.filter((n) => !hidden.has(nodeLobe.get(n.id) ?? 'parietal') && (!snap || snap.has(n.id)));
     const visibleIds = new Set(visible.map((n) => n.id));
     return {
-      nodes: visible.map((n) => {
-        const lobe = nodeLobe.get(n.id) ?? 'parietal';
-        const [fx, fy, fz] = positionForLobe(n.id, lobe);
-        return { ...n, __lobe: lobe, fx, fy, fz } as FGNode;
-      }),
+      // Un-pinned: the force layout connects everything into ONE galaxy — same-
+      // source nodes clump via their dense internal edges (code↔code, commit→
+      // parent), cross-source edges (concept→doc) bridge them. Colored by source,
+      // not flung into separate universes.
+      nodes: visible.map((n) => ({ ...n, __lobe: nodeLobe.get(n.id) ?? 'parietal' } as FGNode)),
       links: data.edges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target)).map((e) => ({ source: e.source, target: e.target, verb: e.verb })) as FGLink[],
     };
   }, [data.nodes, data.edges, hidden, nodeLobe, isolate, highlighted]);
@@ -324,6 +324,10 @@ export function BrainGraph({ data }: { data: GraphData }) {
         .cooldownTicks(120)
         .onEngineStop(() => { try { graphRef.current?.zoomToFit(600, 60); } catch { /* noop */ } });
       graphRef.current = g;
+      // Spread the galaxy — more charge repulsion + a bit of link distance so 800+
+      // nodes breathe instead of collapsing into a dense ball.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      try { (g.d3Force('charge') as any)?.strength(-60); (g.d3Force('link') as any)?.distance(28); } catch { /* noop */ }
       setReady(true);
     }).catch((e) => setEngineError(e?.message ? String(e.message) : String(e)));
     return () => {
