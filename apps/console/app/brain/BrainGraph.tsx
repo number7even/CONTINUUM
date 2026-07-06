@@ -16,6 +16,7 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import type { GraphData, GraphNode } from './lib';
+import { useVoice, VoiceOrb } from './voice';
 
 // ── Lobe clustering (technique adapted from seo-os) ──────────────────────────
 // Nodes aren't force-simulated into a cloud; each is DETERMINISTICALLY placed in
@@ -50,21 +51,24 @@ function hash(s: string, salt: number): number {
   return h / 0xffffffff;
 }
 
-const SCALE = 120; // seo-os placement is ~unit; scale up for force-graph world coords
-/** Deterministic position inside a lobe region (adapted from seo-os positionForNote). */
+// Each lobe is its OWN region in space (a pentagon of cluster centers), so the
+// five clusters read as distinct lobes you can isolate + fly into — not one
+// overlapping cloud. Nodes scatter deterministically around their lobe center.
+const LOBE_CENTER: Record<LobeKey, [number, number, number]> = {
+  frontal: [190, 40, 20],
+  parietal: [-190, 40, -20],
+  temporal: [100, -150, 160],
+  occipital: [-100, -120, -160],
+  cerebellum: [10, 180, -40],
+};
+const LOBE_SPREAD = 62;
 function positionForLobe(id: string, lobe: LobeKey): [number, number, number] {
-  const side: 1 | -1 = hash(id, 1) < 0.5 ? -1 : 1;
-  let su = hash(id, 2) * 2 - 1, sv = hash(id, 3) * 2 - 1, sw = hash(id, 4) * 2 - 1;
-  if (lobe === 'cerebellum') return [su * 0.55 * SCALE, (sv * 0.3 - 0.52) * SCALE, (sw * 0.4 - 0.95) * SCALE];
-  switch (lobe) {
-    case 'frontal': sw = 0.45 + Math.abs(sw) * 0.5; break;
-    case 'parietal': sv = 0.25 + Math.abs(sv) * 0.55; sw = sw * 0.4; break;
-    case 'temporal': su = side * (0.6 + Math.abs(su) * 0.35); sv = -Math.abs(sv) * 0.55; sw = sw * 0.6; break;
-    case 'occipital': sw = -0.45 - Math.abs(sw) * 0.5; break;
-  }
-  const len2 = su * su + sv * sv + sw * sw;
-  if (len2 > 0.92) { const k = Math.sqrt(0.92 / len2); su *= k; sv *= k; sw *= k; }
-  return [(su * 0.5 + side * 0.5) * SCALE, sv * 0.78 * SCALE, sw * 1.05 * SCALE];
+  const [cx, cy, cz] = LOBE_CENTER[lobe];
+  return [
+    cx + (hash(id, 2) * 2 - 1) * LOBE_SPREAD,
+    cy + (hash(id, 3) * 2 - 1) * LOBE_SPREAD,
+    cz + (hash(id, 4) * 2 - 1) * LOBE_SPREAD,
+  ];
 }
 
 interface FGNode extends GraphNode { __lobe?: LobeKey; fx?: number; fy?: number; fz?: number; }
@@ -80,8 +84,77 @@ export function BrainGraph({ data }: { data: GraphData }) {
   const [engineError, setEngineError] = useState<string | null>(null);
   const [dims, setDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [focused, setFocused] = useState<LobeKey | null>(null);
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [pathEnds, setPathEnds] = useState<string[]>([]);
+
+  // Fly the camera to frame just one lobe's nodes (click a cluster → drill in).
+  const focusLobe = (lobe: LobeKey | null) => {
+    setFocused(lobe);
+    const g = graphRef.current;
+    if (!g) return;
+    try {
+      if (lobe) g.zoomToFit(800, 40, (n: FGNode) => n.__lobe === lobe);
+      else g.zoomToFit(800, 60);
+    } catch { /* noop */ }
+  };
+
+  // ── Voice layer ────────────────────────────────────────────────────────────
+  const voice = useVoice();
+  // Map a spoken lobe name → LobeKey.
+  const lobeFromPhrase = (t: string): LobeKey | 'all' | null => {
+    if (/\b(all|everything|zoom out|reset|whole|full)\b/.test(t)) return 'all';
+    if (/\b(amf|engine|media|content|factory)\b/.test(t)) return 'frontal';
+    if (/\b(deploy|ops|operation|infra|self.?host)\b/.test(t)) return 'parietal';
+    if (/\b(sprint|process|kaizen|ledger|status)\b/.test(t)) return 'temporal';
+    if (/\b(concept|noun|idea)\b/.test(t)) return 'occipital';
+    if (/\b(vision|architect|roadmap|unified)\b/.test(t)) return 'cerebellum';
+    return null;
+  };
+  // Route each final transcript to a graph action + a spoken reply.
+  useEffect(() => {
+    const t = voice.lastFinal.text.toLowerCase().trim();
+    if (!t) return;
+    voice.setThinking(true);
+    // 1) greeting
+    if (/^(hey|hi|hello|jarvis|continuum)\b/.test(t) && t.length < 20) {
+      voice.speak(`Online. ${data.stats?.nodeCount ?? 0} nodes across five lobes. Ask me to show a cluster, search, or brief you.`);
+      return;
+    }
+    // 2) status / brief
+    if (/\b(status|brief|summary|overview|how many|how big|what.s here)\b/.test(t)) {
+      const top = data.stats?.topHubs?.[0];
+      voice.speak(`${data.stats?.nodeCount ?? 0} nodes, ${data.stats?.edgeCount ?? 0} connections. The biggest hub is ${top ? truncate(top.label, 40) : 'unknown'}.`);
+      return;
+    }
+    // 3) focus a lobe
+    const lobe = lobeFromPhrase(t);
+    if (lobe === 'all') { focusLobe(null); voice.speak('Showing all clusters.'); return; }
+    if (lobe) { focusLobe(lobe); voice.speak(`Focusing the ${LOBES[lobe].name} cluster — ${lobeCounts[lobe] ?? 0} nodes.`); return; }
+    // 4) describe the selected node
+    if (/\b(read|describe|what is this|tell me about this|explain this)\b/.test(t)) {
+      if (selected) voice.speak(`${selected.source} node, degree ${selected.degree}. ${truncate(selected.label, 120)}`);
+      else voice.speak('Nothing selected. Say search, then a term.');
+      return;
+    }
+    // 5) search / show me <term>
+    const m = t.match(/\b(?:search|find|show me|look for|go to|open)\s+(.+)$/);
+    if (m && m[1]) {
+      const term = m[1].replace(/[.?!]+$/, '').trim();
+      const hit = data.nodes.find((n) => n.label.toLowerCase().includes(term));
+      if (hit) {
+        setSelected(hit);
+        const lb = nodeLobe.get(hit.id) ?? null;
+        if (lb) focusLobe(lb);
+        voice.speak(`Found ${truncate(hit.label, 60)} in the ${lb ? LOBES[lb].name : 'graph'}.`);
+      } else {
+        voice.speak(`Nothing matching ${term}.`);
+      }
+      return;
+    }
+    voice.setThinking(false); // unrecognized — no reply, return to listening
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voice.lastFinal.nonce]);
 
   // Undirected adjacency for path-tracing.
   const adjacency = useMemo(() => {
@@ -171,19 +244,25 @@ export function BrainGraph({ data }: { data: GraphData }) {
         // Each node = a lobe-colored sphere (size by degree) + an always-on label.
         .nodeThreeObject((n: FGNode) => {
           const lobe = n.__lobe ?? 'parietal';
-          const r = 2 + Math.sqrt(n.degree || 0) * 1.4;
+          // Small dots (like seo-os: ~2-3% of the field), gently scaled + capped
+          // by degree so hubs read bigger without becoming blobs.
+          const r = 1.6 + Math.min(Math.sqrt(n.degree || 0), 9) * 0.42; // ~1.6 → ~5.4
           const group = new THREE.Group();
           group.add(new THREE.Mesh(
             new THREE.SphereGeometry(r, 12, 12),
             new THREE.MeshBasicMaterial({ color: colorFor(lobe) }),
           ));
-          const label = new SpriteText(truncate(n.label || '', 18));
-          label.color = 'rgba(215,220,235,0.6)';
-          label.fontFace = 'ui-monospace, monospace';
-          label.textHeight = 3.2;
-          label.position.set(0, r + 4, 0);
-          (label.material as THREE.Material).depthWrite = false;
-          group.add(label);
+          // Label only the meaningful nodes (degree ≥ 3) so 267 concepts don't
+          // bury the field in text; the rest reveal their title on hover.
+          if ((n.degree || 0) >= 3) {
+            const label = new SpriteText(truncate(n.label || '', 22));
+            label.color = 'rgba(210,216,232,0.5)';
+            label.fontFace = 'ui-monospace, monospace';
+            label.textHeight = 2.4;
+            label.position.set(0, r + 3, 0);
+            (label.material as THREE.Material).depthWrite = false;
+            group.add(label);
+          }
           return group;
         })
         .linkLabel((l: FGLink) => (l.verb ? `<b style="color:#f59e0b">${l.verb}</b>` : ''))
@@ -292,16 +371,24 @@ export function BrainGraph({ data }: { data: GraphData }) {
 
       {/* RIGHT — lobes (the clusters) */}
       <aside style={panel.right}>
-        <div style={panel.sectionLabel}>LOBES</div>
+        <div style={{ ...panel.sectionLabel, display: 'flex', justifyContent: 'space-between' }}>
+          <span>LOBES</span>
+          {focused && <span style={{ cursor: 'pointer', color: '#6ee7b7' }} onClick={() => focusLobe(null)}>← all</span>}
+        </div>
         {(Object.keys(LOBES) as LobeKey[]).sort((a, b) => (lobeCounts[b] ?? 0) - (lobeCounts[a] ?? 0)).map((lobe) => (
-          <label key={lobe} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '6px 0', cursor: 'pointer', opacity: hidden.has(lobe) ? 0.4 : 1 }}>
-            <input type="checkbox" checked={!hidden.has(lobe)} onChange={() => toggleLobe(lobe)} />
+          <div key={lobe} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '6px 0', opacity: hidden.has(lobe) ? 0.4 : 1, background: focused === lobe ? 'rgba(52,211,153,0.12)' : 'transparent', borderRadius: 4, padding: '2px 4px' }}>
+            <input type="checkbox" checked={!hidden.has(lobe)} onChange={() => toggleLobe(lobe)} style={{ cursor: 'pointer' }} />
             <span style={{ width: 10, height: 10, borderRadius: 5, background: colorFor(lobe), display: 'inline-block' }} />
-            <span style={{ color: '#e5e7eb', flex: 1 }}>{LOBES[lobe].name}</span>
+            {/* Click the name → fly into that cluster. */}
+            <span style={{ color: '#e5e7eb', flex: 1, cursor: 'pointer' }} onClick={() => focusLobe(focused === lobe ? null : lobe)}>{LOBES[lobe].name}</span>
             <span style={{ color: '#6b7280' }}>{lobeCounts[lobe] ?? 0}</span>
-          </label>
+          </div>
         ))}
+        <div style={{ marginTop: 10, fontSize: 11, color: '#6b7280' }}>click a lobe name → fly into that cluster · checkbox → show/hide</div>
       </aside>
+
+      {/* Voice orb — tap to talk. "show me AMF" · "search vault" · "status" · "read this" */}
+      <VoiceOrb voice={voice} />
     </div>
   );
 }

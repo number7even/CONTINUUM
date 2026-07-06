@@ -65,9 +65,13 @@ const nextConfig = {
         "script-src 'self' 'unsafe-inline'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
       ) + "; worker-src 'self' blob:";
-    const brainHeaders = securityHeaders.map((h) =>
-      h.key === 'Content-Security-Policy' ? { key: h.key, value: brainCsp } : h,
-    );
+    // /brain also hosts the voice orb (Web Speech API) → needs the microphone,
+    // which the app-wide Permissions-Policy disables. Grant it to self on /brain only.
+    const brainHeaders = securityHeaders.map((h) => {
+      if (h.key === 'Content-Security-Policy') return { key: h.key, value: brainCsp };
+      if (h.key === 'Permissions-Policy') return { key: h.key, value: h.value.replace('microphone=()', 'microphone=(self)') };
+      return h;
+    });
     return [
       { source: '/brain', headers: brainHeaders },
       { source: '/((?!brain).*)', headers: securityHeaders },
