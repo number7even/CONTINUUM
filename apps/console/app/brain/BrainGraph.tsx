@@ -87,6 +87,9 @@ export function BrainGraph({ data }: { data: GraphData }) {
   const [focused, setFocused] = useState<LobeKey | null>(null);
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [pathEnds, setPathEnds] = useState<string[]>([]);
+  const [depth, setDepth] = useState(1);
+  const [search, setSearch] = useState('');
+  const highlightRef = useRef<Set<string> | null>(null);
 
   // Fly the camera to frame just one lobe's nodes (click a cluster → drill in).
   const focusLobe = (lobe: LobeKey | null) => {
@@ -190,6 +193,22 @@ export function BrainGraph({ data }: { data: GraphData }) {
     return { nodes, links };
   }, [pathEnds, adjacency]);
 
+  // Highlight set: search matches, else the selected node + its neighbours out
+  // to `depth` hops. null = nothing highlighted (everything shown at full).
+  const highlighted = useMemo<Set<string> | null>(() => {
+    const term = search.trim().toLowerCase();
+    if (term) return new Set(data.nodes.filter((n) => n.label.toLowerCase().includes(term)).map((n) => n.id));
+    if (!selected) return null;
+    const set = new Set<string>([selected.id]);
+    let frontier = [selected.id];
+    for (let d = 0; d < depth; d++) {
+      const next: string[] = [];
+      for (const id of frontier) for (const nb of adjacency.get(id) ?? []) if (!set.has(nb)) { set.add(nb); next.push(nb); }
+      frontier = next;
+    }
+    return set;
+  }, [search, selected, depth, adjacency, data.nodes]);
+
   // Lobe per node (the cluster assignment) + counts for the legend/filter.
   const nodeLobe = useMemo(() => {
     const m = new Map<string, LobeKey>();
@@ -228,6 +247,30 @@ export function BrainGraph({ data }: { data: GraphData }) {
     return () => ro.disconnect();
   }, []);
 
+  // Node renderer — reads highlightRef so it can DIM non-highlighted nodes.
+  // Stable identity; re-applied (rebuilds node objects) when the highlight changes.
+  const nodeObj = useRef<(n: FGNode) => THREE.Object3D>((n: FGNode) => {
+    const hl = highlightRef.current;
+    const dim = !!hl && !hl.has(n.id);
+    const lobe = n.__lobe ?? 'parietal';
+    const r = 1.6 + Math.min(Math.sqrt(n.degree || 0), 9) * 0.42;
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(
+      new THREE.SphereGeometry(r, 12, 12),
+      new THREE.MeshBasicMaterial({ color: colorFor(lobe), transparent: dim, opacity: dim ? 0.1 : 1 }),
+    ));
+    if (!dim && (n.degree || 0) >= 3) {
+      const label = new SpriteText(truncate(n.label || '', 22));
+      label.color = 'rgba(210,216,232,0.6)';
+      label.fontFace = 'ui-monospace, monospace';
+      label.textHeight = 2.4;
+      label.position.set(0, r + 3, 0);
+      (label.material as THREE.Material).depthWrite = false;
+      group.add(label);
+    }
+    return group;
+  }).current;
+
   // Create the 3d-force-graph engine once, on the canvas element.
   useEffect(() => {
     const el = canvasRef.current;
@@ -241,30 +284,9 @@ export function BrainGraph({ data }: { data: GraphData }) {
       const g = new FG(canvasRef.current as HTMLElement)
         .backgroundColor('#05070a')
         .nodeLabel((n: FGNode) => `${n.label} (${n.source}, deg ${n.degree})`)
-        // Each node = a lobe-colored sphere (size by degree) + an always-on label.
-        .nodeThreeObject((n: FGNode) => {
-          const lobe = n.__lobe ?? 'parietal';
-          // Small dots (like seo-os: ~2-3% of the field), gently scaled + capped
-          // by degree so hubs read bigger without becoming blobs.
-          const r = 1.6 + Math.min(Math.sqrt(n.degree || 0), 9) * 0.42; // ~1.6 → ~5.4
-          const group = new THREE.Group();
-          group.add(new THREE.Mesh(
-            new THREE.SphereGeometry(r, 12, 12),
-            new THREE.MeshBasicMaterial({ color: colorFor(lobe) }),
-          ));
-          // Label only the meaningful nodes (degree ≥ 3) so 267 concepts don't
-          // bury the field in text; the rest reveal their title on hover.
-          if ((n.degree || 0) >= 3) {
-            const label = new SpriteText(truncate(n.label || '', 22));
-            label.color = 'rgba(210,216,232,0.5)';
-            label.fontFace = 'ui-monospace, monospace';
-            label.textHeight = 2.4;
-            label.position.set(0, r + 3, 0);
-            (label.material as THREE.Material).depthWrite = false;
-            group.add(label);
-          }
-          return group;
-        })
+        // Each node = a lobe-colored sphere (size by degree, dim if not highlighted)
+        // + an always-on label on the meaningful nodes.
+        .nodeThreeObject(nodeObj)
         .linkLabel((l: FGLink) => (l.verb ? `<b style="color:#f59e0b">${l.verb}</b>` : ''))
         .linkDirectionalArrowLength((l: FGLink) => (l.verb ? 3 : 0))
         .linkDirectionalArrowRelPos(1)
@@ -294,19 +316,33 @@ export function BrainGraph({ data }: { data: GraphData }) {
     g.graphData(graphData);
   }, [graphData, dims, ready]);
 
-  // Re-apply link colors/widths for path-trace + verb emphasis (no data reset → no re-sim).
+  // Apply highlight/dim + link emphasis + camera fly. Rebuilds node objects
+  // (dim non-highlighted), colors links, and flies to the selected node.
   useEffect(() => {
+    highlightRef.current = highlighted;
     const g = graphRef.current;
     if (!g || !ready) return;
+    g.nodeThreeObject(nodeObj); // rebuild → applies dim/highlight
     g.linkColor((l: FGLink) => {
-        if (pathEnds.length === 2) return tracedPath.links.has(`${endId(l.source)}|${endId(l.target)}`) ? '#34d399' : 'rgba(120,130,150,0.12)';
-        return l.verb ? 'rgba(245,158,11,0.55)' : 'rgba(80,120,110,0.28)';
-      })
-      .linkWidth((l: FGLink) => {
-        if (pathEnds.length === 2 && tracedPath.links.has(`${endId(l.source)}|${endId(l.target)}`)) return 2;
-        return l.verb ? 1.5 : 0.5;
-      });
-  }, [pathEnds, tracedPath, ready]);
+      const s = endId(l.source), t = endId(l.target);
+      if (pathEnds.length === 2) return tracedPath.links.has(`${s}|${t}`) ? '#34d399' : 'rgba(120,130,150,0.08)';
+      if (highlighted) return highlighted.has(s) && highlighted.has(t) ? '#6ee7b7' : 'rgba(120,130,150,0.04)';
+      return l.verb ? 'rgba(245,158,11,0.55)' : 'rgba(80,120,110,0.28)';
+    }).linkWidth((l: FGLink) => {
+      const s = endId(l.source), t = endId(l.target);
+      if (pathEnds.length === 2 && tracedPath.links.has(`${s}|${t}`)) return 2;
+      if (highlighted && highlighted.has(s) && highlighted.has(t)) return 1.2;
+      return l.verb ? 1.5 : 0.5;
+    });
+    if (selected) {
+      const lobe = nodeLobe.get(selected.id) ?? 'parietal';
+      const [x, y, z] = positionForLobe(selected.id, lobe);
+      const d = Math.hypot(x, y, z) || 1;
+      const k = (d + 120) / d;
+      try { g.cameraPosition({ x: x * k, y: y * k, z: z * k }, { x, y, z }, 800); } catch { /* noop */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlighted, pathEnds, tracedPath, selected, ready]);
 
   const toggleLobe = (lobe: string) =>
     setHidden((prev) => { const next = new Set(prev); next.has(lobe) ? next.delete(lobe) : next.add(lobe); return next; });
@@ -334,6 +370,13 @@ export function BrainGraph({ data }: { data: GraphData }) {
         <div style={{ color: '#9ca3af', fontSize: 12, marginBottom: 12 }}>
           {stats?.nodeCount ?? 0} nodes · {stats?.edgeCount ?? 0} connections · {data.latencyMs}ms
         </div>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="search the brain…"
+          style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#e5e7eb', fontSize: 12, padding: '7px 10px', borderRadius: 6, outline: 'none' }}
+        />
+        {search && <div style={{ fontSize: 11, color: '#6ee7b7', margin: '6px 0' }}>{highlighted?.size ?? 0} match{(highlighted?.size ?? 0) === 1 ? '' : 'es'} · <span style={{ cursor: 'pointer', color: '#9ca3af' }} onClick={() => setSearch('')}>clear</span></div>}
         <div style={panel.sectionLabel}>INSPECTOR</div>
         {selected ? (
           <div style={{ fontSize: 13, color: '#e5e7eb' }}>
@@ -341,6 +384,15 @@ export function BrainGraph({ data }: { data: GraphData }) {
             <div style={{ margin: '6px 0', lineHeight: 1.4 }}>{selected.label}</div>
             <div style={{ color: '#9ca3af', fontSize: 12 }}>degree {selected.degree}{selected.timestamp ? ' · ' + selected.timestamp.slice(0, 16) : ''}</div>
             <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4 }}>{selected.id}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 12, color: '#9ca3af' }}>
+              <span>depth</span>
+              {[1, 2, 3].map((d) => (
+                <button key={d} type="button" onClick={() => setDepth(d)}
+                  style={{ width: 24, height: 22, borderRadius: 4, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', background: depth === d ? '#34d399' : 'transparent', color: depth === d ? '#05070a' : '#cbd5e1', fontWeight: 600 }}>{d}</button>
+              ))}
+              <span style={{ cursor: 'pointer', color: '#9ca3af', marginLeft: 6 }} onClick={() => setSelected(null)}>✕ clear</span>
+            </div>
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>{highlighted ? `${highlighted.size} node(s) highlighted` : ''}</div>
           </div>
         ) : (
           <div style={{ color: '#6b7280', fontSize: 12 }}>Click a node to focus it. Shift-click two nodes to trace the path between them.</div>
