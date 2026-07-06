@@ -340,15 +340,11 @@ export function BrainGraph({ data }: { data: GraphData }) {
       if (highlighted && highlighted.has(s) && highlighted.has(t)) return 1.2;
       return l.verb ? 1.5 : 0.5;
     });
-    if (selected) {
-      const lobe = nodeLobe.get(selected.id) ?? 'parietal';
-      const [x, y, z] = positionForLobe(selected.id, lobe);
-      const d = Math.hypot(x, y, z) || 1;
-      const k = (d + 120) / d;
-      try { g.cameraPosition({ x: x * k, y: y * k, z: z * k }, { x, y, z }, 800); } catch { /* noop */ }
-    }
+    // NB: deliberately DON'T move the camera on node select — highlight+dim is the
+    // focus; the user keeps their own zoom. Camera flight is an explicit action
+    // (clicking a lobe name → focusLobe).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlighted, pathEnds, tracedPath, selected, ready]);
+  }, [highlighted, pathEnds, tracedPath, ready]);
 
   const toggleLobe = (lobe: string) =>
     setHidden((prev) => { const next = new Set(prev); next.has(lobe) ? next.delete(lobe) : next.add(lobe); return next; });
