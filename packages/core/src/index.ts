@@ -50,6 +50,10 @@ export type { GraphNode, GraphEdge, ObservationGraph, GraphOptions, DeclaredRela
 export { extractConcepts, isConceptTerm } from './concepts.js';
 export type { ConceptAdditions, ConceptOptions } from './concepts.js';
 
+// — Kaizen (改善) — forge-a-plan-to-blind-executable discipline, wired onto Todo+Observation
+export { KAIZEN_STANDARD, KAIZEN_POINTS, gradeLedgerEntry, blankLedgerEntry } from './kaizen.js';
+export type { KaizenGrade, AdversarialResult, BlindRun, KaizenLedgerEntry, KaizenVerdict } from './kaizen.js';
+
 // Embedder — exposed so adapters / scripts can pre-compute embeddings
 // outside the storage backend if they need to (V0.5 stub primitive).
 export { embed, embeddingDimensions } from './embedder.js';
