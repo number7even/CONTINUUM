@@ -117,7 +117,11 @@ export function BrainGraph({ data }: { data: GraphData }) {
         .onNodeClick((node: FGNode, event: MouseEvent) => {
           if (event.shiftKey) setPathEnds((prev) => (prev.length >= 2 ? [node.id] : [...prev, node.id]));
           else { setSelected(node); setPathEnds([]); }
-        });
+        })
+        // Frame the whole graph once the force layout settles → the "brain" snaps
+        // into view instead of drifting off-centre.
+        .cooldownTicks(120)
+        .onEngineStop(() => { try { graphRef.current?.zoomToFit(600, 60); } catch { /* noop */ } });
       graphRef.current = g;
       setReady(true);
     }).catch((e) => setEngineError(e?.message ? String(e.message) : String(e)));
