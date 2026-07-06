@@ -3,19 +3,17 @@
  * BrainGraph — the 3D "brain" (JARVIS-style AI-WORKSHOP-OS clone).
  *
  * Renders the continuum_graph provenance graph as a force-directed 3D field:
- * nodes colored by source, sized by degree; edges are refs[] links. Left =
- * INSPECTOR (click a node → focus + read; shift-click a second → trace the
- * path). Right = FILTER (per-source toggles with counts) + TOP HUBS.
+ * nodes colored by source, sized by degree; edges are refs[] links; authored
+ * verbs render amber with arrows + hover labels. Left = INSPECTOR (click →
+ * focus + read; shift-click a second → trace path). Right = FILTER + TOP HUBS.
  *
- * react-force-graph-3d is WebGL/three.js → client-only, dynamically imported
- * with ssr:false. Data arrives from the server via fetchGraph() over MCP/SSE.
+ * Drives the VANILLA 3d-force-graph engine imperatively (ref + effects) rather
+ * than the React wrapper — sidesteps Next App-Router SSR/hydration/wrapper
+ * failure modes that left the canvas blank. Data arrives from the server via
+ * fetchGraph() over MCP/SSE.
  */
-import dynamic from 'next/dynamic';
-import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import type { GraphData, GraphNode } from './lib';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), { ssr: false }) as any;
 
 const SOURCE_COLOR: Record<string, string> = {
   docs: '#34d399',       // emerald
@@ -29,30 +27,20 @@ const SOURCE_COLOR: Record<string, string> = {
 const colorFor = (source: string) => SOURCE_COLOR[source] ?? '#9ca3af';
 
 interface FGNode extends GraphNode { }
-interface FGLink { source: string; target: string; verb?: string; }
+interface FGLink { source: string | FGNode; target: string | FGNode; verb?: string; }
+const endId = (e: string | FGNode) => (typeof e === 'object' ? e.id : e);
 
 export function BrainGraph({ data }: { data: GraphData }) {
-  const fgRef = useRef<unknown>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const graphRef = useRef<any>(null);
+  const [ready, setReady] = useState(false);
   const [dims, setDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [pathEnds, setPathEnds] = useState<string[]>([]);
 
-  // Explicit canvas dimensions — react-force-graph-3d measures its container
-  // once at mount and, inside a flex child, often reads 0×0 and renders nothing.
-  // A ResizeObserver keeps width/height correct through layout + window resize.
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-    const measure = () => setDims({ w: el.clientWidth, h: el.clientHeight });
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // Adjacency (undirected) for path-tracing + fast neighbour lookups.
+  // Undirected adjacency for path-tracing.
   const adjacency = useMemo(() => {
     const adj = new Map<string, Set<string>>();
     for (const e of data.edges) {
@@ -74,52 +62,98 @@ export function BrainGraph({ data }: { data: GraphData }) {
     while (q.length) {
       const cur = q.shift()!;
       if (cur === b) break;
-      for (const nb of adjacency.get(cur) ?? []) {
-        if (!seen.has(nb)) { seen.add(nb); prev.set(nb, cur); q.push(nb); }
-      }
+      for (const nb of adjacency.get(cur) ?? []) if (!seen.has(nb)) { seen.add(nb); prev.set(nb, cur); q.push(nb); }
     }
     const nodes = new Set<string>();
     const links = new Set<string>();
     if (seen.has(b!)) {
       let cur = b!;
       nodes.add(cur);
-      while (cur !== a) {
-        const p = prev.get(cur)!;
-        nodes.add(p);
-        links.add(`${p}|${cur}`);
-        links.add(`${cur}|${p}`);
-        cur = p;
-      }
+      while (cur !== a) { const p = prev.get(cur)!; nodes.add(p); links.add(`${p}|${cur}`); links.add(`${cur}|${p}`); cur = p; }
     }
     return { nodes, links };
   }, [pathEnds, adjacency]);
 
-  // Filtered graph — fresh objects every render (react-force-graph mutates links).
+  // Filtered graph — fresh objects each time (the engine mutates link source/target).
   const graphData = useMemo(() => {
     const visible = data.nodes.filter((n) => !hidden.has(n.source));
     const visibleIds = new Set(visible.map((n) => n.id));
-    const nodes: FGNode[] = visible.map((n) => ({ ...n }));
-    const links: FGLink[] = data.edges
-      .filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target))
-      .map((e) => ({ source: e.source, target: e.target, verb: e.verb }));
-    return { nodes, links };
+    return {
+      nodes: visible.map((n) => ({ ...n })) as FGNode[],
+      links: data.edges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target)).map((e) => ({ source: e.source, target: e.target, verb: e.verb })) as FGLink[],
+    };
   }, [data.nodes, data.edges, hidden]);
 
-  const onNodeClick = useCallback((node: FGNode, event: MouseEvent) => {
-    if (event.shiftKey) {
-      setPathEnds((prev) => (prev.length >= 2 ? [node.id] : [...prev, node.id]));
-    } else {
-      setSelected(node);
-      setPathEnds([]);
-    }
+  // Track canvas size.
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const measure = () => setDims({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
-  const toggleSource = (src: string) =>
-    setHidden((prev) => {
-      const next = new Set(prev);
-      next.has(src) ? next.delete(src) : next.add(src);
-      return next;
+  // Create the 3d-force-graph engine once, on the canvas element.
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el || !data.ok) return;
+    let destroyed = false;
+    import('3d-force-graph').then((mod) => {
+      if (destroyed || !canvasRef.current) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const FG = (mod as any).default;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = new FG(canvasRef.current as HTMLElement)
+        .backgroundColor('#05070a')
+        .nodeLabel((n: FGNode) => `${n.label} (${n.source}, deg ${n.degree})`)
+        .nodeVal((n: FGNode) => 1 + Math.sqrt(n.degree) * 2)
+        .nodeOpacity(0.95)
+        .linkLabel((l: FGLink) => (l.verb ? `<b style="color:#f59e0b">${l.verb}</b>` : ''))
+        .linkDirectionalArrowLength((l: FGLink) => (l.verb ? 3 : 0))
+        .linkDirectionalArrowRelPos(1)
+        .onNodeClick((node: FGNode, event: MouseEvent) => {
+          if (event.shiftKey) setPathEnds((prev) => (prev.length >= 2 ? [node.id] : [...prev, node.id]));
+          else { setSelected(node); setPathEnds([]); }
+        });
+      graphRef.current = g;
+      setReady(true);
     });
+    return () => {
+      destroyed = true;
+      try { graphRef.current?._destructor?.(); } catch { /* noop */ }
+      graphRef.current = null;
+    };
+  }, [data.ok]);
+
+  // Push data + size into the engine.
+  useEffect(() => {
+    const g = graphRef.current;
+    if (!g || !ready) return;
+    if (dims.w > 0 && dims.h > 0) g.width(dims.w).height(dims.h);
+    g.graphData(graphData);
+  }, [graphData, dims, ready]);
+
+  // Re-apply colors/widths for path-trace + verb emphasis (no data reset → no re-sim).
+  useEffect(() => {
+    const g = graphRef.current;
+    if (!g || !ready) return;
+    g.nodeColor((n: FGNode) =>
+      pathEnds.length === 2 ? (tracedPath.nodes.has(n.id) ? '#ffffff' : 'rgba(120,130,150,0.25)') : colorFor(n.source),
+    )
+      .linkColor((l: FGLink) => {
+        if (pathEnds.length === 2) return tracedPath.links.has(`${endId(l.source)}|${endId(l.target)}`) ? '#34d399' : 'rgba(120,130,150,0.12)';
+        return l.verb ? 'rgba(245,158,11,0.55)' : 'rgba(80,120,110,0.28)';
+      })
+      .linkWidth((l: FGLink) => {
+        if (pathEnds.length === 2 && tracedPath.links.has(`${endId(l.source)}|${endId(l.target)}`)) return 2;
+        return l.verb ? 1.5 : 0.5;
+      });
+  }, [pathEnds, tracedPath, ready]);
+
+  const toggleSource = (src: string) =>
+    setHidden((prev) => { const next = new Set(prev); next.has(src) ? next.delete(src) : next.add(src); return next; });
 
   const stats = data.stats;
 
@@ -149,13 +183,11 @@ export function BrainGraph({ data }: { data: GraphData }) {
           <div style={{ fontSize: 13, color: '#e5e7eb' }}>
             <div style={{ color: colorFor(selected.source), fontWeight: 600 }}>{selected.source} · {selected.type}</div>
             <div style={{ margin: '6px 0', lineHeight: 1.4 }}>{selected.label}</div>
-            <div style={{ color: '#9ca3af', fontSize: 12 }}>degree {selected.degree} · {selected.timestamp?.slice(0, 16)}</div>
+            <div style={{ color: '#9ca3af', fontSize: 12 }}>degree {selected.degree}{selected.timestamp ? ' · ' + selected.timestamp.slice(0, 16) : ''}</div>
             <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4 }}>{selected.id}</div>
           </div>
         ) : (
-          <div style={{ color: '#6b7280', fontSize: 12 }}>
-            Click a node to focus it. Shift-click two nodes to trace the path between them.
-          </div>
+          <div style={{ color: '#6b7280', fontSize: 12 }}>Click a node to focus it. Shift-click two nodes to trace the path between them.</div>
         )}
         {pathEnds.length === 2 && (
           <div style={{ marginTop: 10, color: tracedPath.nodes.size ? '#6ee7b7' : '#f87171', fontSize: 12 }}>
@@ -167,49 +199,17 @@ export function BrainGraph({ data }: { data: GraphData }) {
             <div style={panel.sectionLabel}>TOP HUBS</div>
             {stats.topHubs.slice(0, 8).map((h) => (
               <div key={h.id} style={{ fontSize: 12, color: '#cbd5e1', margin: '3px 0', cursor: 'pointer' }}
-                onClick={() => { const n = data.nodes.find((x) => x.id === h.id) ?? null; setSelected(n); }}>
+                onClick={() => setSelected(data.nodes.find((x) => x.id === h.id) ?? null)}>
                 <span style={{ color: '#fbbf24' }}>{h.degree}</span> · {h.label.slice(0, 34)}
               </div>
             ))}
           </div>
         ) : null}
+        {!ready && <div style={{ marginTop: 18, color: '#6b7280', fontSize: 12 }}>loading 3D engine…</div>}
       </aside>
 
-      {/* CENTER — the 3D field */}
-      <div ref={canvasRef} style={panel.canvas}>
-        {dims.w > 0 && dims.h > 0 && (
-        <ForceGraph3D
-          ref={fgRef}
-          width={dims.w}
-          height={dims.h}
-          graphData={graphData}
-          backgroundColor="#05070a"
-          nodeLabel={(n: FGNode) => `${n.label} (${n.source}, deg ${n.degree})`}
-          nodeVal={(n: FGNode) => 1 + Math.sqrt(n.degree) * 2}
-          nodeColor={(n: FGNode) =>
-            pathEnds.length === 2
-              ? (tracedPath.nodes.has(n.id) ? '#ffffff' : 'rgba(120,130,150,0.25)')
-              : colorFor(n.source)
-          }
-          linkColor={(l: FGLink) => {
-            const s = typeof l.source === 'object' ? (l.source as FGNode).id : l.source;
-            const t = typeof l.target === 'object' ? (l.target as FGNode).id : l.target;
-            if (pathEnds.length === 2) return tracedPath.links.has(`${s}|${t}`) ? '#34d399' : 'rgba(120,130,150,0.15)';
-            return l.verb ? 'rgba(245,158,11,0.55)' : 'rgba(80,120,110,0.28)'; // verbs = amber, meaningful
-          }}
-          linkWidth={(l: FGLink) => {
-            const s = typeof l.source === 'object' ? (l.source as FGNode).id : l.source;
-            const t = typeof l.target === 'object' ? (l.target as FGNode).id : l.target;
-            if (pathEnds.length === 2 && tracedPath.links.has(`${s}|${t}`)) return 2;
-            return l.verb ? 1.5 : 0.5; // typed edges stand out
-          }}
-          linkLabel={(l: FGLink) => (l.verb ? `<b style="color:#f59e0b">${l.verb}</b>` : '')}
-          linkDirectionalArrowLength={(l: FGLink) => (l.verb ? 3 : 0)}
-          linkDirectionalArrowRelPos={1}
-          onNodeClick={onNodeClick}
-        />
-        )}
-      </div>
+      {/* CENTER — the 3D field (engine mounts here) */}
+      <div ref={canvasRef} style={panel.canvas} />
 
       {/* RIGHT — filter */}
       <aside style={panel.right}>
@@ -231,7 +231,7 @@ const panel: Record<string, React.CSSProperties> = {
   root: { position: 'fixed', inset: 0, background: '#05070a', display: 'flex', fontFamily: 'ui-sans-serif, system-ui' },
   left: { width: 300, padding: 20, background: 'rgba(10,14,20,0.85)', overflowY: 'auto', zIndex: 2, borderRight: '1px solid rgba(255,255,255,0.06)' },
   right: { width: 220, padding: 20, background: 'rgba(10,14,20,0.85)', overflowY: 'auto', zIndex: 2, borderLeft: '1px solid rgba(255,255,255,0.06)' },
-  canvas: { flex: 1, position: 'relative' },
+  canvas: { flex: 1, position: 'relative', minWidth: 0 },
   sectionLabel: { fontSize: 11, letterSpacing: 1.5, color: '#6b7280', margin: '14px 0 8px' },
   empty: { position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#05070a', gap: 8 },
 };
