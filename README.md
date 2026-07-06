@@ -1,30 +1,71 @@
-<h1 align="center">Continuum</h1>
+<h1 align="center">CONTINUUM</h1>
 
 <p align="center">
-  <strong>Persistent intelligence layer for AI coding assistants.</strong>
+  <strong>The verifiable memory &amp; trust layer for AI-assisted development.</strong>
   <br>
-  <em>Your AI collaborator finally remembers.</em>
+  <em>The memory that refuses to lie.</em>
 </p>
 
 <p align="center">
-  <a href="#status"><img alt="Status" src="https://img.shields.io/badge/status-v0%20design-orange"></a>
+  <a href="#status"><img alt="Status" src="https://img.shields.io/badge/status-V1%20AaaS%20live-brightgreen"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
+  <a href="https://thenine.foundation"><img alt="Bound by The Nine" src="https://img.shields.io/badge/bound%20by-The%20Nine-8A2BE2"></a>
   <a href="https://github.com/number7even/CONTINUUM"><img alt="Repo" src="https://img.shields.io/badge/github-number7even%2FCONTINUUM-black"></a>
 </p>
 
+<p align="center"><code>npx @number7even/continuum init</code></p>
+
 ---
 
-## What is Continuum?
+## What is CONTINUUM?
 
-A persistent intelligence layer between you and any AI coding assistant. Continuum runs as an MCP server that aggregates **five sources** of project truth — your `/docs` (RAG), your AI memory observations (claude-mem-compatible), your feedback signals (SONA-style HITL rewards), your git history, your AI session transcripts — and produces:
+A persistent, **verifiable** intelligence layer between you and any AI coding assistant
+(Claude Code, Cursor). It runs as an MCP server, ends the cycle of re-explaining your
+project every session — and, unlike every other AI-memory tool, **it refuses to lie about
+what's done.** It is bound by **[The Nine](https://thenine.foundation)**, the bidirectional
+trust protocol that holds *both the human and the agent* to the same standard.
 
-1. **Timestamped `product_state[]` snapshots** — *"What was true on May 14?"* → verifiable answer.
-2. **Auto-generated session-start briefings** — your AI opens with full context, not cold.
-3. **Live todo pipeline** — open commitments tracked from discussion → action → verification.
+Four pillars — [each verified in code](./docs/launch/00_INDEX.md), not marketed:
 
-**Who it's for:** solo founders, small teams, and consultants who ship with AI help and lose hours every session re-explaining context. Anyone who has ever said *"I told you about this last week"* to an AI.
+1. **5-Source Aggregation** — one memory center absorbs five sources of ground truth: local
+   `/docs` (RAG/FTS5), AI memory observations, human-in-the-loop feedback signals, git commit
+   history, and full AI session transcripts. It auto-generates session-start briefings (your AI
+   opens *warm*) and timestamped snapshots (*"what was true on May 14?"* → a verifiable answer).
+2. **Verify-Then-Dissolve** — the defining discipline. A commitment is not marked done until
+   there is **proof**: a shell command that exits 0 *(shipped today via `continuum verify`)*.
+   🔮 Cryptographic hypervisor witness records (RVM) are on the roadmap. This turns the AI from
+   a probabilistic text generator into an execution engine that **cannot claim it finished when
+   it didn't.**
+3. **Progressive Disclosure** — a 3-layer retrieval funnel (compact index → timeline → full
+   fetch by ID) keeps the aggregated memory usable without blowing the context window. Measured
+   **~2.85x token savings** (up to 5.3x single-record). *(The old "10x" claim is retired.)*
+4. **Privacy as Invariant** — an 11-pattern filter deep-scrubs API keys, tokens, and PII —
+   including `Observation.metadata` — **at ingestion**, before anything is written.
 
-**Why it's defensible:** nobody else combines all 5 sources. claude-mem captures observations only. Mem.ai is notes. Notion is docs. Cursor rules are conventions. None checkpoint state. The 5-source aggregation IS the moat.
+**Why it's defensible (the open lane):** of seven surveyed rivals (Mem0, Letta, Zep, Cognee,
+LangMem, Supermemory, MCP memory servers), **zero verify at write time.** Proof-gated memory
+is CONTINUUM's alone — the moat and the ethic are the same artifact.
+
+**Who it's for:** solo founders, small teams, and consultants who ship with AI help and lose
+hours every session re-explaining context — anyone who's ever said *"I told you about this
+last week"* to an AI.
+
+### What's shipped vs. what's next (honest odometer)
+
+| Surface | Status |
+|---|---|
+| Core engine · **~13–14 MCP tools** · 4 resources · 2 prompts · **4 adapters** (docs / git / export / remote-git) | ✅ live |
+| CLI (`init` / `start` / `serve` / `status` / `verify` / `import-state` … **10 verbs**) | ✅ live |
+| **The 3D "Brain"** — 5-source knowledge galaxy in the console | ✅ shipped |
+| **The Dossier** — per-node verified content, read-aloud, mindmap, Mermaid map, reverse call-graph | ✅ shipped |
+| Storage: SQLite + FTS5, with a **Hybrid + RuVector (HNSW) backend** | 🟡 hybrid backend is a smoke-green **stub** |
+| Hosted multi-tenant SaaS · RBAC tenancy · billing | 🔮 V2 roadmap |
+
+> **The dogfood:** [**AMF**](./docs/AMF_ENGINE_MAP.md) — a 14-product content factory built on
+> CONTINUUM. Its A→I pipeline is **verified end-to-end and self-driving *to the human gate***;
+> it is strictly forbidden from publishing on its own (P9 — the leap is the human's). Handoff,
+> autopilot, and the revenue loop are 🔮 gated. If the memory engine ever lied about a completed
+> task, the factory would collapse — so AMF is living proof the engine can be trusted.
 
 ---
 
@@ -129,16 +170,15 @@ build clean. First real `product_state[]` checkpoint written.
 
 This repo currently contains:
 
-- ✅ `ARCHITECTURE.md` (v0.3) — system context, data model, MCP interface, deployment roadmap, 8/9 decisions locked
+- ✅ `ARCHITECTURE.md` (v0.3) — system context, data model, MCP interface, deployment roadmap, **8/9 decisions locked** (only the name pending)
 - ✅ `docs/HOW_CONTINUUM_WORKS.md` — product narrative + V1+ mechanics deep-dive
-- ✅ `packages/core/` — SQLite + FTS5 storage, types, checkpoint engine (compiles clean)
-- ✅ `packages/mcp-server/` — 4 V0 MCP tools (compiles clean)
-- ✅ `.mcp.json.example` — drop-in MCP registration template
-- ⏳ MCP Resources (`continuum://...`) + Prompts (`continuum.session_start`) — v0 polish in progress
-- ⏳ STATE.md parser → first-checkpoint pipeline
-- ⏳ `packages/adapters/{docs,git,export}/` — v0 polish
-- ⏳ `packages/adapters/{claude-mem,sona}/` — V0.5
-- ⏳ `packages/web-ui/` — V1
+- ✅ `packages/core/` — storage (SQLite + FTS5, **default now Hybrid**), types, checkpoint engine, 11-pattern privacy filter
+- ✅ `packages/mcp-server/` — **~13–14 MCP tools** + 4 Resources (`continuum://…`) + 2 Prompts (`continuum.session_start`, `continuum.cite`)
+- ✅ `packages/cli/` — **10 verbs** (`init` / `start` / `serve` / `status` / `verify` / `import-state` …); `@number7even/continuum` forwards to it
+- ✅ `packages/adapters/` — **4 adapters** (docs / git / export / remote-git); STATE.md → first-checkpoint parser
+- ✅ `apps/console/` — Next.js console + the **3D "Brain"** (5-source galaxy, dossier, `/api/ask`) — live on Vercel + Fly
+- ⏳ `packages/adapters/{claude-mem,sona}/` · full RuVector HNSW backend — V0.5
+- 🔮 Hosted multi-tenant SaaS · RBAC tenancy · billing — V2
 
 See [ROADMAP §15](./ARCHITECTURE.md#15-roadmap-post-v0) for full timeline.
 
@@ -146,27 +186,25 @@ See [ROADMAP §15](./ARCHITECTURE.md#15-roadmap-post-v0) for full timeline.
 
 ## Quick start (install from npm)
 
-The CLI is published on npm. The packages are scoped to `@number7even/continuum-*`:
-
 ```bash
-# Install the CLI globally (provides the `continuum` command)
-npm install -g @number7even/continuum-cli
-
-# Initialize a project DB + print the MCP registration snippet, then run the server
-continuum init
-continuum start
+# The one-liner — no install needed
+npx @number7even/continuum init      # create the project DB + print the MCP snippet
+npx @number7even/continuum start     # run the stdio MCP server
+npx @number7even/continuum verify    # run the exit-0 proof gate on open commitments
 ```
 
-Or run it without installing:
+Or install the command globally:
 
 ```bash
-npx @number7even/continuum-cli init
-npx @number7even/continuum-cli start
+npm install -g @number7even/continuum
+continuum init && continuum start
 ```
 
-Published packages: [`@number7even/continuum-core`](https://www.npmjs.com/package/@number7even/continuum-core) ·
-[`@number7even/continuum-mcp-server`](https://www.npmjs.com/package/@number7even/continuum-mcp-server) ·
-[`@number7even/continuum-cli`](https://www.npmjs.com/package/@number7even/continuum-cli).
+> `@number7even/continuum` is the marketed entry point; it forwards to the CLI
+> implementation, [`@number7even/continuum-cli`](https://www.npmjs.com/package/@number7even/continuum-cli)
+> (which you can also call directly). Libraries:
+> [`@number7even/continuum-core`](https://www.npmjs.com/package/@number7even/continuum-core) ·
+> [`@number7even/continuum-mcp-server`](https://www.npmjs.com/package/@number7even/continuum-mcp-server).
 
 ## Quick start (from source)
 
