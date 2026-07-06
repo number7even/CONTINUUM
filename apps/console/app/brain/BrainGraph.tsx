@@ -290,6 +290,12 @@ export function BrainGraph({ data }: { data: GraphData }) {
         .linkLabel((l: FGLink) => (l.verb ? `<b style="color:#f59e0b">${l.verb}</b>` : ''))
         .linkDirectionalArrowLength((l: FGLink) => (l.verb ? 3 : 0))
         .linkDirectionalArrowRelPos(1)
+        // Flow particles — animated dots travelling source→target along each edge
+        // (shows the relationship direction; typed/verb edges flow brighter).
+        .linkDirectionalParticles((l: FGLink) => (l.verb ? 2 : 1))
+        .linkDirectionalParticleSpeed(0.006)
+        .linkDirectionalParticleWidth((l: FGLink) => (l.verb ? 1.6 : 1.0))
+        .linkDirectionalParticleColor((l: FGLink) => (l.verb ? 'rgba(245,158,11,0.95)' : 'rgba(110,231,183,0.8)'))
         .onNodeClick((node: FGNode, event: MouseEvent) => {
           if (event.shiftKey) setPathEnds((prev) => (prev.length >= 2 ? [node.id] : [...prev, node.id]));
           else { setSelected(node); setPathEnds([]); }
