@@ -35,6 +35,7 @@ export function BrainGraph({ data }: { data: GraphData }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null);
   const [ready, setReady] = useState(false);
+  const [engineError, setEngineError] = useState<string | null>(null);
   const [dims, setDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<GraphNode | null>(null);
@@ -119,7 +120,7 @@ export function BrainGraph({ data }: { data: GraphData }) {
         });
       graphRef.current = g;
       setReady(true);
-    });
+    }).catch((e) => setEngineError(e?.message ? String(e.message) : String(e)));
     return () => {
       destroyed = true;
       try { graphRef.current?._destructor?.(); } catch { /* noop */ }
@@ -205,7 +206,9 @@ export function BrainGraph({ data }: { data: GraphData }) {
             ))}
           </div>
         ) : null}
-        {!ready && <div style={{ marginTop: 18, color: '#6b7280', fontSize: 12 }}>loading 3D engine…</div>}
+        {engineError
+          ? <div style={{ marginTop: 18, color: '#f87171', fontSize: 12 }}>3D engine error: {engineError}</div>
+          : !ready && <div style={{ marginTop: 18, color: '#6b7280', fontSize: 12 }}>loading 3D engine…</div>}
       </aside>
 
       {/* CENTER — the 3D field (engine mounts here) */}
