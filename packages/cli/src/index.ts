@@ -109,12 +109,14 @@ COMMANDS
                  state-snapshot claims are still true on the current machine.
                  --json : emit {name, section, verifyCommand, exitCode, state}
                  per entry (state = DONE|FAILED|SKIPPED) — feeds the 6-state UI.
-  ingest         Repo-drop — turn any repo into the knowledge graph in one shot:
-                 git commits + markdown docs + exported code symbols & call graph
-                 (inline codegraph bridge if a .codegraph index is present).
+  ingest         Repo-drop — turn any repo into the knowledge graph in one shot.
+                 Local path: git commits + markdown docs + exported code symbols &
+                 call graph (inline codegraph bridge if a .codegraph index exists).
+                 Remote URL: the remote-git adapter (gitingest digest).
                  Project defaults to the repo's basename.
                  Examples:
                    continuum ingest --repo=/path/to/repo
+                   continuum ingest --repo=https://github.com/owner/name
                    continuum ingest --repo=. --project=my-repo
   adapter        Run a single source adapter (docs|git) once, or with --watch as a
                  long-running daemon that re-syncs on file change.
@@ -1178,14 +1180,45 @@ function commandIngest(): void {
   const { repo, project, docsDir } = parseIngestArgs(process.argv);
   if (!repo || !repo.trim()) {
     process.stderr.write(
-      `continuum ingest: --repo=<path> required.\n` +
+      `continuum ingest: --repo=<path-or-url> required.\n` +
         `  Drop any repo into the graph:\n` +
         `    continuum ingest --repo=/path/to/repo\n` +
+        `    continuum ingest --repo=https://github.com/owner/name\n` +
         `    continuum ingest --repo=. --project=my-repo\n`,
     );
     process.exit(2);
   }
-  const repoPath = resolvePath(repo);
+  const raw = repo.trim();
+
+  // A remote URL → the remote-git adapter (gitingest digest → one observation).
+  // A local path → the git + docs + codegraph flow below.
+  if (/^(https?:\/\/|git@)/i.test(raw)) {
+    const projectId = project?.trim() ? project.trim() : basename(raw.replace(/\.git$/, '')).toLowerCase();
+    process.stdout.write(`continuum ingest — remote repo '${raw}' → project '${projectId}'\n\n▸ remote-git — gitingest digest\n`);
+    let bin: string;
+    try {
+      bin = fileURLToPath(import.meta.resolve('@number7even/continuum-adapter-remote-git'));
+    } catch (err) {
+      process.stderr.write(
+        `[ingest:remote-git] cannot resolve @number7even/continuum-adapter-remote-git — install it in this workspace. (${err instanceof Error ? err.message : String(err)})\n`,
+      );
+      process.exit(2);
+    }
+    try {
+      execFileSync(process.execPath, [bin, `--repo=${raw}`, `--project=${projectId}`], { stdio: 'inherit' });
+    } catch (err) {
+      process.stderr.write(`[ingest:remote-git] failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+    process.stdout.write(
+      `\n✓ Remote repo ingested into project '${projectId}'.\n` +
+        `  Inspect:  continuum status --project-id ${projectId}\n` +
+        `  Map + dossier: open the 3D brain against project '${projectId}'.\n`,
+    );
+    return;
+  }
+
+  const repoPath = resolvePath(raw);
   if (!existsSync(repoPath)) {
     process.stderr.write(`continuum ingest: repo not found: ${repoPath}\n`);
     process.exit(2);
