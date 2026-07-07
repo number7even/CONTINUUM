@@ -174,6 +174,73 @@ interface FGLink { source: string | FGNode; target: string | FGNode; verb?: stri
 const endId = (e: string | FGNode) => (typeof e === 'object' ? e.id : e);
 const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + '…' : s);
 
+/**
+ * MatrixRain — the "enter the isolation" transition. The files/labels of the
+ * isolated proximity cascade down the screen like the Matrix, then the node
+ * materialises center-screen as the rain fades — revealing the isolated graph.
+ */
+function MatrixRain({ title, lines, onDone }: { title: string; lines: string[]; onDone: () => void }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    let W = (canvas.width = window.innerWidth);
+    let H = (canvas.height = window.innerHeight);
+    const fontSize = 16;
+    const cols = Math.max(1, Math.floor(W / fontSize));
+    const kata = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎ0123456789<>[]{}/=';
+    // Half the columns spell a real file/label (legible); the rest are glyphs.
+    const streams = Array.from({ length: cols }, (_, i) => ({
+      y: Math.floor(Math.random() * -50),
+      text: lines.length && Math.random() < 0.55 ? lines[i % lines.length]! + '   ' : '',
+      k: 0,
+    }));
+    const DURATION = 2100, FADE_AT = 1450;
+    const start = performance.now();
+    let raf = 0;
+    const draw = (now: number) => {
+      const t = now - start;
+      ctx.fillStyle = 'rgba(5,7,10,0.12)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = `${fontSize}px ui-monospace, monospace`;
+      for (let i = 0; i < cols; i++) {
+        const st = streams[i]!;
+        const ch = st.text ? st.text[st.k % st.text.length]! : kata[Math.floor(Math.random() * kata.length)]!;
+        const x = i * fontSize, y = st.y * fontSize;
+        ctx.fillStyle = '#c7ffe6';
+        ctx.fillText(ch, x, y);
+        ctx.fillStyle = st.text ? 'rgba(110,231,183,0.85)' : 'rgba(52,211,153,0.4)';
+        ctx.fillText(ch, x, y - fontSize);
+        st.y++; st.k++;
+        if (y > H && Math.random() > 0.97) { st.y = Math.floor(Math.random() * -20); st.k = 0; }
+      }
+      if (t > FADE_AT) {
+        const p = Math.min(1, (t - FADE_AT) / (DURATION - FADE_AT));
+        ctx.fillStyle = `rgba(5,7,10,${0.12 + p * 0.55})`;
+        ctx.fillRect(0, 0, W, H);
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#34d399';
+        ctx.shadowBlur = 26;
+        ctx.font = `bold ${Math.round(28 + p * 12)}px ui-sans-serif, system-ui`;
+        ctx.fillStyle = `rgba(198,255,230,${p})`;
+        ctx.fillText(truncate(title, 46), W / 2, H / 2);
+        ctx.shadowBlur = 0;
+        ctx.textAlign = 'left';
+      }
+      if (t < DURATION) raf = requestAnimationFrame(draw);
+      else onDoneRef.current();
+    };
+    raf = requestAnimationFrame(draw);
+    const onResize = () => { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; };
+    window.addEventListener('resize', onResize);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', onResize); };
+  }, [title, lines]);
+  return <canvas ref={ref} style={{ position: 'fixed', inset: 0, zIndex: 9, pointerEvents: 'none' }} />;
+}
+
 export function BrainGraph({ data }: { data: GraphData }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -200,6 +267,8 @@ export function BrainGraph({ data }: { data: GraphData }) {
   const [dossier, setDossier] = useState<{ node: GraphNode; loading: boolean; content: string | null; meta: Record<string, unknown> | null; error?: string } | null>(null);
   const [mindmapOn, setMindmapOn] = useState(false); // dossier: content view ⟷ mindmap view
   const [mermaidText, setMermaidText] = useState<string | null>(null); // dossier: gitreverse-style mermaid map
+  const [matrixRain, setMatrixRain] = useState<{ title: string; lines: string[] } | null>(null); // "enter isolation" transition
+  const prevIsolateRef = useRef(false);
   const [copied, setCopied] = useState(false);
   const highlightRef = useRef<Set<string> | null>(null);
   const didFitRef = useRef(false); // auto-fit ONCE on load; never yank the camera again
@@ -451,6 +520,16 @@ export function BrainGraph({ data }: { data: GraphData }) {
     }
     return set;
   }, [askNodes, search, selected, depth, adjacency, data.nodes]);
+
+  // Matrix "enter the isolation" transition — fires when isolate flips false→true.
+  useEffect(() => {
+    if (isolate && !prevIsolateRef.current && selected) {
+      const ids = highlighted ? [...highlighted] : [selected.id];
+      const lines = ids.map((id) => nodeById.get(id)?.label ?? id).filter(Boolean).slice(0, 60);
+      setMatrixRain({ title: selected.label, lines });
+    }
+    prevIsolateRef.current = isolate;
+  }, [isolate, selected, highlighted, nodeById]);
 
   // Glue the radial menu to the node's live screen position (follows orbit/zoom).
   useEffect(() => {
@@ -1002,6 +1081,9 @@ export function BrainGraph({ data }: { data: GraphData }) {
           </div>
         </div>
       )}
+
+      {/* Matrix "enter the isolation" transition — files rain, then the node materialises. */}
+      {matrixRain && <MatrixRain title={matrixRain.title} lines={matrixRain.lines} onDone={() => setMatrixRain(null)} />}
 
       {/* Voice orb — tap to talk. "show me AMF" · "search vault" · "status" · "read this" */}
       <VoiceOrb voice={voice} />
