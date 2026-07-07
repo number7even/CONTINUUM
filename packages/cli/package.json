@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@number7even/continuum-core": "0.0.1",
-    "@number7even/continuum-mcp-server": "0.0.1"
+    "@number7even/continuum-mcp-server": "0.0.1",
+    "better-sqlite3": "^11.3.0"
   },
   "license": "Apache-2.0",
   "author": "Riaan Kleynhans <riaan@number7even.com>",

@@ -27,6 +27,7 @@ import { basename, dirname, join as joinPath, resolve as resolvePath } from 'nod
 import { copyFileSync, existsSync, mkdirSync, readFileSync, watch as fsWatch, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
+import Database from 'better-sqlite3';
 import {
   openStorage,
   parseStateMdToCheckpoint,
@@ -108,7 +109,14 @@ COMMANDS
                  state-snapshot claims are still true on the current machine.
                  --json : emit {name, section, verifyCommand, exitCode, state}
                  per entry (state = DONE|FAILED|SKIPPED) — feeds the 6-state UI.
-  adapter        Run a source adapter (docs|git) once, or with --watch as a
+  ingest         Repo-drop — turn any repo into the knowledge graph in one shot:
+                 git commits + markdown docs + exported code symbols & call graph
+                 (inline codegraph bridge if a .codegraph index is present).
+                 Project defaults to the repo's basename.
+                 Examples:
+                   continuum ingest --repo=/path/to/repo
+                   continuum ingest --repo=. --project=my-repo
+  adapter        Run a single source adapter (docs|git) once, or with --watch as a
                  long-running daemon that re-syncs on file change.
                  Examples:
                    continuum adapter docs
@@ -1071,6 +1079,162 @@ function commandVerify(projectId: string): void {
   }
 }
 
+// ── continuum ingest --repo=<path> (the repo-drop) ───────────────────────────
+//
+// One command turns a dropped repo into the knowledge graph: git commits +
+// markdown docs (via the published adapters) + exported code symbols + call
+// graph (inline codegraph bridge, if a .codegraph index is present). The result
+// is the "map + dossier" surface the brain renders.
+
+function parseIngestArgs(argv: string[]): { repo?: string; project?: string; docsDir?: string } {
+  const args = argv.slice(2);
+  const out: { repo?: string; project?: string; docsDir?: string } = {};
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === undefined) continue;
+    if (a.startsWith('--repo=')) out.repo = a.split('=').slice(1).join('=');
+    else if (a === '--repo') out.repo = args[++i];
+    else if (a.startsWith('--project=')) out.project = a.split('=').slice(1).join('=');
+    else if (a.startsWith('--docs-dir=')) out.docsDir = a.split('=').slice(1).join('=');
+  }
+  return out;
+}
+
+/** Run a published source adapter (docs|git) once against a target dir. */
+function runAdapterOnce(name: AdapterName, projectId: string, opts: { docsDir?: string; repoDir?: string }): boolean {
+  let bin: string;
+  try {
+    bin = resolveAdapterBin(name);
+  } catch (err) {
+    process.stderr.write(`[ingest] ${(err as Error).message}\n`);
+    return false;
+  }
+  const args =
+    name === 'docs'
+      ? [`--project=${projectId}`, `--docs-dir=${opts.docsDir ?? process.cwd()}`, '--once']
+      : [`--project=${projectId}`, `--repo-dir=${opts.repoDir ?? process.cwd()}`, '--once'];
+  try {
+    execFileSync(process.execPath, [bin, ...args], { stdio: 'inherit' });
+    return true;
+  } catch (err) {
+    process.stderr.write(`[ingest:${name}] failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    return false;
+  }
+}
+
+interface CgNode { id: number; kind: string; name: string; qualified_name: string; file_path: string; signature: string | null; docstring: string | null }
+interface CgEdge { source: number; target: number }
+
+/** Inline codegraph bridge — ingest exported symbols + call/import edges from a
+ *  repo's .codegraph/codegraph.db as observations (id=`sym:<qn>`), directional
+ *  refs = the symbols each one calls/imports. Mirrors scripts/ingest-codegraph.mjs. */
+function ingestCodegraph(projectId: string, dbPath: string): { symbols: number; edges: number } {
+  const KINDS = ['function', 'class', 'method', 'interface', 'component'];
+  const db = new Database(dbPath, { readonly: true });
+  const rows = db
+    .prepare(
+      `SELECT id, kind, name, qualified_name, file_path, signature, docstring
+       FROM nodes WHERE is_exported = 1 AND kind IN (${KINDS.map(() => '?').join(',')})`,
+    )
+    .all(...KINDS) as CgNode[];
+  const idToQn = new Map(rows.map(r => [r.id, r.qualified_name]));
+  const symId = (qn: string): string => `sym:${qn}`;
+  const refs = new Map<string, Set<string>>();
+  const edgeRows = db.prepare(`SELECT source, target FROM edges WHERE kind IN ('calls','imports')`).all() as CgEdge[];
+  for (const e of edgeRows) {
+    if (idToQn.has(e.source) && idToQn.has(e.target) && e.source !== e.target) {
+      const s = symId(idToQn.get(e.source)!), t = symId(idToQn.get(e.target)!);
+      if (!refs.has(s)) refs.set(s, new Set());
+      refs.get(s)!.add(t);
+    }
+  }
+  db.close();
+
+  const now = new Date().toISOString();
+  const storage = openStorage(projectId);
+  let symbols = 0, edges = 0;
+  try {
+    storage.upsertSource(`codegraph:${projectId}`, 'export', { adapter: 'codegraph-bridge', db: dbPath });
+    for (const r of rows) {
+      const id = symId(r.qualified_name);
+      const content = [
+        `${r.name}${r.signature ? ' ' + r.signature : ''}`,
+        r.file_path,
+        (r.docstring ?? '').trim(),
+      ].filter(Boolean).join('\n');
+      const rr = [...(refs.get(id) ?? [])];
+      if (storage.upsertObservation({ id, sourceId: `codegraph:${projectId}`, type: r.kind, content, timestamp: now, refs: rr, metadata: { adapter: 'codegraph-bridge', file: r.file_path, kind: r.kind } })) {
+        symbols++;
+      }
+      edges += rr.length;
+    }
+  } finally {
+    storage.close();
+  }
+  return { symbols, edges };
+}
+
+function commandIngest(): void {
+  const { repo, project, docsDir } = parseIngestArgs(process.argv);
+  if (!repo || !repo.trim()) {
+    process.stderr.write(
+      `continuum ingest: --repo=<path> required.\n` +
+        `  Drop any repo into the graph:\n` +
+        `    continuum ingest --repo=/path/to/repo\n` +
+        `    continuum ingest --repo=. --project=my-repo\n`,
+    );
+    process.exit(2);
+  }
+  const repoPath = resolvePath(repo);
+  if (!existsSync(repoPath)) {
+    process.stderr.write(`continuum ingest: repo not found: ${repoPath}\n`);
+    process.exit(2);
+  }
+  const projectId = project?.trim() ? project.trim() : basename(repoPath).toLowerCase();
+
+  process.stdout.write(`continuum ingest — repo '${repoPath}' → project '${projectId}'\n\n`);
+
+  // 1) git commit history (the temporal spine)
+  if (existsSync(joinPath(repoPath, '.git'))) {
+    process.stdout.write(`▸ git — commit history\n`);
+    runAdapterOnce('git', projectId, { repoDir: repoPath });
+  } else {
+    process.stdout.write(`▸ git — skipped (no .git at ${repoPath})\n`);
+  }
+
+  // 2) markdown docs (RAG surface)
+  const docsTarget = docsDir
+    ? resolvePath(docsDir)
+    : existsSync(joinPath(repoPath, 'docs'))
+      ? joinPath(repoPath, 'docs')
+      : repoPath;
+  process.stdout.write(`\n▸ docs — markdown in ${docsTarget}\n`);
+  runAdapterOnce('docs', projectId, { docsDir: docsTarget });
+
+  // 3) code symbols + call graph (the architecture map)
+  const cgDb = joinPath(repoPath, '.codegraph', 'codegraph.db');
+  process.stdout.write(`\n▸ code — exported symbols + call graph\n`);
+  if (existsSync(cgDb)) {
+    try {
+      const { symbols, edges } = ingestCodegraph(projectId, cgDb);
+      process.stdout.write(`  ✓ ${symbols} symbol(s) · ${edges} call/import edge(s) — directional code flow\n`);
+    } catch (err) {
+      process.stderr.write(`  ✗ codegraph ingest failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    }
+  } else {
+    process.stdout.write(
+      `  no .codegraph index — code structure skipped. To add it, run in the repo:\n` +
+        `    codegraph init -i     # then re-run: continuum ingest --repo=${repoPath}\n`,
+    );
+  }
+
+  process.stdout.write(
+    `\n✓ Repo ingested into project '${projectId}'.\n` +
+      `  Inspect:  continuum status --project-id ${projectId}\n` +
+      `  Map + dossier: open the 3D brain (apps/console → /brain) against project '${projectId}'.\n`,
+  );
+}
+
 // ── continuum start ───────────────────────────────────────────────────────────
 
 async function commandStart(projectId: string): Promise<void> {
@@ -1138,6 +1302,10 @@ async function main(): Promise<void> {
 
     case 'verify':
       commandVerify(projectId);
+      return;
+
+    case 'ingest':
+      commandIngest();
       return;
 
     case 'adapter':
