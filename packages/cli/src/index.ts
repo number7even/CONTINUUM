@@ -91,6 +91,9 @@ COMMANDS
   init           Create the project DB and print MCP registration snippet.
                  Auto-imports ./STATE.md as the first checkpoint if found
                  and no checkpoints exist yet.
+                 --guided : the 5-minute cold start — also writes .mcp.json
+                 for you (merges, never clobbers) and records a seed checkpoint
+                 so get_state is warm on the very first session.
   start          Run the MCP stdio server for this project.
   serve          Run the MCP HTTP/SSE server (V1 — remote / hosted clients).
                  Requires $CONTINUUM_HTTP_TOKEN (Bearer shared secret).
@@ -103,6 +106,8 @@ COMMANDS
   verify         Re-run every verify_command in the latest snapshot. Exit code
                  = number of failures (0 = all green). Use this to confirm
                  state-snapshot claims are still true on the current machine.
+                 --json : emit {name, section, verifyCommand, exitCode, state}
+                 per entry (state = DONE|FAILED|SKIPPED) — feeds the 6-state UI.
   adapter        Run a source adapter (docs|git) once, or with --watch as a
                  long-running daemon that re-syncs on file change.
                  Examples:
@@ -366,7 +371,33 @@ async function commandUpgrade(projectId: string): Promise<void> {
   }
 }
 
+/** Write or merge the `continuum` MCP server into a project-local `.mcp.json`,
+ *  never clobbering other servers. Returns what happened for the operator note. */
+function writeOrMergeMcpJson(
+  mcpPath: string,
+  server: Record<string, unknown>,
+): 'created' | 'merged' | 'error' {
+  try {
+    if (existsSync(mcpPath)) {
+      const cfg = JSON.parse(readFileSync(mcpPath, 'utf-8')) as {
+        mcpServers?: Record<string, unknown>;
+      };
+      cfg.mcpServers = cfg.mcpServers ?? {};
+      cfg.mcpServers.continuum = server;
+      writeFileSync(mcpPath, JSON.stringify(cfg, null, 2) + '\n');
+      return 'merged';
+    }
+    writeFileSync(mcpPath, JSON.stringify({ mcpServers: { continuum: server } }, null, 2) + '\n');
+    return 'created';
+  } catch {
+    return 'error';
+  }
+}
+
 function commandInit(projectId: string, stateMdOverride: string | undefined): void {
+  // --guided: the 5-minute cold start. Detect the project, auto-write .mcp.json,
+  // and seed a checkpoint so the user's very first `get_state` is never empty.
+  const guided = process.argv.includes('--guided');
   const storage = openStorage(projectId);
   const dataPath = storage.dataLocation();
 
@@ -374,17 +405,69 @@ function commandInit(projectId: string, stateMdOverride: string | undefined): vo
   // AND no checkpoints exist yet (avoid noise on re-running init).
   const stateMdPath = resolveStateMdPath(stateMdOverride);
   const existingSnapshots = storage.listSnapshots(1);
+  let hasCheckpoint = existingSnapshots.length > 0;
   let stateMdNote = '';
   if (existsSync(stateMdPath) && existingSnapshots.length === 0) {
     const summary = importStateMdInto(storage, stateMdPath, 'continuum init');
     printStateMdSummary(summary, stateMdPath);
     if (summary.imported) {
+      hasCheckpoint = true;
       stateMdNote =
         `\n  Auto-imported STATE.md as first checkpoint (${summary.snapshotId!.slice(0, 8)}).`;
     }
   } else if (existsSync(stateMdPath) && existingSnapshots.length > 0) {
     stateMdNote =
       `\n  STATE.md detected but checkpoints already exist — skipping auto-import.\n  Use 'continuum import-state' to force a fresh checkpoint from STATE.md.`;
+  }
+
+  // Find the MCP server binary so the registration snippet is copy-paste ready.
+  // Resolve through node's module resolution rather than guessing paths — this
+  // makes the printed snippet correct whether @number7even/continuum-mcp-server was
+  // installed via npx, npm install -g, or as a workspace dep.
+  let mcpServerBinPath: string;
+  try {
+    const main = import.meta.resolve('@number7even/continuum-mcp-server');
+    mcpServerBinPath = new URL(main).pathname;
+  } catch {
+    mcpServerBinPath = '<install-@number7even/continuum-mcp-server-first>';
+  }
+  const continuumServer = {
+    command: 'node',
+    args: [mcpServerBinPath],
+    env: { CONTINUUM_PROJECT_ID: projectId },
+  };
+  const mcpSnippet = { mcpServers: { continuum: continuumServer } };
+
+  // GUIDED extras — write .mcp.json for the operator + seed a checkpoint.
+  let guidedNote = '';
+  if (guided) {
+    const mcpPath = joinPath(process.cwd(), '.mcp.json');
+    const wrote = writeOrMergeMcpJson(mcpPath, continuumServer);
+    guidedNote +=
+      wrote === 'created' ? `\n  ✓ Wrote .mcp.json (continuum registered — no hand-editing).`
+      : wrote === 'merged' ? `\n  ✓ Merged 'continuum' into your existing .mcp.json (other servers untouched).`
+      : `\n  ⚠ Could not write .mcp.json — add the snippet below manually.`;
+
+    // Seed a checkpoint so `get_state` returns something on the first try. Only
+    // when there's no checkpoint yet and the .mcp.json registration is in place
+    // (its verifyCommand proves that registration — verify-then-dissolve from day one).
+    if (!hasCheckpoint && wrote !== 'error') {
+      const seeded = storage.recordCheckpoint({
+        reason: 'continuum init --guided — seed checkpoint (project initialised, MCP registered)',
+        active: [
+          {
+            name: 'continuum-registered',
+            where: mcpPath,
+            verifyCommand: `grep -q '"continuum"' .mcp.json`,
+            verifiedAt: new Date().toISOString(),
+            description:
+              'Continuum registered as an MCP server for this project via `continuum init --guided`. This seed checkpoint means get_state is never empty on the first session.',
+          },
+        ],
+      });
+      hasCheckpoint = true;
+      guidedNote += `\n  ✓ Seed checkpoint recorded (${seeded.id.slice(0, 8)}) — get_state is warm from day one.`;
+    }
   }
 
   storage.close();
@@ -399,50 +482,35 @@ function commandInit(projectId: string, stateMdOverride: string | undefined): vo
       : `\n  ICM structure already present (${skipped.length} files) — left untouched.`;
   }
 
-  // Find the MCP server binary so the registration snippet is copy-paste ready.
-  // Resolve through node's module resolution rather than guessing paths — this
-  // makes the printed snippet correct whether @number7even/continuum-mcp-server was
-  // installed via npx, npm install -g, or as a workspace dep.
-  let mcpServerBinPath: string;
-  try {
-    // Resolve the package's main entry; the bin file in dist/index.js sits
-    // next to it (the package.json `bin` field points there).
-    const main = import.meta.resolve('@number7even/continuum-mcp-server');
-    mcpServerBinPath = new URL(main).pathname;
-  } catch {
-    mcpServerBinPath = '<install-@number7even/continuum-mcp-server-first>';
-  }
-
-  const mcpSnippet = {
-    mcpServers: {
-      continuum: {
-        command: 'node',
-        args: [mcpServerBinPath],
-        env: { CONTINUUM_PROJECT_ID: projectId },
-      },
-    },
-  };
+  const nextSteps = guided
+    ? [
+        `Next steps (guided):`,
+        `  1. Restart your AI client so it picks up the new .mcp.json.`,
+        `  2. Run \`continuum status\` — you'll already see the seed checkpoint.`,
+        `  3. Say "let's pick up where we left off" — your AI opens warm.`,
+        ``,
+      ]
+    : [
+        `MCP registration — add to ~/.claude.json or .mcp.json`,
+        `(or re-run \`continuum init --guided\` to write it for you):`,
+        ``,
+        JSON.stringify(mcpSnippet, null, 2),
+        ``,
+        `Next steps:`,
+        `  1. Add the snippet above to your AI client's MCP config.`,
+        `  2. Restart the client so it picks up the new server.`,
+        `  3. Run \`continuum status\` here to confirm the DB is reachable.`,
+        ``,
+      ];
 
   process.stdout.write(
     [
-      `✓ Continuum initialised`,
+      `✓ Continuum initialised${guided ? ' (guided)' : ''}`,
       ``,
       `  Project ID:  ${projectId}`,
-      `  Data path:   ${dataPath}${stateMdNote}${icmNote}`,
+      `  Data path:   ${dataPath}${stateMdNote}${guidedNote}${icmNote}`,
       ``,
-      `MCP registration — add to ~/.claude.json or .mcp.json:`,
-      ``,
-      JSON.stringify(mcpSnippet, null, 2),
-      ``,
-      `Next steps:`,
-      `  1. Add the snippet above to your AI client's MCP config.`,
-      `  2. Restart the client so it picks up the new server.`,
-      `  3. Run \`continuum status\` here to confirm the DB is reachable.`,
-      `  4. (Optional) If STATE.md was not auto-imported, run`,
-      `     'continuum import-state --state-md=./STATE.md' to capture`,
-      `     a fresh checkpoint, or use continuum_record_checkpoint from`,
-      `     inside your AI client.`,
-      ``,
+      ...nextSteps,
     ].join('\n'),
   );
 }
@@ -849,39 +917,69 @@ async function commandMigrate(projectId: string): Promise<void> {
 //     rest of the snapshot's health.
 //   - Empty snapshot / no verify_commands → exit 0 with a clear note.
 
-interface VerifyEntry {
-  section: 'active' | 'dormant' | 'broken';
+/** One verify result row in the 6-state observability model. `verify` produces
+ *  DONE / FAILED / SKIPPED; RUNNING / REVIEW / BLOCKED come from the live pipeline. */
+type VerifyState = 'DONE' | 'FAILED' | 'SKIPPED';
+interface VerifyResult {
   name: string;
+  section: 'active' | 'dormant' | 'broken';
   where: string;
-  verifyCommand: string;
+  verifyCommand: string | null;
+  exitCode: number | string | null;
+  state: VerifyState;
+  stderr?: string;
 }
 
 function commandVerify(projectId: string): void {
+  const json = process.argv.includes('--json');
   const storage = openStorage(projectId);
   try {
     const snapshot = storage.getStateAt();
     if (!snapshot) {
-      process.stdout.write(
-        `continuum verify — no snapshot found for project '${projectId}'.\n` +
-          `  Capture one via continuum_record_checkpoint inside an AI client,\n` +
-          `  or run 'continuum import-state' to import from STATE.md.\n`,
-      );
+      if (json) {
+        process.stdout.write(
+          JSON.stringify(
+            { project: projectId, snapshot: null, summary: { pass: 0, fail: 0, skipped: 0, total: 0 }, entries: [] },
+            null,
+            2,
+          ) + '\n',
+        );
+      } else {
+        process.stdout.write(
+          `continuum verify — no snapshot found for project '${projectId}'.\n` +
+            `  Capture one via continuum_record_checkpoint inside an AI client,\n` +
+            `  or run 'continuum import-state' to import from STATE.md.\n`,
+        );
+      }
       process.exit(0);
     }
 
-    const entries: VerifyEntry[] = [
-      ...snapshot.active
-        .filter(e => e.verifyCommand?.trim())
-        .map(e => ({ section: 'active' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand! })),
-      ...snapshot.dormant
-        .filter(e => e.verifyCommand?.trim())
-        .map(e => ({ section: 'dormant' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand! })),
-      ...snapshot.broken
-        .filter(e => e.verifyCommand?.trim())
-        .map(e => ({ section: 'broken' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand! })),
+    // Every entry, flagged by section; those without a verify_command are SKIPPED.
+    const rows = [
+      ...snapshot.active.map(e => ({ section: 'active' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand })),
+      ...snapshot.dormant.map(e => ({ section: 'dormant' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand })),
+      ...snapshot.broken.map(e => ({ section: 'broken' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand })),
     ];
+    const runnable = rows.filter(r => r.verifyCommand?.trim());
 
-    if (entries.length === 0) {
+    if (runnable.length === 0) {
+      if (json) {
+        process.stdout.write(
+          JSON.stringify(
+            {
+              project: projectId,
+              snapshot: snapshot.id,
+              timestamp: snapshot.timestamp,
+              reason: snapshot.reason,
+              summary: { pass: 0, fail: 0, skipped: rows.length, total: rows.length },
+              entries: rows.map(r => ({ name: r.name, section: r.section, where: r.where, verifyCommand: r.verifyCommand ?? null, exitCode: null, state: 'SKIPPED' as const })),
+            },
+            null,
+            2,
+          ) + '\n',
+        );
+        process.exit(0);
+      }
       process.stdout.write(
         `continuum verify — snapshot ${snapshot.id.slice(0, 8)} has no entries with verify_command.\n` +
           `  Reason: ${snapshot.reason}\n` +
@@ -890,23 +988,33 @@ function commandVerify(projectId: string): void {
       process.exit(0);
     }
 
-    process.stdout.write(
-      `continuum verify — project '${projectId}' · snapshot ${snapshot.id.slice(0, 8)}\n` +
-        `  captured ${snapshot.timestamp}\n` +
-        `  reason:  ${snapshot.reason}\n` +
-        `  running ${entries.length} verify_command${entries.length === 1 ? '' : 's'}…\n\n`,
-    );
+    if (!json) {
+      process.stdout.write(
+        `continuum verify — project '${projectId}' · snapshot ${snapshot.id.slice(0, 8)}\n` +
+          `  captured ${snapshot.timestamp}\n` +
+          `  reason:  ${snapshot.reason}\n` +
+          `  running ${runnable.length} verify_command${runnable.length === 1 ? '' : 's'}…\n\n`,
+      );
+    }
 
+    const results: VerifyResult[] = [];
     let failures = 0;
-    for (const entry of entries) {
+    for (const r of rows) {
+      if (!r.verifyCommand?.trim()) {
+        // 6-state model: no proof attached → SKIPPED (a soft state, not a failure).
+        results.push({ name: r.name, section: r.section, where: r.where, verifyCommand: null, exitCode: null, state: 'SKIPPED' });
+        if (!json) process.stdout.write(`  ⊘ [${r.section}] ${r.name} — skipped (no verify_command)\n`);
+        continue;
+      }
       try {
-        execSync(entry.verifyCommand, {
+        execSync(r.verifyCommand, {
           stdio: 'pipe',
           timeout: 30_000,
           // Run from cwd of the CLI invocation. Verify commands are
           // intentionally repo-relative (grep, curl, fly status, etc.).
         });
-        process.stdout.write(`  ✓ [${entry.section}] ${entry.name}\n`);
+        results.push({ name: r.name, section: r.section, where: r.where, verifyCommand: r.verifyCommand, exitCode: 0, state: 'DONE' });
+        if (!json) process.stdout.write(`  ✓ [${r.section}] ${r.name}\n`);
       } catch (err) {
         failures++;
         const e = err as NodeJS.ErrnoException & {
@@ -918,28 +1026,45 @@ function commandVerify(projectId: string): void {
         const exitCode = e.status ?? (e.signal ? `signal=${e.signal}` : 'unknown');
         const stderr = e.stderr?.toString().trim() ?? '';
         const stdoutTail = e.stdout?.toString().trim() ?? '';
-        process.stdout.write(
-          `  ✗ [${entry.section}] ${entry.name} — exit ${exitCode}\n` +
-            `      where:   ${entry.where}\n` +
-            `      command: ${entry.verifyCommand}\n`,
-        );
-        if (stderr) {
+        results.push({ name: r.name, section: r.section, where: r.where, verifyCommand: r.verifyCommand, exitCode, state: 'FAILED', stderr: stderr || stdoutTail || undefined });
+        if (!json) {
           process.stdout.write(
-            `      stderr:  ${stderr.slice(-200).replace(/\n/g, '\n               ')}\n`,
+            `  ✗ [${r.section}] ${r.name} — exit ${exitCode}\n` +
+              `      where:   ${r.where}\n` +
+              `      command: ${r.verifyCommand}\n`,
           );
-        } else if (stdoutTail) {
-          // No stderr but stdout might explain — show tail.
-          process.stdout.write(
-            `      stdout:  ${stdoutTail.slice(-200).replace(/\n/g, '\n               ')}\n`,
-          );
+          if (stderr) {
+            process.stdout.write(`      stderr:  ${stderr.slice(-200).replace(/\n/g, '\n               ')}\n`);
+          } else if (stdoutTail) {
+            process.stdout.write(`      stdout:  ${stdoutTail.slice(-200).replace(/\n/g, '\n               ')}\n`);
+          }
         }
       }
     }
 
-    const passes = entries.length - failures;
-    process.stdout.write(
-      `\nSummary: ${passes} pass · ${failures} fail (exit ${failures})\n`,
-    );
+    const passes = results.filter(r => r.state === 'DONE').length;
+    const skipped = results.filter(r => r.state === 'SKIPPED').length;
+
+    if (json) {
+      process.stdout.write(
+        JSON.stringify(
+          {
+            project: projectId,
+            snapshot: snapshot.id,
+            timestamp: snapshot.timestamp,
+            reason: snapshot.reason,
+            summary: { pass: passes, fail: failures, skipped, total: results.length },
+            entries: results.map(r => ({ name: r.name, section: r.section, where: r.where, verifyCommand: r.verifyCommand, exitCode: r.exitCode, state: r.state })),
+          },
+          null,
+          2,
+        ) + '\n',
+      );
+    } else {
+      process.stdout.write(
+        `\nSummary: ${passes} pass · ${failures} fail${skipped ? ` · ${skipped} skipped` : ''} (exit ${failures})\n`,
+      );
+    }
     process.exit(failures);
   } finally {
     storage.close();
