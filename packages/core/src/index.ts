@@ -91,3 +91,7 @@ export {
 // pure functions. The HTTP/SSE auth middleware (W27-3) maps `null` to
 // HTTP 400; stdio resolution falls back to CONTINUUM_PROJECT_ID env.
 export { sanitiseTenantId, tenantDataDir } from './tenant.js';
+
+// The PM brain — actionable-task computation over the todo dependency DAG.
+export { computeNextTasks } from './next-tasks.js';
+export type { NextTasksResult, RankedTask, NextTaskState } from './next-tasks.js';

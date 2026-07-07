@@ -29,8 +29,10 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
 import Database from 'better-sqlite3';
 import {
+  computeNextTasks,
   openStorage,
   parseStateMdToCheckpoint,
+  type RankedTask,
   type StorageBackend,
 } from '@number7even/continuum-core';
 
@@ -104,6 +106,10 @@ COMMANDS
                  (idempotent; --force refreshes templates) + report engine updates.
   import-state   Parse a STATE.md and record it as a new checkpoint. Always
                  creates a checkpoint (use this to re-snapshot after edits).
+  next           The PM brain — "what should I work on next?" Reads the todo
+                 dependency DAG and prints the ACTIONABLE set (unblocked, not
+                 done), ordered by downstream leverage, each with its state,
+                 verify_command, and dossier refs. --json for the raw payload.
   verify         Re-run every verify_command in the latest snapshot. Exit code
                  = number of failures (0 = all green). Use this to confirm
                  state-snapshot claims are still true on the current machine.
@@ -1268,6 +1274,60 @@ function commandIngest(): void {
   );
 }
 
+// ── continuum next (the PM brain — "what's next?") ───────────────────────────
+
+const truncate = (s: string, n: number): string => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + '…' : s);
+
+function stateGlyph(s: RankedTask['state']): string {
+  return s === 'READY' ? '○' : s === 'RUNNING' ? '◐' : s === 'BLOCKED' ? '⊘' : '✓';
+}
+
+function commandNext(projectId: string): void {
+  const json = process.argv.includes('--json');
+  const storage = openStorage(projectId);
+  try {
+    const result = computeNextTasks(storage.listTodos());
+    if (json) {
+      process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      return;
+    }
+    if (result.total === 0) {
+      process.stdout.write(
+        `continuum next — no todos in project '${projectId}'.\n` +
+          `  Create tasks via continuum_create_todo inside your AI client.\n`,
+      );
+      return;
+    }
+    process.stdout.write(
+      `continuum next — project '${projectId}' · ${result.actionable.length} actionable · ` +
+        `${result.blocked.length} blocked · ${result.done}/${result.total} done\n\n`,
+    );
+    if (result.actionable.length === 0) {
+      process.stdout.write(`  Nothing actionable — every open task is blocked. See the critical path below.\n\n`);
+    } else {
+      process.stdout.write(`DO NEXT (unblocked, highest leverage first):\n`);
+      for (const t of result.actionable) {
+        const lev = t.leverage > 0 ? ` · unblocks ${t.leverage}` : '';
+        const dossier = t.refs.length ? ` · dossier ${t.refs.length}` : '';
+        process.stdout.write(`  ${stateGlyph(t.state)} [${t.state}] ${truncate(t.title, 60)}${lev}${dossier}\n`);
+        const vc = t.hasVerify ? `verify: ${truncate(t.verifyCommand!, 50)}` : '⚠ no verify_command';
+        process.stdout.write(`      ${t.id.slice(0, 8)} · ${vc}\n`);
+      }
+    }
+    if (result.blocked.length) {
+      process.stdout.write(`\nBLOCKED (waiting on upstream):\n`);
+      for (const t of result.blocked.slice(0, 10)) {
+        process.stdout.write(
+          `  ⊘ ${truncate(t.title, 58)} — needs ${t.blockedByOpen.map(id => id.slice(0, 8)).join(', ')}\n`,
+        );
+      }
+    }
+    process.stdout.write(`\n`);
+  } finally {
+    storage.close();
+  }
+}
+
 // ── continuum start ───────────────────────────────────────────────────────────
 
 async function commandStart(projectId: string): Promise<void> {
@@ -1339,6 +1399,10 @@ async function main(): Promise<void> {
 
     case 'ingest':
       commandIngest();
+      return;
+
+    case 'next':
+      commandNext(projectId);
       return;
 
     case 'adapter':
