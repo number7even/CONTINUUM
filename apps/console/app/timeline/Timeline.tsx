@@ -12,8 +12,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 type ItemKind = 'commit' | 'doc' | 'code' | 'concept' | 'memory';
-interface Item { id: string; kind: ItemKind; title: string; ts: string; refs: string[] }
-interface Session { start: string; end: string; items: Item[]; counts: Record<ItemKind, number> }
+interface Item { id: string; kind: ItemKind; title: string; ts: string; refs: string[]; checkpoint: boolean }
+interface Session { start: string; end: string; items: Item[]; counts: Record<ItemKind, number>; checkpoints: number }
 interface Day { date: string; sessions: Session[]; total: number }
 
 const KIND: Record<ItemKind, { color: string; label: string }> = {
@@ -64,14 +64,19 @@ export default function Timeline() {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 25000); // never hang on a bare "loading"
     try {
-      const r = await fetch('/api/timeline', { cache: 'no-store' });
+      const r = await fetch('/api/timeline', { cache: 'no-store', signal: ctrl.signal });
       const d = await r.json();
       if (d.error && d.error !== 'login') throw new Error(d.error);
       setDays(d.days ?? []);
       if (d.error === 'login') setError('not authenticated — set CONTINUUM_HTTP_TOKEN');
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(e instanceof Error && e.name === 'AbortError'
+        ? 'timed out fetching history — the engine may be warming up (dev first-compile). hit ↻ to retry.'
+        : (e instanceof Error ? e.message : String(e)));
+    } finally { clearTimeout(timer); setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
 
@@ -97,8 +102,38 @@ export default function Timeline() {
         </div>
       </header>
 
-      {error && <div style={{ color: '#f87171', padding: 14, fontSize: 13 }}>⚠ {error}</div>}
-      {loading && <div style={{ color: '#f59e0b', padding: 14, fontSize: 13 }}>…loading history</div>}
+      {error && (
+        <div style={{ padding: 14, fontSize: 13, display: 'flex', gap: 12, alignItems: 'center' }}>
+          <span style={{ color: '#f87171' }}>⚠ {error}</span>
+          <button type="button" onClick={() => void load()} style={s.navlink}>↻ retry</button>
+        </div>
+      )}
+      {loading && (
+        <div style={{ ...s.scroll, paddingTop: 22 }}>
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 14 }}>reading the session history…</div>
+          {[0, 1, 2].map((i) => (
+            <div key={i} style={{ ...s.sprint, marginBottom: 18 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ ...sk, width: 90, height: 12 }} />
+                <span style={{ ...sk, width: 130, height: 10 }} />
+                <span style={{ ...sk, marginLeft: 'auto', width: 60, height: 10 }} />
+              </div>
+              {[0, 1].map((j) => (
+                <div key={j} style={{ marginLeft: 12, marginBottom: 10 }}>
+                  <span style={{ ...sk, width: 160, height: 11, display: 'block', marginBottom: 8 }} />
+                  {[0, 1, 2].map((k) => (
+                    <div key={k} style={{ display: 'flex', gap: 8, marginBottom: 6, marginLeft: 12 }}>
+                      <span style={{ ...sk, width: 8, height: 8, borderRadius: 4 }} />
+                      <span style={{ ...sk, width: `${45 + ((i + j + k) % 4) * 12}%`, height: 10 }} />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+          <style>{`@keyframes tlshimmer { 0% { opacity: .35 } 50% { opacity: .7 } 100% { opacity: .35 } }`}</style>
+        </div>
+      )}
       {!loading && !error && days.length === 0 && (
         <div style={{ color: '#6b7280', padding: 14, fontSize: 13 }}>no history yet — run the git/docs adapters or work a session with CONTINUUM registered.</div>
       )}
@@ -157,7 +192,8 @@ export default function Timeline() {
                       <div key={si} style={s.session}>
                         <div style={s.sessionHead} onClick={() => isolateInBrain(ss.items.map((it) => it.id))}>
                           <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: '#9ca3af' }}>{hhmm(ss.start)}–{hhmm(ss.end)}</span>
-                          <span style={{ display: 'flex', gap: 5 }}>
+                          <span style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                            {ss.checkpoints > 0 && <span style={{ ...s.badge, color: '#fbbf24', background: 'rgba(251,191,36,0.12)' }}>◆ {ss.checkpoints}</span>}
                             {(Object.keys(KIND) as ItemKind[]).filter((k) => ss.counts[k]).map((k) => (
                               <span key={k} style={{ ...s.badge, color: KIND[k].color }}>{ss.counts[k]} {KIND[k].label}</span>
                             ))}
@@ -166,11 +202,20 @@ export default function Timeline() {
                         </div>
                         <div>
                           {ss.items.map((it) => (
-                            <div key={it.id} style={s.item} onClick={() => isolateInBrain([it.id, ...it.refs])}>
-                              <span style={{ width: 7, height: 7, borderRadius: 4, background: KIND[it.kind].color, flexShrink: 0 }} />
-                              <span style={{ fontSize: 9, color: '#6b7280', width: 34, flexShrink: 0 }}>{hhmm(it.ts)}</span>
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#d1d5db' }}>{it.title}</span>
-                            </div>
+                            it.checkpoint ? (
+                              <div key={it.id} style={s.checkpoint} onClick={() => isolateInBrain([it.id, ...it.refs])}>
+                                <span style={{ color: '#fbbf24', fontSize: 12, flexShrink: 0 }}>◆</span>
+                                <span style={{ fontSize: 8.5, letterSpacing: 1, color: '#fbbf24', flexShrink: 0 }}>CHECKPOINT</span>
+                                <span style={{ fontSize: 9, color: '#a16207', width: 34, flexShrink: 0 }}>{hhmm(it.ts)}</span>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fde68a' }}>{it.title}</span>
+                              </div>
+                            ) : (
+                              <div key={it.id} style={s.item} onClick={() => isolateInBrain([it.id, ...it.refs])}>
+                                <span style={{ width: 7, height: 7, borderRadius: 4, background: KIND[it.kind].color, flexShrink: 0 }} />
+                                <span style={{ fontSize: 9, color: '#6b7280', width: 34, flexShrink: 0 }}>{hhmm(it.ts)}</span>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#d1d5db' }}>{it.title}</span>
+                              </div>
+                            )
                           ))}
                         </div>
                       </div>
@@ -193,6 +238,7 @@ export default function Timeline() {
               return acc;
             }, {} as Record<ItemKind, number>);
             const total = sprintDays.reduce((n, d) => n + d.total, 0);
+            const spCheckpoints = sprintDays.flatMap((d) => d.sessions).reduce((n, ss) => n + ss.checkpoints, 0);
             const isolateSprint = () => isolateInBrain(sprintDays.flatMap((d) => d.sessions).flatMap((ss) => ss.items.map((it) => it.id)));
             return (
               <div key={key} style={s.sprint}>
@@ -201,6 +247,7 @@ export default function Timeline() {
                   <span style={{ fontSize: 12, letterSpacing: 1.5, color: '#a78bfa', fontWeight: 700 }}>SPRINT · {meta.label}</span>
                   <span style={{ fontSize: 11, color: '#6b7280' }}>{meta.range} · {total} events</span>
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 5, alignItems: 'center' }}>
+                    {spCheckpoints > 0 && <span style={{ ...s.badge, color: '#fbbf24', background: 'rgba(251,191,36,0.12)' }}>◆ {spCheckpoints}</span>}
                     {(Object.keys(KIND) as ItemKind[]).filter((k) => spCounts[k]).map((k) => (
                       <span key={k} style={{ ...s.badge, color: KIND[k].color }}>{spCounts[k]} {KIND[k].label}</span>
                     ))}
@@ -217,6 +264,8 @@ export default function Timeline() {
   );
 }
 
+const sk: React.CSSProperties = { display: 'inline-block', background: 'rgba(255,255,255,0.08)', borderRadius: 4, animation: 'tlshimmer 1.4s ease-in-out infinite' };
+
 const s: Record<string, React.CSSProperties> = {
   root: { position: 'fixed', inset: 0, background: '#05070a', color: '#e5e7eb', fontFamily: 'ui-sans-serif, system-ui', display: 'flex', flexDirection: 'column' },
   header: { display: 'flex', alignItems: 'center', padding: '14px 22px', borderBottom: '1px solid rgba(255,255,255,0.06)' },
@@ -229,4 +278,5 @@ const s: Record<string, React.CSSProperties> = {
   session: { marginBottom: 12 },
   sessionHead: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', marginBottom: 4 },
   item: { display: 'flex', alignItems: 'center', gap: 8, padding: '3px 8px', fontSize: 12, cursor: 'pointer', borderRadius: 6 },
+  checkpoint: { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', fontSize: 12, cursor: 'pointer', borderRadius: 6, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)', margin: '3px 0' },
 };

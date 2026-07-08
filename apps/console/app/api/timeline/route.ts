@@ -20,9 +20,16 @@ export const maxDuration = 60;
 
 export type ItemKind = 'commit' | 'doc' | 'code' | 'concept' | 'memory';
 interface Obs { id: string; sourceId?: string; type?: string; content?: string; timestamp?: string; refs?: string[] }
-export interface TimelineItem { id: string; kind: ItemKind; title: string; ts: string; refs: string[] }
-export interface Session { start: string; end: string; items: TimelineItem[]; counts: Record<ItemKind, number> }
+export interface TimelineItem { id: string; kind: ItemKind; title: string; ts: string; refs: string[]; checkpoint: boolean }
+export interface Session { start: string; end: string; items: TimelineItem[]; counts: Record<ItemKind, number>; checkpoints: number }
 export interface Day { date: string; sessions: Session[]; total: number }
+
+// A checkpoint = a verified milestone (record_checkpoint stamp / "SPRINT CLOSED" /
+// reproducible-via marker). These form the auditable chain of truth.
+function isCheckpoint(o: Obs): boolean {
+  const first = (o.content ?? '').split('\n')[0] ?? ''; // subject only — avoid body false-positives
+  return /\bcheckpoint\b|\bstamp\s+[0-9a-f]{6,}|verify[-\s]?green|SPRINT[-\s]?W?\d+\s+CLOSED/i.test(first);
+}
 
 const SESSION_GAP_MS = 90 * 60 * 1000; // >90 min idle → a new session
 
@@ -113,10 +120,11 @@ export async function GET(): Promise<Response> {
       let last = 0;
       const flush = () => {
         if (!cur.length) return;
-        const items: TimelineItem[] = cur.map(o => ({ id: o.id, kind: kindOf(o), title: titleOf(o), ts: o.timestamp!, refs: o.refs ?? [] }));
+        const items: TimelineItem[] = cur.map(o => ({ id: o.id, kind: kindOf(o), title: titleOf(o), ts: o.timestamp!, refs: o.refs ?? [], checkpoint: isCheckpoint(o) }));
         const counts = { commit: 0, doc: 0, code: 0, concept: 0, memory: 0 } as Record<ItemKind, number>;
         for (const it of items) counts[it.kind]++;
-        sessions.push({ start: cur[0]!.timestamp!, end: cur[cur.length - 1]!.timestamp!, items, counts });
+        const checkpoints = items.filter(it => it.checkpoint).length;
+        sessions.push({ start: cur[0]!.timestamp!, end: cur[cur.length - 1]!.timestamp!, items, counts, checkpoints });
         cur = [];
       };
       for (const o of asc) {
