@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import type { GraphData, GraphNode } from './lib';
 import { useVoice, VoiceOrb } from './voice';
+import { ArianAvatar } from './ArianAvatar';
 
 // ── Lobe clustering (technique adapted from seo-os) ──────────────────────────
 // Nodes aren't force-simulated into a cloud; each is DETERMINISTICALLY placed in
@@ -886,7 +887,8 @@ export function BrainGraph({ data }: { data: GraphData }) {
             <div style={panel.sectionLabel}>TOP HUBS</div>
             {stats.topHubs.slice(0, 8).map((h) => (
               <div key={h.id} style={{ fontSize: 12, color: '#cbd5e1', margin: '3px 0', cursor: 'pointer' }}
-                onClick={() => setSelected(data.nodes.find((x) => x.id === h.id) ?? null)}>
+                onClick={() => { const n = nodeById.get(h.id); if (n) { setSelected(n); void openDossier(n); } }}
+                title="open in the right panel">
                 <span style={{ color: '#fbbf24' }}>{h.degree}</span> · {h.label.slice(0, 34)}
               </div>
             ))}
@@ -1085,6 +1087,13 @@ export function BrainGraph({ data }: { data: GraphData }) {
       {/* Matrix "enter the isolation" transition — files rain, then the node materialises. */}
       {matrixRain && <MatrixRain title={matrixRain.title} lines={matrixRain.lines} onDone={() => setMatrixRain(null)} />}
 
+      {/* ARIAN — the human face of the brain: reacts to the conversation + speaks the
+          grounded answers. You converse with her; she knows your project. */}
+      <ArianAvatar
+        state={voice.state}
+        caption={voice.state === 'speaking' ? answer?.text : (voice.interim || undefined)}
+      />
+
       {/* Voice orb — tap to talk. "show me AMF" · "search vault" · "status" · "read this" */}
       <VoiceOrb voice={voice} />
     </div>
@@ -1103,7 +1112,7 @@ const panel: Record<string, React.CSSProperties> = {
 };
 
 const dossierStyle: Record<string, React.CSSProperties> = {
-  panel: { position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, zIndex: 7, background: 'rgba(8,11,16,0.97)', borderLeft: '1px solid rgba(56,189,248,0.25)', padding: '18px 20px', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 40px rgba(0,0,0,0.6)', fontFamily: 'ui-sans-serif, system-ui' },
+  panel: { position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, zIndex: 7, background: 'rgba(8,11,16,0.97)', borderLeft: '1px solid rgba(56,189,248,0.25)', padding: '18px 20px 300px', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 40px rgba(0,0,0,0.6)', fontFamily: 'ui-sans-serif, system-ui' },
   btn: { fontSize: 11, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#e5e7eb' },
   content: { fontSize: 12, lineHeight: 1.55, color: '#d1d5db', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'ui-monospace, monospace', margin: 0 },
 };

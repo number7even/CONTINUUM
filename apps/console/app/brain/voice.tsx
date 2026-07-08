@@ -213,7 +213,7 @@ export function VoiceOrb({ voice }: { voice: Voice }) {
 }
 
 const orb: Record<string, React.CSSProperties> = {
-  wrap: { position: 'fixed', right: 28, bottom: 28, zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 },
+  wrap: { position: 'fixed', right: 28, bottom: 28, zIndex: 9, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 },
   caption: { fontFamily: 'ui-monospace, monospace', fontSize: 11, letterSpacing: 1.5, color: '#cbd5e1', background: 'rgba(10,14,20,0.85)', padding: '4px 10px', borderRadius: 12, maxWidth: 320, textAlign: 'center' },
   button: { width: 56, height: 56, borderRadius: '50%', background: 'radial-gradient(circle at 50% 40%, rgba(20,28,40,0.9), rgba(6,9,14,0.95))', border: '2px solid', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'box-shadow 200ms', flexShrink: 0 },
   dot: { width: 13, height: 13, borderRadius: '50%', display: 'block' },
