@@ -548,6 +548,23 @@ export function BrainGraph({ data }: { data: GraphData }) {
     prevIsolateRef.current = isolate;
   }, [isolate, selected, highlighted, nodeById]);
 
+  // Deep-link from the timeline: /brain?focus=id1,id2 → isolate that cluster on load.
+  const focusAppliedRef = useRef(false);
+  useEffect(() => {
+    if (focusAppliedRef.current || !ready || !data.nodes.length) return;
+    const focus = new URLSearchParams(window.location.search).get('focus');
+    if (!focus) return;
+    focusAppliedRef.current = true;
+    const ids = resolveAskIds(focus.split(',').map((s) => s.trim()).filter(Boolean));
+    if (!ids.length) return;
+    setAskNodes(ids);
+    const first = nodeById.get(ids[0]!);
+    if (first) setSelected(first);
+    setIsolate(true); // triggers the Matrix curtain + framing
+    const idSet = new Set(ids);
+    setTimeout(() => { try { graphRef.current?.zoomToFit(900, 90, (n: FGNode) => idSet.has(n.id)); } catch { /* noop */ } }, 140);
+  }, [ready, data.nodes, resolveAskIds, nodeById]);
+
   // Glue the radial menu to the node's live screen position (follows orbit/zoom).
   useEffect(() => {
     if (!menuNode || !ready) { setMenuPos(null); return; }
