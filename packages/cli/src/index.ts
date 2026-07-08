@@ -119,6 +119,8 @@ COMMANDS
                  Local path: git commits + markdown docs + exported code symbols &
                  call graph (inline codegraph bridge if a .codegraph index exists).
                  Remote URL: the remote-git adapter (gitingest digest).
+                 Code engine: CONTINUUM_CODE_ENGINE=cbm (+ CONTINUUM_CBM_BIN) uses
+                 codebase-memory-mcp (Hybrid LSP); default = inline codegraph bridge.
                  Project defaults to the repo's basename.
                  Examples:
                    continuum ingest --repo=/path/to/repo
@@ -1182,6 +1184,101 @@ function ingestCodegraph(projectId: string, dbPath: string): { symbols: number; 
   return { symbols, edges };
 }
 
+// ── codebase-memory-mcp bridge (opt-in via CONTINUUM_CODE_ENGINE=cbm) ─────────
+// The approved Hybrid-LSP engine. Indexes the repo, then pulls the raw structural
+// truth via query_graph (Cypher) — bypassing trace_path's constructor blind spot
+// — and maps it into canonical CONTINUUM observations with sym: edges. The inline
+// codegraph bridge remains the reversible fallback.
+
+function resolveCbmBin(): string | null {
+  const envBin = process.env.CONTINUUM_CBM_BIN;
+  if (envBin && existsSync(envBin)) return envBin;
+  try {
+    const p = execFileSync('which', ['codebase-memory-mcp'], { encoding: 'utf-8' }).trim();
+    if (p && existsSync(p)) return p;
+  } catch { /* not on PATH */ }
+  return null;
+}
+
+function runCbmTool(bin: string, tool: string, args: Record<string, unknown>): { rows?: unknown[][]; project?: string } {
+  const out = execFileSync(bin, ['cli', tool, JSON.stringify(args)], {
+    encoding: 'utf-8',
+    stdio: ['ignore', 'pipe', 'ignore'], // logs → stderr (ignored), result JSON → stdout
+    maxBuffer: 256 * 1024 * 1024,
+    timeout: 300_000,
+  });
+  return JSON.parse(out) as { rows?: unknown[][]; project?: string };
+}
+
+function ingestViaCbm(projectId: string, repoPath: string, bin: string): { symbols: number; edges: number } {
+  const idx = runCbmTool(bin, 'index_repository', { repo_path: repoPath });
+  const cbmProject = String(idx.project ?? '');
+  if (!cbmProject) throw new Error('codebase-memory-mcp index_repository returned no project id');
+  const strip = (qn: string): string => (qn.startsWith(cbmProject + '.') ? qn.slice(cbmProject.length + 1) : qn);
+  const symId = (qn: string): string => `sym:${strip(qn)}`;
+
+  // Symbols — ONE query for all node kinds (perf: each cbm cli call cold-starts the
+  // binary). Keep only code symbols + exported, filtered client-side (Cypher
+  // WHERE-on-boolean is unreliable here).
+  type Sym = { id: string; name: string; file: string; signature: string; docstring: string; kind: string };
+  const CODE_KINDS = ['function', 'method', 'class', 'interface', 'component'];
+  const symbols: Sym[] = [];
+  const exported = new Set<string>();
+  try {
+    const res = runCbmTool(bin, 'query_graph', {
+      project: cbmProject,
+      query: `MATCH (n) RETURN n.qualified_name, n.name, n.file_path, n.signature, n.docstring, n.is_exported, labels(n) LIMIT 50000`,
+    });
+    for (const row of res.rows ?? []) {
+      const [qn, name, file, sig, doc, exp, labels] = row as [string, string, string, string, string, unknown, unknown];
+      if (!qn) continue;
+      const isExp = exp === true || exp === 1 || exp === 'true' || exp === '1';
+      if (!isExp) continue;
+      const labelStr = (Array.isArray(labels) ? labels.join(',') : String(labels)).toLowerCase();
+      const kind = CODE_KINDS.find(k => labelStr.includes(k));
+      if (!kind) continue; // skip Section / Decorator / non-code nodes
+      const id = symId(qn);
+      symbols.push({ id, name: name ?? '', file: file ?? '', signature: sig ?? '', docstring: doc ?? '', kind });
+      exported.add(id);
+    }
+  } catch { /* leave symbols empty → caller falls back */ }
+
+  // Edges — ONE query, CALLS|IMPORTS union. Kept only among the exported set (no
+  // dangling refs), directional a → b as sym: ids.
+  const refs = new Map<string, Set<string>>();
+  try {
+    const res = runCbmTool(bin, 'query_graph', {
+      project: cbmProject,
+      query: `MATCH (a)-[:CALLS|IMPORTS]->(b) RETURN a.qualified_name, b.qualified_name LIMIT 200000`,
+    });
+    for (const row of res.rows ?? []) {
+      const a = symId(String(row[0] ?? '')), b = symId(String(row[1] ?? ''));
+      if (a === 'sym:' || b === 'sym:' || a === b) continue;
+      if (!exported.has(a) || !exported.has(b)) continue;
+      if (!refs.has(a)) refs.set(a, new Set());
+      refs.get(a)!.add(b);
+    }
+  } catch { /* no edges → symbols still ingest */ }
+
+  const now = new Date().toISOString();
+  const storage = openStorage(projectId);
+  let count = 0, edgeCount = 0;
+  try {
+    storage.upsertSource(`codegraph:${projectId}`, 'export', { adapter: 'codebase-memory-mcp', engine: 'cbm', project: cbmProject });
+    for (const s of symbols) {
+      const content = [`${s.name}${s.signature ? ' ' + s.signature : ''}`, s.file, (s.docstring || '').trim()].filter(Boolean).join('\n');
+      const rr = [...(refs.get(s.id) ?? [])];
+      if (storage.upsertObservation({ id: s.id, sourceId: `codegraph:${projectId}`, type: s.kind, content, timestamp: now, refs: rr, metadata: { adapter: 'codebase-memory-mcp', engine: 'cbm', file: s.file, kind: s.kind } })) {
+        count++;
+      }
+      edgeCount += rr.length;
+    }
+  } finally {
+    storage.close();
+  }
+  return { symbols: count, edges: edgeCount };
+}
+
 function commandIngest(): void {
   const { repo, project, docsDir } = parseIngestArgs(process.argv);
   if (!repo || !repo.trim()) {
@@ -1250,21 +1347,41 @@ function commandIngest(): void {
   process.stdout.write(`\n▸ docs — markdown in ${docsTarget}\n`);
   runAdapterOnce('docs', projectId, { docsDir: docsTarget });
 
-  // 3) code symbols + call graph (the architecture map)
-  const cgDb = joinPath(repoPath, '.codegraph', 'codegraph.db');
+  // 3) code symbols + call graph (the architecture map).
+  //    Engine select: CONTINUUM_CODE_ENGINE=cbm → codebase-memory-mcp (Hybrid LSP);
+  //    default → inline codegraph bridge (the safe, reversible baseline).
   process.stdout.write(`\n▸ code — exported symbols + call graph\n`);
-  if (existsSync(cgDb)) {
-    try {
-      const { symbols, edges } = ingestCodegraph(projectId, cgDb);
-      process.stdout.write(`  ✓ ${symbols} symbol(s) · ${edges} call/import edge(s) — directional code flow\n`);
-    } catch (err) {
-      process.stderr.write(`  ✗ codegraph ingest failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  const engine = (process.env.CONTINUUM_CODE_ENGINE ?? 'codegraph').toLowerCase();
+  let codeDone = false;
+  if (engine === 'cbm' || engine === 'codebase-memory') {
+    const cbmBin = resolveCbmBin();
+    if (cbmBin) {
+      try {
+        const { symbols, edges } = ingestViaCbm(projectId, repoPath, cbmBin);
+        process.stdout.write(`  ✓ [codebase-memory-mcp · Hybrid LSP] ${symbols} symbol(s) · ${edges} cross-file edge(s)\n`);
+        codeDone = true;
+      } catch (err) {
+        process.stderr.write(`  ✗ codebase-memory-mcp ingest failed: ${err instanceof Error ? err.message : String(err)} — falling back to inline codegraph\n`);
+      }
+    } else {
+      process.stdout.write(`  ⚠ CONTINUUM_CODE_ENGINE=cbm but binary not found — set CONTINUUM_CBM_BIN=/path/to/codebase-memory-mcp (or install it on PATH). Falling back to inline codegraph.\n`);
     }
-  } else {
-    process.stdout.write(
-      `  no .codegraph index — code structure skipped. To add it, run in the repo:\n` +
-        `    codegraph init -i     # then re-run: continuum ingest --repo=${repoPath}\n`,
-    );
+  }
+  if (!codeDone) {
+    const cgDb = joinPath(repoPath, '.codegraph', 'codegraph.db');
+    if (existsSync(cgDb)) {
+      try {
+        const { symbols, edges } = ingestCodegraph(projectId, cgDb);
+        process.stdout.write(`  ✓ [inline codegraph] ${symbols} symbol(s) · ${edges} call/import edge(s) — directional code flow\n`);
+      } catch (err) {
+        process.stderr.write(`  ✗ codegraph ingest failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      }
+    } else {
+      process.stdout.write(
+        `  no code index — for Hybrid LSP set CONTINUUM_CODE_ENGINE=cbm (+ CONTINUUM_CBM_BIN);\n` +
+          `  or for the inline bridge run 'codegraph init -i' in the repo, then re-run ingest.\n`,
+      );
+    }
   }
 
   process.stdout.write(
