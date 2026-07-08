@@ -18,6 +18,7 @@ import SpriteText from 'three-spritetext';
 import type { GraphData, GraphNode } from './lib';
 import { useVoice, VoiceOrb } from './voice';
 import { ArianAvatar } from './ArianAvatar';
+import { Markdown } from './md';
 
 // ── Lobe clustering (technique adapted from seo-os) ──────────────────────────
 // Nodes aren't force-simulated into a cloud; each is DETERMINISTICALLY placed in
@@ -1040,7 +1041,9 @@ export function BrainGraph({ data }: { data: GraphData }) {
             {dossier.loading && <div style={{ color: '#f59e0b', fontSize: 12 }}>…loading full record</div>}
             {dossier.error && <div style={{ color: '#f87171', fontSize: 12 }}>⚠ {dossier.error}</div>}
             {!dossier.loading && !dossier.error && !mindmapOn && !mermaidText && (
-              <pre style={dossierStyle.content}>{dossier.content}</pre>
+              dossier.node.source === 'docs' && dossier.content
+                ? <Markdown text={dossier.content} />
+                : <pre style={dossierStyle.content}>{dossier.content}</pre>
             )}
             {!dossier.loading && mermaidText && (
               <div>
