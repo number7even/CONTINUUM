@@ -30,21 +30,30 @@ const dayLabel = (d: string) => {
   catch { return d; }
 };
 
-// ── Sprint lanes — group days into fortnightly sprints (the PM planning unit) ──
-const sprintOf = (dateStr: string): number => Math.floor(Math.floor(new Date(dateStr + 'T00:00:00').getTime() / 86400000) / 14);
-const isoWeek = (d: Date): string => {
-  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+// ── Sprint lanes — detected from real commit tags (W22, W27…), ISO-week fallback ──
+const isoWeekNum = (dateStr: string): number => {
+  const d = new Date(dateStr + 'T00:00:00');
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayNum = (date.getUTCDay() + 6) % 7;
   date.setUTCDate(date.getUTCDate() - dayNum + 3);
   const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
-  const week = 1 + Math.round((date.getTime() - firstThursday.getTime()) / 86400000 / 7);
-  return `${date.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+  return 1 + Math.round((date.getTime() - firstThursday.getTime()) / 86400000 / 7);
 };
-const sprintMeta = (idx: number): { label: string; range: string } => {
-  const start = new Date(idx * 14 * 86400000);
-  const end = new Date((idx * 14 + 13) * 86400000);
-  const fmt = (dt: Date) => dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  return { label: isoWeek(start), range: `${fmt(start)} – ${fmt(end)}` };
+// Pull an explicit sprint tag (W27, W27-3, Sprint W22) from a commit subject.
+const tagFrom = (title: string): string | null => {
+  const m = title.match(/\bW(\d{1,2})(?:[-.]\d+)?\b/) || title.match(/\bSprint\s+W?(\d{1,2})\b/i);
+  return m ? 'W' + m[1] : null;
+};
+// A day's DOMINANT explicit sprint tag (majority commit tag), or null if untagged.
+const dominantTag = (day: Day): string | null => {
+  const counts: Record<string, number> = {};
+  for (const ss of day.sessions) for (const it of ss.items) {
+    if (it.kind !== 'commit' && it.kind !== 'memory') continue;
+    const t = tagFrom(it.title);
+    if (t) counts[t] = (counts[t] ?? 0) + 1;
+  }
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  return top ? top[0] : null;
 };
 
 export default function Timeline() {
@@ -96,10 +105,33 @@ export default function Timeline() {
 
       <div style={s.scroll}>
         {(() => {
-          // Group days into fortnightly SPRINT LANES (newest first).
-          const byS = new Map<number, Day[]>();
-          for (const day of days) { const i = sprintOf(day.date); if (!byS.has(i)) byS.set(i, []); byS.get(i)!.push(day); }
-          const sprints = [...byS.entries()].sort((a, b) => b[0] - a[0]);
+          // Sprint anchors from explicit tags (first-appearance order) define the
+          // real boundaries; untagged days fall into the containing sprint; days
+          // after the last tag continue as W28, W29… (weekly, no ISO-week collision).
+          const taggedDays = days.map((d) => ({ date: d.date, tag: dominantTag(d) })).filter((x): x is { date: string; tag: string } => !!x.tag);
+          taggedDays.sort((a, b) => a.date.localeCompare(b.date));
+          const anchors: { date: string; tag: string }[] = [];
+          { const seen = new Set<string>(); for (const td of taggedDays) if (!seen.has(td.tag)) { seen.add(td.tag); anchors.push(td); } }
+          const firstTagDate = anchors[0]?.date ?? '';
+          const lastTagDate = taggedDays.length ? taggedDays[taggedDays.length - 1]!.date : '';
+          const maxTagNum = anchors.reduce((m, a) => Math.max(m, parseInt(a.tag.slice(1), 10) || 0), 0);
+          const WEEK = 7 * 86400000;
+          const sprintForDay = (day: Day): string => {
+            const t = dominantTag(day);
+            if (t) return t;
+            if (!anchors.length) return 'W' + isoWeekNum(day.date);
+            if (day.date < firstTagDate) return 'W' + isoWeekNum(day.date);       // pre-era (lower #, no collision)
+            if (day.date <= lastTagDate) {                                        // within a tagged sprint window
+              let lbl = anchors[0]!.tag;
+              for (const a of anchors) { if (a.date <= day.date) lbl = a.tag; else break; }
+              return lbl;
+            }
+            const weeks = Math.floor((new Date(day.date + 'T00:00:00').getTime() - new Date(lastTagDate + 'T00:00:00').getTime()) / WEEK);
+            return 'W' + (maxTagNum + 1 + weeks);                                 // post-era: continue numbering
+          };
+          const byS = new Map<string, Day[]>();
+          for (const day of days) { const lbl = sprintForDay(day); if (!byS.has(lbl)) byS.set(lbl, []); byS.get(lbl)!.push(day); }
+          const sprints = [...byS.entries()].sort((a, b) => (b[1][0]?.date ?? '').localeCompare(a[1][0]?.date ?? ''));
 
           const renderDay = (day: Day) => {
             const isCol = collapsed.has(day.date);
@@ -149,9 +181,12 @@ export default function Timeline() {
             );
           };
 
-          return sprints.map(([idx, sprintDays]) => {
-            const meta = sprintMeta(idx);
-            const key = 'sprint:' + idx;
+          return sprints.map(([label, sprintDays]) => {
+            const key = 'sprint:' + label;
+            const dates = sprintDays.map((d) => d.date).sort();
+            const fmt = (ds: string) => new Date(ds + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            const range = dates.length ? (dates[0] === dates[dates.length - 1] ? fmt(dates[0]!) : `${fmt(dates[0]!)} – ${fmt(dates[dates.length - 1]!)}`) : '';
+            const meta = { label, range };
             const spCol = collapsed.has(key);
             const spCounts = sprintDays.flatMap((d) => d.sessions).reduce((acc, ss) => {
               (Object.keys(ss.counts) as ItemKind[]).forEach((k) => (acc[k] = (acc[k] ?? 0) + ss.counts[k]));
