@@ -46,6 +46,34 @@ export function useVoice(): Voice {
   const recRef = useRef<AnyRec>(null);
   const listeningRef = useRef(false);
   const nonceRef = useRef(0);
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+
+  // Pick the best available system voice for ARIAN (avoid the default robot).
+  // Prefer natural/premium/neural, then known-good female names, then Google,
+  // then any en-US. Voices load async → also listen for voiceschanged.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const pick = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return;
+      const en = voices.filter((v) => /^en/i.test(v.lang));
+      const pool = en.length ? en : voices;
+      const score = (v: SpeechSynthesisVoice): number => {
+        const n = v.name.toLowerCase();
+        let s = 0;
+        if (/natural|premium|enhanced|neural/.test(n)) s += 100;
+        if (/samantha|ava|allison|serena|zoe|karen|susan|moira|tessa|nicky|joanna|female/.test(n)) s += 50;
+        if (/google/.test(n)) s += 30;
+        if (/en[-_]us/i.test(v.lang)) s += 10;
+        if (v.localService) s += 5;
+        return s;
+      };
+      voiceRef.current = pool.slice().sort((a, b) => score(b) - score(a))[0] ?? null;
+    };
+    pick();
+    window.speechSynthesis.onvoiceschanged = pick;
+    return () => { try { window.speechSynthesis.onvoiceschanged = null; } catch { /* noop */ } };
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -110,7 +138,8 @@ export function useVoice(): Voice {
     try {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
-      u.rate = 1.02; u.pitch = 1.0;
+      if (voiceRef.current) u.voice = voiceRef.current;   // the chosen non-robot voice
+      u.rate = 0.98; u.pitch = 1.06;                       // slightly warmer, less flat
       u.onstart = () => setState('speaking');
       u.onend = backToRest;
       window.speechSynthesis.speak(u);
