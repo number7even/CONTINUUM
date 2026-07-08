@@ -19,6 +19,7 @@ import type { GraphData, GraphNode } from './lib';
 import { useVoice, VoiceOrb } from './voice';
 import { ArianAvatar } from './ArianAvatar';
 import { Markdown } from './md';
+import { MermaidDiagram } from './MermaidDiagram';
 
 // ── Lobe clustering (technique adapted from seo-os) ──────────────────────────
 // Nodes aren't force-simulated into a cloud; each is DETERMINISTICALLY placed in
@@ -267,8 +268,8 @@ export function BrainGraph({ data }: { data: GraphData }) {
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null); // its screen anchor
   const [reverseNode, setReverseNode] = useState<GraphNode | null>(null); // reverse-engineer diagram target
   const [dossier, setDossier] = useState<{ node: GraphNode; loading: boolean; content: string | null; meta: Record<string, unknown> | null; error?: string } | null>(null);
-  const [mindmapOn, setMindmapOn] = useState(false); // dossier: content view ⟷ mindmap view
-  const [mermaidText, setMermaidText] = useState<string | null>(null); // dossier: gitreverse-style mermaid map
+  // dossier: content ⟷ a rendered mermaid diagram (mermaid call-graph OR mindmap)
+  const [diagram, setDiagram] = useState<{ kind: 'mermaid' | 'mindmap'; code: string } | null>(null);
   const [matrixRain, setMatrixRain] = useState<{ title: string; lines: string[] } | null>(null); // "enter isolation" transition
   const prevIsolateRef = useRef(false);
   const [copied, setCopied] = useState(false);
@@ -302,6 +303,21 @@ export function BrainGraph({ data }: { data: GraphData }) {
     callers.forEach(({ node: n, verb }) => L.push(`  ${idOf.get(n.id)}["${lbl(n.label)}"] -->|${vb(verb)}| ${c}`));
     callees.forEach(({ node: n, verb }) => L.push(`  ${c} -->|${vb(verb)}| ${idOf.get(n.id)}["${lbl(n.label)}"]`));
     L.push(`  style ${c} fill:#0b1220,stroke:#38bdf8,stroke-width:2px,color:#e5e7eb`);
+    return L.join('\n');
+  };
+  // A top-down hub mind-map of a node's whole neighbourhood (radial, all relations).
+  const graphToMindmap = (node: GraphNode): string => {
+    const rel = neighborsOf(node.id).slice(0, 20);
+    const lbl = (s: string) => truncate(s.replace(/["\n|]/g, ' '), 30);
+    const vb = (v?: string) => (v || 'refs').replace(/[|"\n]/g, ' ');
+    const c = 'M0';
+    const L = ['graph TD', `  ${c}["${lbl(node.label)}"]`];
+    rel.forEach(({ node: n, verb, dir }, i) => {
+      const id = 'M' + (i + 1);
+      if (dir === '→') L.push(`  ${c} -->|${vb(verb)}| ${id}["${lbl(n.label)}"]`);
+      else L.push(`  ${id}["${lbl(n.label)}"] -->|${vb(verb)}| ${c}`);
+    });
+    L.push(`  style ${c} fill:#0b1220,stroke:#a78bfa,stroke-width:2px,color:#e5e7eb`);
     return L.join('\n');
   };
   // Dive into a node — select it, push the breadcrumb, focus its proximity.
@@ -394,8 +410,7 @@ export function BrainGraph({ data }: { data: GraphData }) {
   // Open the node DOSSIER — fetch its full verified content (Layer-3), no LLM.
   const openDossier = useCallback(async (node: GraphNode) => {
     setDossier({ node, loading: true, content: null, meta: null });
-    setMindmapOn(false);
-    setMermaidText(null);
+    setDiagram(null);
     setCopied(false);
     try {
       const r = await fetch('/api/observation', {
@@ -1028,61 +1043,38 @@ export function BrainGraph({ data }: { data: GraphData }) {
             <button type="button" style={{ ...dossierStyle.btn, background: voice.state === 'speaking' ? 'rgba(52,211,153,0.2)' : dossierStyle.btn.background }} disabled={!dossier.content}
               onClick={() => { if (voice.state === 'speaking') voice.stop(); else if (dossier.content) voice.speak(dossier.content); }}>
               {voice.state === 'speaking' ? '⏹ Stop' : '🔊 Read aloud'}</button>
-            <button type="button" style={{ ...dossierStyle.btn, background: mindmapOn ? 'rgba(56,189,248,0.2)' : dossierStyle.btn.background }}
-              onClick={() => { setMindmapOn((v) => !v); setMermaidText(null); }}>🧠 Mindmap</button>
-            <button type="button" style={{ ...dossierStyle.btn, background: mermaidText ? 'rgba(56,189,248,0.2)' : dossierStyle.btn.background }}
-              onClick={() => { setMermaidText((v) => (v ? null : graphToMermaid(dossier.node))); setMindmapOn(false); setCopied(false); }}>⤓ Mermaid</button>
+            <button type="button" style={{ ...dossierStyle.btn, background: diagram?.kind === 'mindmap' ? 'rgba(167,139,250,0.22)' : dossierStyle.btn.background }}
+              onClick={() => setDiagram((d) => (d?.kind === 'mindmap' ? null : { kind: 'mindmap', code: graphToMindmap(dossier.node) }))}>🧠 Mindmap</button>
+            <button type="button" style={{ ...dossierStyle.btn, background: diagram?.kind === 'mermaid' ? 'rgba(56,189,248,0.22)' : dossierStyle.btn.background }}
+              onClick={() => { setDiagram((d) => (d?.kind === 'mermaid' ? null : { kind: 'mermaid', code: graphToMermaid(dossier.node) })); setCopied(false); }}>⤓ Mermaid</button>
             <button type="button" style={dossierStyle.btn}
               onClick={() => { setReverseNode(dossier.node); }}>⊹ Reverse</button>
           </div>
 
-          {/* body: content OR mindmap */}
+          {/* body: content OR a rendered, draggable diagram (mindmap / mermaid) */}
           <div style={{ marginTop: 12, flex: 1, overflowY: 'auto', minHeight: 0 }}>
             {dossier.loading && <div style={{ color: '#f59e0b', fontSize: 12 }}>…loading full record</div>}
             {dossier.error && <div style={{ color: '#f87171', fontSize: 12 }}>⚠ {dossier.error}</div>}
-            {!dossier.loading && !dossier.error && !mindmapOn && !mermaidText && (
+            {!dossier.loading && !dossier.error && !diagram && (
               dossier.node.source === 'docs' && dossier.content
                 ? <Markdown text={dossier.content} />
                 : <pre style={dossierStyle.content}>{dossier.content}</pre>
             )}
-            {!dossier.loading && mermaidText && (
+            {!dossier.loading && diagram && (
               <div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                  <span style={{ fontSize: 10, letterSpacing: 1, color: '#38bdf8' }}>MERMAID MAP</span>
+                  <span style={{ fontSize: 10, letterSpacing: 1, color: diagram.kind === 'mindmap' ? '#a78bfa' : '#38bdf8' }}>
+                    {diagram.kind === 'mindmap' ? 'MINDMAP' : 'MERMAID MAP'}
+                  </span>
                   <button type="button" style={{ ...dossierStyle.btn, fontSize: 10, padding: '3px 8px' }}
-                    onClick={() => { navigator.clipboard?.writeText(mermaidText).then(() => { setCopied(true); }); }}>
-                    {copied ? '✓ copied' : '⧉ copy'}
+                    onClick={() => { navigator.clipboard?.writeText(diagram.code).then(() => { setCopied(true); }); }}>
+                    {copied ? '✓ copied' : '⧉ copy code'}
                   </button>
-                  <a href="https://mermaid.live" target="_blank" rel="noreferrer" style={{ fontSize: 10, color: '#a78bfa' }}>open mermaid.live ↗</a>
+                  <a href="https://mermaid.live" target="_blank" rel="noreferrer" style={{ fontSize: 10, color: '#a78bfa' }}>mermaid.live ↗</a>
                 </div>
-                <pre style={{ ...dossierStyle.content, fontSize: 11, background: 'rgba(255,255,255,0.03)', padding: 10, borderRadius: 6 }}>{mermaidText}</pre>
-                <div style={{ fontSize: 10, color: '#6b7280', marginTop: 6 }}>paste into GitHub, Notion, or mermaid.live to render the diagram</div>
+                <MermaidDiagram code={diagram.code} />
               </div>
             )}
-            {!dossier.loading && mindmapOn && !mermaidText && (() => {
-              const rel = neighborsOf(dossier.node.id);
-              const grp = (title: string, items: typeof rel, accent: string) => (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, letterSpacing: 1, color: accent, marginBottom: 4 }}>{title}</div>
-                  {items.length === 0 && <div style={{ fontSize: 11, color: '#6b7280', paddingLeft: 12 }}>none</div>}
-                  {items.slice(0, 20).map(({ node, verb }, k) => (
-                    <div key={node.id + k} onClick={() => { void openDossier(node); setSelected(node); }}
-                      style={{ cursor: 'pointer', fontSize: 12, color: '#e5e7eb', padding: '2px 0 2px 12px', borderLeft: `2px solid ${accent}`, marginLeft: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ width: 6, height: 6, borderRadius: 3, background: colorFor(nodeLobe.get(node.id) ?? 'cerebellum') }} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{truncate(node.label, 32)}</span>
-                      {verb && <span style={{ marginLeft: 'auto', fontSize: 9, color: '#6b7280' }}>{verb}</span>}
-                    </div>
-                  ))}
-                </div>
-              );
-              return (
-                <div>
-                  <div style={{ fontSize: 13, color: '#38bdf8', fontWeight: 600, marginBottom: 10 }}>◉ {truncate(dossier.node.label, 40)}</div>
-                  {grp('→ CALLS / USES', rel.filter((r) => r.dir === '→'), '#6ee7b7')}
-                  {grp('← CALLED BY / REFERS', rel.filter((r) => r.dir === '←'), '#f59e0b')}
-                </div>
-              );
-            })()}
           </div>
         </div>
       )}
