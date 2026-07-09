@@ -79,6 +79,24 @@ export interface StateEntry {
   verifiedAt: string;
   /** Operator-facing description. */
   description?: string;
+  /**
+   * The authorship seal (Authorship Ledger spec §3). When a human accepts this
+   * state at the P9 boundary, their consent is stamped here. Because
+   * canonicalStringify hashes every field at every depth, this binds the
+   * decision into the checkpoint's SHA-256 hash automatically — tampering with
+   * the referenced decision breaks the chain. Optional + additive: pre-seal
+   * checkpoints simply omit it.
+   */
+  acceptedBy?: {
+    /** WHO leapt — git user.email (local) or the authenticated account (hosted). */
+    operator: string;
+    /** The type='decision' Observation that captured the consent. */
+    decisionId: string;
+    /** SHA-256 of that decision's canonical consent record (self-integrity). */
+    decisionHash: string;
+    /** ISO-8601 timestamp of the acceptance. */
+    at: string;
+  };
 }
 
 /**
