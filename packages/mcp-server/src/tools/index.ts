@@ -28,6 +28,7 @@ import { checkBrandTool, handleCheckBrand } from './check-brand.js';
 import { graphTool, handleGraph } from './graph.js';
 import { kaizenRecordTool, handleKaizenRecord } from './kaizen-record.js';
 import { nextTasksTool, handleNextTasks } from './next-tasks.js';
+import { snapshotsTool, handleSnapshots } from './snapshots.js';
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   recordCheckpointTool,
@@ -45,6 +46,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   graphTool,
   kaizenRecordTool,
   nextTasksTool,
+  snapshotsTool,
 ] as const;
 
 const DISPATCH_TABLE: Record<string, ToolHandler> = {
@@ -62,6 +64,7 @@ const DISPATCH_TABLE: Record<string, ToolHandler> = {
   continuum_check_brand: handleCheckBrand,
   continuum_graph: handleGraph,
   continuum_next_tasks: handleNextTasks,
+  continuum_snapshots: handleSnapshots,
   continuum_kaizen_record: handleKaizenRecord,
 };
 
