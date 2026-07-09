@@ -9,7 +9,7 @@
  *
  * IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans
  */
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
 type ItemKind = 'commit' | 'doc' | 'code' | 'concept' | 'memory';
 interface Item { id: string; kind: ItemKind; title: string; ts: string; refs: string[]; checkpoint: boolean }
@@ -56,11 +56,53 @@ const dominantTag = (day: Day): string | null => {
   return top ? top[0] : null;
 };
 
+// Group days into sprint lanes (real tags → boundaries; ISO-week / continued fallback).
+interface Sprint { label: string; range: string; days: Day[] }
+const buildSprints = (days: Day[]): Sprint[] => {
+  const taggedDays = days.map((d) => ({ date: d.date, tag: dominantTag(d) })).filter((x): x is { date: string; tag: string } => !!x.tag);
+  taggedDays.sort((a, b) => a.date.localeCompare(b.date));
+  const anchors: { date: string; tag: string }[] = [];
+  { const seen = new Set<string>(); for (const td of taggedDays) if (!seen.has(td.tag)) { seen.add(td.tag); anchors.push(td); } }
+  const firstTag = anchors[0]?.date ?? '';
+  const lastTag = taggedDays.length ? taggedDays[taggedDays.length - 1]!.date : '';
+  const maxN = anchors.reduce((m, a) => Math.max(m, parseInt(a.tag.slice(1), 10) || 0), 0);
+  const WEEK = 7 * 86400000;
+  const forDay = (day: Day): string => {
+    const t = dominantTag(day);
+    if (t) return t;
+    if (!anchors.length || day.date < firstTag) return 'W' + isoWeekNum(day.date);
+    if (day.date <= lastTag) { let l = anchors[0]!.tag; for (const a of anchors) { if (a.date <= day.date) l = a.tag; else break; } return l; }
+    return 'W' + (maxN + 1 + Math.floor((new Date(day.date + 'T00:00:00').getTime() - new Date(lastTag + 'T00:00:00').getTime()) / WEEK));
+  };
+  const byS = new Map<string, Day[]>();
+  for (const day of days) { const l = forDay(day); if (!byS.has(l)) byS.set(l, []); byS.get(l)!.push(day); }
+  return [...byS.entries()].sort((a, b) => (b[1][0]?.date ?? '').localeCompare(a[1][0]?.date ?? '')).map(([label, sd]) => {
+    const dates = sd.map((d) => d.date).sort();
+    const fmt = (ds: string) => new Date(ds + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const range = dates.length ? (dates[0] === dates[dates.length - 1] ? fmt(dates[0]!) : `${fmt(dates[0]!)} – ${fmt(dates[dates.length - 1]!)}`) : '';
+    return { label, range, days: sd };
+  });
+};
+// Swimlane rows: a checkpoint lane on top, then the five source lanes.
+type Lane = 'checkpoint' | ItemKind;
+const LANES: { key: Lane; color: string; label: string }[] = [
+  { key: 'checkpoint', color: '#fbbf24', label: '◆ checkpoint' },
+  { key: 'commit', color: '#f59e0b', label: 'commit' },
+  { key: 'doc', color: '#34d399', label: 'doc' },
+  { key: 'code', color: '#f472b6', label: 'code' },
+  { key: 'concept', color: '#a78bfa', label: 'concept' },
+  { key: 'memory', color: '#38bdf8', label: 'memory' },
+];
+const laneItems = (sp: Sprint, lane: Lane): Item[] =>
+  sp.days.flatMap((d) => d.sessions).flatMap((ss) => ss.items).filter((it) => (lane === 'checkpoint' ? it.checkpoint : it.kind === lane && !it.checkpoint));
+
 export default function Timeline() {
   const [days, setDays] = useState<Day[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<'list' | 'swim'>('swim');
+  const sprints = useMemo(() => buildSprints(days), [days]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -95,7 +137,11 @@ export default function Timeline() {
             The receipt for "we did X." Click a session → isolate it in the brain.
           </div>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 2 }}>
+            <button type="button" onClick={() => setView('swim')} style={{ ...s.toggle, background: view === 'swim' ? 'rgba(167,139,250,0.25)' : 'transparent', color: view === 'swim' ? '#c4b5fd' : '#9ca3af' }}>▤ swimlanes</button>
+            <button type="button" onClick={() => setView('list')} style={{ ...s.toggle, background: view === 'list' ? 'rgba(167,139,250,0.25)' : 'transparent', color: view === 'list' ? '#c4b5fd' : '#9ca3af' }}>≡ list</button>
+          </div>
           <a href="/brain" style={s.navlink}>◉ brain</a>
           <a href="/board" style={s.navlink}>▦ board</a>
           <button type="button" onClick={() => void load()} style={s.navlink}>↻</button>
@@ -138,6 +184,7 @@ export default function Timeline() {
         <div style={{ color: '#6b7280', padding: 14, fontSize: 13 }}>no history yet — run the git/docs adapters or work a session with CONTINUUM registered.</div>
       )}
 
+      {!loading && !error && view === 'list' && (
       <div style={s.scroll}>
         {(() => {
           // Sprint anchors from explicit tags (first-appearance order) define the
@@ -260,6 +307,37 @@ export default function Timeline() {
           });
         })()}
       </div>
+      )}
+
+      {!loading && !error && view === 'swim' && (
+        <div style={{ flex: 1, overflow: 'auto', padding: '18px 22px' }}>
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 12 }}>lanes × sprints — click a cell to isolate that work in the brain</div>
+          <div style={{ display: 'grid', gridTemplateColumns: `132px repeat(${Math.max(1, sprints.length)}, minmax(94px, 1fr))`, gap: 6, minWidth: 'min-content', alignItems: 'stretch' }}>
+            <div style={{ position: 'sticky', left: 0 }} />
+            {sprints.map((sp) => (
+              <div key={sp.label} style={s.swimSprintHead} onClick={() => isolateInBrain(sp.days.flatMap((d) => d.sessions).flatMap((ss) => ss.items.map((it) => it.id)))} title="isolate this sprint">
+                <div style={{ color: '#a78bfa', fontWeight: 700, fontSize: 11 }}>{sp.label}</div>
+                <div style={{ color: '#6b7280', fontSize: 9 }}>{sp.range}</div>
+              </div>
+            ))}
+            {LANES.map((lane) => (
+              <Fragment key={lane.key}>
+                <div style={s.swimLaneLabel}><span style={{ width: 8, height: 8, borderRadius: 4, background: lane.color, flexShrink: 0 }} /> {lane.label}</div>
+                {sprints.map((sp) => {
+                  const items = laneItems(sp, lane.key);
+                  return (
+                    <div key={sp.label} title={items.length ? items.slice(0, 8).map((it) => it.title).join('\n') : ''}
+                      style={{ ...s.swimCell, cursor: items.length ? 'pointer' : 'default', borderColor: items.length ? lane.color + '55' : 'rgba(255,255,255,0.05)', background: items.length ? lane.color + '12' : 'transparent' }}
+                      onClick={() => items.length && isolateInBrain(items.map((it) => it.id))}>
+                      {items.length ? <span style={{ color: lane.color, fontWeight: 700, fontSize: 13 }}>{items.length}</span> : <span style={{ color: '#2a3441' }}>·</span>}
+                    </div>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -270,6 +348,10 @@ const s: Record<string, React.CSSProperties> = {
   root: { position: 'fixed', inset: 0, background: '#05070a', color: '#e5e7eb', fontFamily: 'ui-sans-serif, system-ui', display: 'flex', flexDirection: 'column' },
   header: { display: 'flex', alignItems: 'center', padding: '14px 22px', borderBottom: '1px solid rgba(255,255,255,0.06)' },
   navlink: { fontSize: 12, padding: '6px 11px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#e5e7eb', textDecoration: 'none', cursor: 'pointer' },
+  toggle: { fontSize: 11, padding: '5px 10px', borderRadius: 6, border: 'none', cursor: 'pointer' },
+  swimSprintHead: { textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.16)', cursor: 'pointer' },
+  swimLaneLabel: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#cbd5e1', position: 'sticky', left: 0, background: '#05070a', paddingRight: 8 },
+  swimCell: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 34, borderRadius: 8, border: '1px solid' },
   scroll: { flex: 1, overflowY: 'auto', padding: '18px 22px', maxWidth: 900, width: '100%', margin: '0 auto', boxSizing: 'border-box' },
   sprint: { marginBottom: 22, border: '1px solid rgba(167,139,250,0.16)', borderRadius: 12, padding: '12px 14px', background: 'rgba(167,139,250,0.03)' },
   sprintHead: { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', paddingBottom: 4 },
