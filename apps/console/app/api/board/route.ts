@@ -27,6 +27,7 @@ import { cookies } from 'next/headers';
 import { execSync } from 'node:child_process';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { resolveProject } from '@/lib/project';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -98,7 +99,7 @@ export async function GET(): Promise<Response> {
     if (!token) return Response.json({ error: 'login', cards: [] }, { status: 200 });
     const headers = {
       Authorization: `Bearer ${token}`,
-      'X-Continuum-Project': process.env.CONTINUUM_PROJECT_ID ?? 'continuum',
+      'X-Continuum-Project': await resolveProject('continuum'),
     };
     const transport = new SSEClientTransport(new URL(url), {
       requestInit: { headers },

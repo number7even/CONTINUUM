@@ -10,6 +10,7 @@
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { resolveProject } from '@/lib/project';
 import { cookies } from 'next/headers';
 
 export interface GraphNode {
@@ -63,7 +64,7 @@ async function resolveToken(): Promise<string | null> {
 export async function fetchGraph(limit = 3000): Promise<GraphData> {
   const url = process.env.CONTINUUM_HTTP_URL;
   const token = await resolveToken();
-  const projectId = process.env.CONTINUUM_PROJECT_ID;
+  const projectId = await resolveProject();
   const empty: GraphData = { ok: false, nodes: [], edges: [], stats: null, latencyMs: 0 };
 
   if (!url) return { ...empty, reason: 'unconfigured' };

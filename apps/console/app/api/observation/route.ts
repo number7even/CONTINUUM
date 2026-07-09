@@ -17,6 +17,7 @@
  */
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { resolveProject } from '@/lib/project';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -35,7 +36,7 @@ export async function POST(req: Request): Promise<Response> {
 
     const headers = {
       Authorization: `Bearer ${token}`,
-      'X-Continuum-Project': process.env.CONTINUUM_PROJECT_ID ?? 'graph-demo',
+      'X-Continuum-Project': await resolveProject('graph-demo'),
     };
     const transport = new SSEClientTransport(new URL(url), {
       requestInit: { headers },
