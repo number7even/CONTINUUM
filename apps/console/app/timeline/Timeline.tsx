@@ -287,6 +287,7 @@ export default function Timeline() {
             const total = sprintDays.reduce((n, d) => n + d.total, 0);
             const spCheckpoints = sprintDays.flatMap((d) => d.sessions).reduce((n, ss) => n + ss.checkpoints, 0);
             const isolateSprint = () => isolateInBrain(sprintDays.flatMap((d) => d.sessions).flatMap((ss) => ss.items.map((it) => it.id)));
+            const boardSprint = () => { if (dates.length) window.location.href = `/board?sprint=${encodeURIComponent(label)}&from=${dates[0]}&to=${dates[dates.length - 1]}`; };
             return (
               <div key={key} style={s.sprint}>
                 <div style={s.sprintHead} onClick={() => toggleDay(key)}>
@@ -298,7 +299,8 @@ export default function Timeline() {
                     {(Object.keys(KIND) as ItemKind[]).filter((k) => spCounts[k]).map((k) => (
                       <span key={k} style={{ ...s.badge, color: KIND[k].color }}>{spCounts[k]} {KIND[k].label}</span>
                     ))}
-                    <span onClick={(e) => { e.stopPropagation(); isolateSprint(); }} style={{ fontSize: 10, color: '#38bdf8', cursor: 'pointer', marginLeft: 4 }}>isolate ↗</span>
+                    <span onClick={(e) => { e.stopPropagation(); boardSprint(); }} style={{ fontSize: 10, color: '#6ee7b7', cursor: 'pointer', marginLeft: 4 }} title="see this sprint's tasks on the board">board ↗</span>
+                    <span onClick={(e) => { e.stopPropagation(); isolateSprint(); }} style={{ fontSize: 10, color: '#38bdf8', cursor: 'pointer' }}>isolate ↗</span>
                   </span>
                 </div>
                 {!spCol && <div style={{ marginTop: 12, marginLeft: 4 }}>{sprintDays.map(renderDay)}</div>}
@@ -315,9 +317,12 @@ export default function Timeline() {
           <div style={{ display: 'grid', gridTemplateColumns: `132px repeat(${Math.max(1, sprints.length)}, minmax(94px, 1fr))`, gap: 6, minWidth: 'min-content', alignItems: 'stretch' }}>
             <div style={{ position: 'sticky', left: 0 }} />
             {sprints.map((sp) => (
-              <div key={sp.label} style={s.swimSprintHead} onClick={() => isolateInBrain(sp.days.flatMap((d) => d.sessions).flatMap((ss) => ss.items.map((it) => it.id)))} title="isolate this sprint">
+              <div key={sp.label} style={s.swimSprintHead} onClick={() => isolateInBrain(sp.days.flatMap((d) => d.sessions).flatMap((ss) => ss.items.map((it) => it.id)))} title="isolate this sprint in the brain">
                 <div style={{ color: '#a78bfa', fontWeight: 700, fontSize: 11 }}>{sp.label}</div>
                 <div style={{ color: '#6b7280', fontSize: 9 }}>{sp.range}</div>
+                <div
+                  onClick={(e) => { e.stopPropagation(); const ds = sp.days.map((d) => d.date).sort(); if (ds.length) window.location.href = `/board?sprint=${encodeURIComponent(sp.label)}&from=${ds[0]}&to=${ds[ds.length - 1]}`; }}
+                  style={{ color: '#6ee7b7', fontSize: 9, cursor: 'pointer', marginTop: 2 }} title="see this sprint's tasks on the board">▦ board</div>
               </div>
             ))}
             {LANES.map((lane) => (

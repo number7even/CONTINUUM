@@ -15,8 +15,9 @@ type Column = 'RUNNING' | 'REVIEW' | 'DONE' | 'SKIPPED' | 'BLOCKED' | 'FAILED';
 interface Card {
   id: string; title: string; status: string; column: Column;
   verifyCommand: string | null; hasVerify: boolean; refs: string[];
-  leverage: number; blockedByOpen: string[];
+  leverage: number; blockedByOpen: string[]; createdAt: string | null;
 }
+interface SprintFilter { label: string; from: string; to: string }
 
 const COLUMNS: { key: Column; label: string; color: string; hint: string }[] = [
   { key: 'BLOCKED', label: 'BLOCKED', color: '#f59e0b', hint: 'waiting on upstream' },
@@ -36,6 +37,15 @@ export default function Board() {
   const [live, setLive] = useState(false);
   const [selected, setSelected] = useState<Card | null>(null);
   const [dossier, setDossier] = useState<{ loading: boolean; obs: Obs[] } | null>(null);
+  // Sprint focus arrives from a timeline sprint click: /board?sprint=W27&from=…&to=…
+  const [sprint, setSprint] = useState<SprintFilter | null>(null);
+
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const label = p.get('sprint'), from = p.get('from'), to = p.get('to');
+    if (label && from && to) setSprint({ label, from, to });
+  }, []);
+  const clearSprint = () => { setSprint(null); window.history.replaceState(null, '', '/board'); };
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -66,9 +76,18 @@ export default function Board() {
     } catch { setDossier({ loading: false, obs: [] }); }
   }, []);
 
-  const byCol = (c: Column) => cards.filter(k => k.column === c);
-  const doneWithProof = cards.filter(k => k.column === 'DONE').length;
-  const totalDoneClaims = cards.filter(k => k.status === 'done').length;
+  // A task belongs to a sprint if it came into being inside that sprint's date
+  // window (P4: an honest, defensible binding — not an invented sprint↔task field).
+  const inSprint = (c: Card) => {
+    if (!sprint) return true;
+    const d = (c.createdAt ?? '').slice(0, 10);
+    return d >= sprint.from && d <= sprint.to;
+  };
+  const visible = cards.filter(inSprint);
+  const boundable = cards.filter(k => k.createdAt).length;
+  const byCol = (c: Column) => visible.filter(k => k.column === c);
+  const doneWithProof = visible.filter(k => k.column === 'DONE').length;
+  const totalDoneClaims = visible.filter(k => k.status === 'done').length;
 
   return (
     <div style={s.root}>
@@ -83,6 +102,20 @@ export default function Board() {
         </div>
         <button type="button" onClick={() => void load()} style={s.refresh}>↻ refresh</button>
       </header>
+
+      {sprint && (
+        <div style={s.sprintBanner}>
+          <span style={{ color: '#6ee7b7', fontWeight: 700, letterSpacing: 0.5 }}>▦ SPRINT {sprint.label}</span>
+          <span style={{ color: '#9ca3af' }}>{sprint.from} → {sprint.to}</span>
+          <span style={{ color: '#e5e7eb' }}>{visible.length} task{visible.length === 1 ? '' : 's'} created in-window</span>
+          {boundable < cards.length && (
+            <span style={{ color: '#6b7280', fontSize: 11 }} title="tasks with no createdAt can't be bound to a sprint">
+              ({cards.length - boundable} undated, unbindable)
+            </span>
+          )}
+          <button type="button" onClick={clearSprint} style={s.clear}>✕ clear · all sprints</button>
+        </div>
+      )}
 
       {error && <div style={{ color: '#f87171', padding: 12, fontSize: 13 }}>⚠ {error}</div>}
       {loading && <div style={{ color: '#f59e0b', padding: 12, fontSize: 13 }}>…loading the plan</div>}
@@ -163,4 +196,6 @@ const s: Record<string, React.CSSProperties> = {
   dossier: { position: 'fixed', top: 0, right: 0, bottom: 0, width: 380, background: 'rgba(8,11,16,0.97)', borderLeft: '1px solid rgba(56,189,248,0.25)', padding: 18, overflowY: 'auto', zIndex: 5, boxShadow: '-8px 0 40px rgba(0,0,0,0.6)' },
   code: { fontSize: 11, color: '#d1d5db', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'ui-monospace, monospace', background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 6, margin: '4px 0 0' },
   obs: { marginBottom: 10 },
+  sprintBanner: { display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '9px 20px', fontSize: 12, background: 'rgba(52,211,153,0.06)', borderBottom: '1px solid rgba(52,211,153,0.18)' },
+  clear: { marginLeft: 'auto', fontSize: 11, padding: '4px 10px', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#e5e7eb' },
 };

@@ -53,6 +53,8 @@ export interface BoardCard {
   refs: string[];
   leverage: number;
   blockedByOpen: string[];
+  /** When the task came into being — used to bind it to a timeline sprint window. */
+  createdAt: string | null;
 }
 
 async function resolveToken(): Promise<string | null> {
@@ -149,6 +151,7 @@ export async function GET(): Promise<Response> {
         refs: t.refs ?? [],
         leverage: leverageOf(t.id),
         blockedByOpen,
+        createdAt: t.createdAt ?? null,
       };
     });
 
