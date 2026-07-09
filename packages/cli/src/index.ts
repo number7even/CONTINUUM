@@ -256,9 +256,12 @@ function icmFiles(projectId: string): Record<string, string> {
       `- **Never over-consume context:** fetch skills/reference only when a task needs them (see \`skills/\`).\n\n` +
       `## How to work here\n` +
       `1. Read [\`router.md\`](./router.md) — the Map. It routes you to the right floor by intent.\n` +
-      `2. Each floor has its own \`agents.md\` (local context) + the rebound rule.\n` +
-      `3. "Pick up" = read the current state (\`continuum_get_state\` if the MCP server is registered) + the relevant floor.\n` +
-      `4. "Hand off" = write progress to an artifact + (optionally) stamp a checkpoint.\n`,
+      `2. Each floor has its own \`agents.md\` (local context) + the rebound rule (return to the Map if lost).\n\n` +
+      `## Memory — "Pick up" / "Hand off" (verifiable, not remembered)\n` +
+      `This workspace's memory is **CONTINUUM** (registered as an MCP server via \`.mcp.json\`). It refuses to lie: a state reaches DONE only when its \`verifyCommand\` exits 0. Do NOT keep memory in a plain text file you have to trust.\n` +
+      `- **When I say "Pick up"** → read \`continuum://session/briefing\` (the warm brief) + \`continuum_get_state\`, then \`continuum_next_tasks\` for what is actionable right now. Brief me on where we left off. Never start cold.\n` +
+      `- **When I say "Hand off"** → call \`continuum_record_checkpoint\` with the current \`active\` / \`dormant\` / \`broken\` state, **each entry carrying a \`verifyCommand\`** (the shell proof). It is hash-sealed + append-only — the audit ledger, not a memory you assert. Also append a one-line human note to [\`artifacts/\`](./artifacts/agents.md).\n` +
+      `- If CONTINUUM's MCP server is not registered yet, run \`continuum init --guided\` in this repo first, then restart your AI client.\n`,
     'router.md':
       `# router.md — The Map (Interpretable Context Methodology)\n\n` +
       `> Read \`agents.md\` first (the Prime Mission). This is the Map — it routes you to the right *floor* by intent.\n` +

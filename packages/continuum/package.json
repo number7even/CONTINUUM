@@ -1,13 +1,13 @@
 {
   "name": "@number7even/continuum",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "CONTINUUM — the verifiable memory & trust layer for AI-assisted development. Marketed entry point; forwards to the CONTINUUM CLI.",
   "type": "module",
   "bin": {
     "continuum": "./bin.mjs"
   },
   "dependencies": {
-    "@number7even/continuum-cli": "0.0.1"
+    "@number7even/continuum-cli": "0.0.2"
   },
   "files": [
     "bin.mjs",
