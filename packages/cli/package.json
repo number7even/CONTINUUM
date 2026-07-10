@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "continuum": "./dist/index.js"
+    "continuum": "dist/index.js"
   },
   "scripts": {
     "build": "tsc -b",
