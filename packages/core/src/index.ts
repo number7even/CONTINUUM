@@ -44,6 +44,11 @@ export { SQLiteStorageBackend } from './storage-sqlite.js';
 export { HybridStorageBackend } from './storage-hybrid.js';
 export { openStorage } from './factory.js';
 
+// — Checkpoint seal (Authorship Ledger): the exported hash so callers can
+//   RE-DERIVE a snapshot's hash and detect tamper, not just create checkpoints.
+//   (CheckpointInput is already exported above.)
+export { computeCheckpointHash } from './checkpoint.js';
+
 // — Observation graph (the 3D "brain" viz data: nodes + refs edges)
 export { buildObservationGraph, sourceOf } from './graph.js';
 export type { GraphNode, GraphEdge, ObservationGraph, GraphOptions, DeclaredRelation } from './graph.js';

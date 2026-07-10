@@ -46,6 +46,19 @@ export const recordCheckpointTool: ToolDefinition = {
           landedAt: { type: 'string' },
           verifiedAt: { type: 'string' },
           description: { type: 'string' },
+          acceptedBy: {
+            type: 'object',
+            description:
+              'The authorship seal — the human decision that accepted this state ' +
+              '(from continuum_record_decision). Sealed into the checkpoint hash.',
+            properties: {
+              operator: { type: 'string' },
+              decisionId: { type: 'string' },
+              decisionHash: { type: 'string' },
+              at: { type: 'string' },
+            },
+            required: ['operator', 'decisionId', 'decisionHash', 'at'],
+          },
         },
         required: ['name', 'where', 'verifyCommand', 'verifiedAt'],
       },
