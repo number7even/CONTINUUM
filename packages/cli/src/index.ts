@@ -27,6 +27,7 @@ import { basename, dirname, join as joinPath, resolve as resolvePath } from 'nod
 import { copyFileSync, existsSync, mkdirSync, readFileSync, watch as fsWatch, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
 import {
   computeNextTasks,
@@ -110,6 +111,12 @@ COMMANDS
                  dependency DAG and prints the ACTIONABLE set (unblocked, not
                  done), ordered by downstream leverage, each with its state,
                  verify_command, and dossier refs. --json for the raw payload.
+  observe        Capture terminal output as a live 'command' Observation — the
+                 capture seam of the qualifying loop. TEEs stdin→stdout (the pipe
+                 stays transparent) and flags significant events (non-zero exit,
+                 build/test/git). Options: --label, --cmd, --exit, --max-bytes.
+                 Example:
+                   npm test 2>&1 | continuum observe --label test --exit $?
   verify         Re-run every verify_command in the latest snapshot. Exit code
                  = number of failures (0 = all green). Use this to confirm
                  state-snapshot claims are still true on the current machine.
@@ -1476,6 +1483,111 @@ async function commandServe(projectId: string): Promise<void> {
   await import('@number7even/continuum-mcp-server/dist/http.js');
 }
 
+// ── continuum observe — capture terminal output as a live Observation ─────────
+//
+// The CAPTURE seam of the qualifying loop. Pipe any command's output in and it
+// becomes a `type='command'` Observation the (separate) qualifying agent can
+// later cross-examine against the codebase, spec, and knowledge base.
+//
+//   npm test 2>&1 | continuum observe --label test --exit $?
+//   ./build.sh 2>&1 | continuum observe --label build --cmd "./build.sh" --exit $?
+//
+// It TEEs stdin → stdout, so the output still shows in your terminal (the pipe
+// stays transparent). Content flows through storage.upsertObservation()'s
+// privacy-scrub choke-point before it's stored.
+//
+// Source registration: under the 'export' genre (captured tool/session activity)
+// but distinguished by the `terminal:<project>` sourceId prefix — which is what
+// the Brain/Timeline color by — plus obs type 'command'. Migration-free until a
+// first-class 'terminal' SourceType lands (P4: honest about the reuse).
+async function commandObserve(projectId: string): Promise<void> {
+  const argv = process.argv.slice(3);
+  let label = '', cmd = '', exitCode: number | null = null, maxBytes = 64 * 1024;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] ?? '';
+    const val = (): string => (a.includes('=') ? a.slice(a.indexOf('=') + 1) : (argv[++i] ?? ''));
+    if (a === '--label' || a.startsWith('--label=')) label = val();
+    else if (a === '--cmd' || a.startsWith('--cmd=')) cmd = val();
+    else if (a === '--exit' || a.startsWith('--exit=')) { const n = Number(val()); exitCode = Number.isFinite(n) ? n : null; }
+    else if (a === '--max-bytes' || a.startsWith('--max-bytes=')) { const n = Number(val()); if (Number.isFinite(n) && n > 0) maxBytes = n; }
+  }
+
+  // Read piped stdin while TEE-ing to stdout so the pipe stays transparent. Guard
+  // the interactive-TTY case (no pipe) so `observe` never hangs waiting on input.
+  let output = '';
+  let total = 0;
+  let truncated = false;
+  if (!process.stdin.isTTY) {
+    const chunks: Buffer[] = [];
+    await new Promise<void>((resolve) => {
+      process.stdin.on('data', (d: Buffer) => {
+        process.stdout.write(d);                    // tee — user still sees it
+        total += d.length;
+        if (!truncated) {
+          chunks.push(d);
+          if (Buffer.concat(chunks).length >= maxBytes) truncated = true;
+        }
+      });
+      process.stdin.on('end', () => resolve());
+      process.stdin.on('error', () => resolve());
+    });
+    output = Buffer.concat(chunks).toString('utf8');
+    if (output.length > maxBytes) output = output.slice(0, maxBytes);
+  }
+
+  // Nothing worth recording (no output AND no command/exit context) → clean no-op.
+  if (!output.trim() && !cmd && exitCode === null) process.exit(0);
+
+  const status = exitCode === null ? 'unknown' : exitCode === 0 ? 'ok' : 'fail';
+  const storage = openStorage(projectId);
+  const sourceId = `terminal:${projectId}`;
+  storage.upsertSource(sourceId, 'export', {
+    adapter: '@number7even/continuum-cli observe',
+    version: '0.0.2',
+    note: "terminal capture — genre 'export' pending a first-class 'terminal' SourceType",
+  });
+
+  const header = [
+    cmd ? `$ ${cmd}` : (label ? `[${label}]` : '$ (command)'),
+    exitCode === null ? '' : `→ exit ${exitCode} (${status})`,
+  ].filter(Boolean).join(' ');
+  const content = `${header}\n${output.trimEnd()}${truncated ? '\n…[truncated]' : ''}`.trimEnd();
+
+  // Significance flag the qualifier keys on (P9: it decides, observe only hints):
+  // a non-zero exit, or a build/test/git/deploy-class label/command.
+  const significant =
+    (exitCode !== null && exitCode !== 0) ||
+    /\b(test|build|deploy|release|git|ci|lint|typecheck|migrate|publish)\b/i.test(`${label} ${cmd}`);
+
+  const id = randomUUID();
+  storage.upsertObservation({
+    id,
+    sourceId,
+    type: 'command',
+    content,
+    timestamp: new Date().toISOString(),
+    refs: [],
+    metadata: {
+      label: label || undefined,
+      cmd: cmd || undefined,
+      exitCode,
+      status,
+      cwd: process.cwd(),
+      bytes: total,
+      truncated,
+      significant: significant || undefined,
+    },
+  });
+
+  // Confirmation on stderr (never stdout — keep the pipe clean for downstream),
+  // then exit explicitly: attaching stdin 'data' listeners refs the event loop,
+  // so a leaf capture command must not rely on a natural exit (it would hang).
+  process.stderr.write(
+    `\x1b[2m[continuum] observed ${status}${label ? ' · ' + label : ''}${significant ? ' · significant' : ''} → ${sourceId} ${id.slice(0, 8)}\x1b[0m\n`,
+    () => process.exit(0),
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -1523,6 +1635,10 @@ async function main(): Promise<void> {
 
     case 'next':
       commandNext(projectId);
+      return;
+
+    case 'observe':
+      await commandObserve(projectId);
       return;
 
     case 'adapter':
