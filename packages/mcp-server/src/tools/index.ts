@@ -31,6 +31,7 @@ import { nextTasksTool, handleNextTasks } from './next-tasks.js';
 import { snapshotsTool, handleSnapshots } from './snapshots.js';
 import { recordDecisionTool, handleRecordDecision } from './record-decision.js';
 import { sessionReviewTool, handleSessionReview } from './session-review.js';
+import { askContextTool, handleAskContext } from './ask-context.js';
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   recordCheckpointTool,
@@ -51,6 +52,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   snapshotsTool,
   recordDecisionTool,
   sessionReviewTool,
+  askContextTool,
 ] as const;
 
 const DISPATCH_TABLE: Record<string, ToolHandler> = {
@@ -72,6 +74,7 @@ const DISPATCH_TABLE: Record<string, ToolHandler> = {
   continuum_kaizen_record: handleKaizenRecord,
   continuum_record_decision: handleRecordDecision,
   continuum_session_review: handleSessionReview,
+  continuum_ask_context: handleAskContext,
 };
 
 /**

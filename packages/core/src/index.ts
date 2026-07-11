@@ -49,6 +49,10 @@ export { openStorage } from './factory.js';
 //   (CheckpointInput is already exported above.)
 export { computeCheckpointHash } from './checkpoint.js';
 
+// — Trust gradient + the Ask retrieval primitive.
+export { tierOf, retrieveContext } from './trust.js';
+export type { TrustTier, RetrievedNode, RetrievalResult } from './trust.js';
+
 // — Observation graph (the 3D "brain" viz data: nodes + refs edges)
 export { buildObservationGraph, sourceOf } from './graph.js';
 export type { GraphNode, GraphEdge, ObservationGraph, GraphOptions, DeclaredRelation } from './graph.js';
