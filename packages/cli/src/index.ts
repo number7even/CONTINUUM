@@ -30,7 +30,9 @@ import { execFileSync, execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
 import {
+  buildDiscussionScript,
   computeNextTasks,
+  continuumDataRoot,
   openStorage,
   parseStateMdToCheckpoint,
   type RankedTask,
@@ -117,6 +119,11 @@ COMMANDS
                  build/test/git). Options: --label, --cmd, --exit, --max-bytes.
                  Example:
                    npm test 2>&1 | continuum observe --label test --exit $?
+  recap          The ambient two-host discussion audio (ARIAN). Builds the grounded,
+                 semantic-fed, tier-cited recap script and synthesises it via LOCAL
+                 supertonic (0-egress; Host A/B on two voices). Writes the script .md
+                 always; the .wav when supertonic is up. Triggerable by a SessionEnd hook.
+                 Env: SUPERTONIC_TTS_URL · SUPERTONIC_VOICE_A · SUPERTONIC_VOICE_B
   verify         Re-run every verify_command in the latest snapshot. Exit code
                  = number of failures (0 = all green). Use this to confirm
                  state-snapshot claims are still true on the current machine.
@@ -1588,6 +1595,54 @@ async function commandObserve(projectId: string): Promise<void> {
   );
 }
 
+// ── continuum recap — the ambient two-host discussion audio (ARIAN) ────────────
+//
+// Builds the grounded, semantic-fed, tier-cited two-host script (buildDiscussionScript)
+// and synthesises it through the LOCAL supertonic TTS (0-egress) — Host A and Host B on
+// two distinct voices. Always writes the script .md (deterministic); writes the .wav when
+// supertonic is reachable, else says so plainly (never fakes audio). Meant to be triggered
+// ambiently by a SessionEnd hook — this is the command that hook calls.
+async function commandRecap(projectId: string): Promise<void> {
+  const storage = openStorage(projectId);
+  const script = await buildDiscussionScript(storage);
+
+  const dir = joinPath(continuumDataRoot(), projectId, 'recaps');
+  mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const base = joinPath(dir, `recap-${stamp}`);
+
+  // 1 — the script (deterministic, grounded). Always written.
+  const md =
+    `# ${script.title}\n\n_${script.turns.length} turns · ${script.grounded} grounded_\n\n` +
+    script.turns.map((t) => `**Host ${t.host}${t.tier ? ` · ${t.tier}` : ''}:** ${t.text}`).join('\n\n') + '\n';
+  writeFileSync(`${base}.script.md`, md);
+  console.log(`[recap] script → ${base}.script.md (${script.turns.length} turns, ${script.grounded} grounded)`);
+
+  // 2 — synthesise via LOCAL supertonic (0 bytes egress). Two hosts → two voices.
+  const ttsUrl = process.env.SUPERTONIC_TTS_URL || 'http://127.0.0.1:7788/v1/audio/speech';
+  const voiceA = process.env.SUPERTONIC_VOICE_A || process.env.SUPERTONIC_VOICE || 'M1';
+  const voiceB = process.env.SUPERTONIC_VOICE_B || 'F1';
+  try {
+    const chunks: Buffer[] = [];
+    for (const t of script.turns) {
+      const r = await fetch(ttsUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'supertonic', input: t.text, voice: t.host === 'A' ? voiceA : voiceB, response_format: 'wav' }),
+      });
+      if (!r.ok) throw new Error(`TTS ${r.status}`);
+      chunks.push(Buffer.from(await r.arrayBuffer()));
+    }
+    const wav = Buffer.concat(chunks);
+    writeFileSync(`${base}.wav`, wav);
+    console.log(`[recap] audio → ${base}.wav (${wav.length} bytes · ${script.turns.length} turns · voices ${voiceA}/${voiceB}) · 0 bytes egress`);
+  } catch (e) {
+    console.log(`[recap] audio skipped — supertonic not reachable at ${ttsUrl} (${e instanceof Error ? e.message : String(e)}).`);
+    console.log(`         start it:  supertonic serve --host 127.0.0.1 --port 7788`);
+  }
+  process.exit(0);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -1639,6 +1694,10 @@ async function main(): Promise<void> {
 
     case 'observe':
       await commandObserve(projectId);
+      return;
+
+    case 'recap':
+      await commandRecap(projectId);
       return;
 
     case 'adapter':

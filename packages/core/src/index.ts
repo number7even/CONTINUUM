@@ -53,6 +53,10 @@ export { computeCheckpointHash } from './checkpoint.js';
 export { tierOf, retrieveContext } from './trust.js';
 export type { TrustTier, RetrievedNode, RetrievalResult } from './trust.js';
 
+// — The two-host discussion recap (ARIAN): grounded, semantic-fed, tier-cited.
+export { buildDiscussionScript } from './discussion.js';
+export type { DiscussionScript, DiscussionTurn } from './discussion.js';
+
 // — Observation graph (the 3D "brain" viz data: nodes + refs edges)
 export { buildObservationGraph, sourceOf } from './graph.js';
 export type { GraphNode, GraphEdge, ObservationGraph, GraphOptions, DeclaredRelation } from './graph.js';
