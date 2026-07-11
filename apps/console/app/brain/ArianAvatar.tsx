@@ -62,12 +62,8 @@ export function ArianAvatar({ state, caption }: { state: VoiceState; caption?: s
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (
-          // Graceful fallback — a presence, not a broken tag.
-          <div style={fallback}>
-            <div style={{ fontSize: 40, opacity: 0.85 }}>◕‿◕</div>
-            <div style={{ fontSize: 11, letterSpacing: 2, color: '#cbd5e1', marginTop: 4 }}>ARIAN</div>
-            <div style={{ fontSize: 9, color: '#6b7280', marginTop: 2 }}>drop a clip → NEXT_PUBLIC_ARIAN_VIDEO_URL</div>
-          </div>
+          // No clip → a live, state-reactive canvas presence (0-egress, no asset needed).
+          <ReactivePresence state={state} color={s.ring} />
         )}
       </div>
       <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, letterSpacing: 1.5, color: s.ring, marginTop: 8, textAlign: 'center' }}>
@@ -82,5 +78,81 @@ export function ArianAvatar({ state, caption }: { state: VoiceState; caption?: s
 // chat window — you converse with her face + voice, not a text field at a graph.
 const wrap: React.CSSProperties = { position: 'fixed', right: 22, bottom: 150, zIndex: 9, display: 'flex', flexDirection: 'column', alignItems: 'center', width: 180 };
 const frame: React.CSSProperties = { width: 150, height: 190, borderRadius: 18, overflow: 'hidden', border: '2px solid', background: 'radial-gradient(circle at 50% 35%, rgba(20,28,40,0.9), rgba(6,9,14,0.96))', transition: 'box-shadow 220ms', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const fallback: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 10 };
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const m = hex.replace('#', '');
+  const n = parseInt(m.length === 3 ? m.split('').map((c) => c + c).join('') : m, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+/**
+ * ReactivePresence — ARIAN made present with NO video asset (Avatar Gap #1 closed).
+ * A 0-egress <canvas> "face" that reacts to voice state:
+ *   idle → a slow breathing ring · listening → expanding ripples ·
+ *   thinking → orbiting particles · speaking → a live circular waveform.
+ */
+function ReactivePresence({ state, color }: { state: VoiceState; color: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const resize = () => {
+      canvas.width = canvas.clientWidth * dpr;
+      canvas.height = canvas.clientHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    const { r, g, b } = hexToRgb(color);
+    const c = (a: number) => `rgba(${r},${g},${b},${a})`;
+    let raf = 0, start = 0, running = true;
+    const frame = (now: number) => {
+      if (!running) return;
+      if (!start) start = now;
+      const t = (now - start) / 1000;
+      const w = canvas.clientWidth, h = canvas.clientHeight, cx = w / 2, cy = h / 2;
+      const base = Math.min(w, h) * 0.2;
+      ctx.clearRect(0, 0, w, h);
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, base * 2.4);
+      grad.addColorStop(0, c(0.5)); grad.addColorStop(1, c(0));
+      ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(cx, cy, base * 2.4, 0, Math.PI * 2); ctx.fill();
+      if (state === 'idle') {
+        ctx.strokeStyle = c(0.4); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy, base * (1 + 0.05 * Math.sin(t * 1.6)), 0, Math.PI * 2); ctx.stroke();
+      } else if (state === 'listening') {
+        for (let i = 0; i < 3; i++) {
+          const p = (t * 0.6 + i / 3) % 1;
+          ctx.strokeStyle = c((1 - p) * 0.6); ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(cx, cy, base * (0.6 + p * 1.7), 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.fillStyle = c(0.75); ctx.beginPath(); ctx.arc(cx, cy, base * 0.5, 0, Math.PI * 2); ctx.fill();
+      } else if (state === 'thinking') {
+        const n = 6;
+        for (let i = 0; i < n; i++) {
+          const a = t * 2 + (i / n) * Math.PI * 2, rr = base * (1.15 + 0.15 * Math.sin(t * 3 + i));
+          ctx.fillStyle = c(0.85 - (i / n) * 0.45);
+          ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 3, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.strokeStyle = c(0.2); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(cx, cy, base, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        const pts = 80;
+        ctx.strokeStyle = c(0.9); ctx.lineWidth = 2.5; ctx.beginPath();
+        for (let i = 0; i <= pts; i++) {
+          const a = (i / pts) * Math.PI * 2;
+          const amp = 0.16 * (Math.sin(a * 6 + t * 9) * 0.5 + Math.sin(a * 3 - t * 6) * 0.5);
+          const rr = base * (1 + amp), x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+          if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        }
+        ctx.closePath(); ctx.stroke();
+        ctx.fillStyle = c(0.45); ctx.beginPath(); ctx.arc(cx, cy, base * 0.55, 0, Math.PI * 2); ctx.fill();
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    window.addEventListener('resize', resize);
+    return () => { running = false; cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
+  }, [state, color]);
+  return <canvas ref={ref} style={{ width: '100%', height: '100%', display: 'block' }} />;
+}
 const captionStyle: React.CSSProperties = { marginBottom: 10, maxWidth: 240, fontSize: 11.5, lineHeight: 1.45, color: '#e5e7eb', background: 'rgba(8,11,16,0.92)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 10, padding: '9px 12px', maxHeight: 160, overflowY: 'auto' };
