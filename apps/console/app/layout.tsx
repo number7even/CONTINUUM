@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { ProjectSwitcher } from './ProjectSwitcher';
+import { ViewSwitcher } from './ViewSwitcher';
 
 export const metadata = {
   title: 'Continuum Console',
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           lineHeight: 1.5,
         }}
       >
+        <ViewSwitcher />
         <ProjectSwitcher />
         {children}
       </body>
