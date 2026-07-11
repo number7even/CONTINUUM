@@ -27,7 +27,7 @@ s.insertObservation({ sourceId: 'terminal:p', type: 'command', content: `${K} np
 s.insertObservation({ sourceId: 'terminal:p', type: 'command', content: `${K} npm test failed`, timestamp: now, refs: [], metadata: { exitCode: 1, status: 'fail' } });
 s.insertObservation({ sourceId: 'external:yt', type: 'transcript', content: `${K} a youtube video said`, timestamp: now, refs: [] });
 
-const res = retrieveContext(s, K, { limit: 20 });
+const res = await retrieveContext(s, K, { limit: 20 });
 console.log('query:', res.query, '· nodes:', res.count);
 for (const n of res.nodes) console.log(`  [${n.tier.padEnd(9)}] ${n.type.padEnd(10)} ${n.id.slice(0, 8)}  ${JSON.stringify(n.excerpt.slice(0, 30))}`);
 

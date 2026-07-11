@@ -11,7 +11,7 @@
  *
  * IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans
  */
-import type { Observation } from './types.js';
+import type { Observation, SearchHit } from './types.js';
 import type { StorageBackend } from './storage.js';
 
 /** The epistemic tier of a piece of evidence (highest → lowest trust). */
@@ -51,41 +51,71 @@ export interface RetrievedNode {
   type: string;
   /** The trust gradient, per node — the UI shows this so no citation is a dead word. */
   tier: TrustTier;
+  /** Fused rank score (Reciprocal Rank Fusion over keyword + semantic). */
   score: number;
+  /** Which signal(s) surfaced this node: 'keyword' · 'semantic' · 'keyword+semantic'. */
+  match: string;
   excerpt: string;
 }
 export interface RetrievalResult {
   query: string;
   count: number;
+  /** True when the semantic (vector) layer contributed — i.e. the hybrid backend is online. */
+  semantic: boolean;
   nodes: RetrievedNode[];
 }
 
 /**
- * The Ask retrieval: Layer-1 search (FTS5 now, +RuVector fusion later) → Layer-3 fetch
- * → a cited, tier-enriched bundle. One call, grounded, ready for a model to answer over
- * (or for the UI to render with tiers).
+ * The Ask retrieval (Semantic SONA): fuse Layer-1 FTS5 keyword rank with RuVector
+ * SEMANTIC rank via Reciprocal Rank Fusion, then Layer-3 fetch → a cited, tier-enriched
+ * bundle. Keyword precision + semantic recall in one ranked list — a node found by BOTH
+ * signals outranks one found by either alone. Vector search is feature-detected (hybrid
+ * backend); on the sqlite backend it degrades to FTS5-only — same shape, no error.
  */
-export function retrieveContext(
-  storage: Pick<StorageBackend, 'searchObservations' | 'getObservations'>,
+export async function retrieveContext(
+  storage: Pick<StorageBackend, 'searchObservations' | 'getObservations' | 'vectorSearch'>,
   query: string,
   opts?: { limit?: number; excerpt?: number },
-): RetrievalResult {
+): Promise<RetrievalResult> {
   const limit = opts?.limit ?? 12;
   const excerptLen = opts?.excerpt ?? 300;
-  const hits = storage.searchObservations(query, limit);
-  const obs = storage.getObservations(hits.map((h) => h.id));
+  const pool = Math.max(limit, 10);
+
+  const ftsHits = storage.searchObservations(query, pool);
+  let vecHits: SearchHit[] = [];
+  if (typeof storage.vectorSearch === 'function') {
+    try { vecHits = await storage.vectorSearch(query, pool); } catch { /* semantic is optional */ }
+  }
+
+  // Reciprocal Rank Fusion — a node in BOTH lists outranks one in either alone.
+  const RRF_K = 60;
+  const fused = new Map<string, { hit: SearchHit; score: number; signals: Set<string> }>();
+  const merge = (list: SearchHit[], signal: string) => {
+    list.forEach((h, i) => {
+      const cur = fused.get(h.id);
+      const s = 1 / (RRF_K + i);
+      if (cur) { cur.score += s; cur.signals.add(signal); }
+      else fused.set(h.id, { hit: h, score: s, signals: new Set([signal]) });
+    });
+  };
+  merge(ftsHits, 'keyword');
+  merge(vecHits, 'semantic');
+
+  const ranked = [...fused.values()].sort((a, b) => b.score - a.score).slice(0, limit);
+  const obs = storage.getObservations(ranked.map((r) => r.hit.id));
   const byId = new Map(obs.map((o) => [o.id, o]));
-  const nodes: RetrievedNode[] = hits.map((h) => {
-    const o = byId.get(h.id);
+  const nodes: RetrievedNode[] = ranked.map((r) => {
+    const o = byId.get(r.hit.id);
     return {
-      id: h.id,
-      title: h.title,
-      source: h.source,
-      type: h.type,
+      id: r.hit.id,
+      title: r.hit.title,
+      source: r.hit.source,
+      type: r.hit.type,
       tier: o ? tierOf(o) : 'claimed',
-      score: h.score,
+      score: r.score,
+      match: [...r.signals].sort().join('+'),
       excerpt: (o?.content ?? '').slice(0, excerptLen).trim(),
     };
   });
-  return { query, count: nodes.length, nodes };
+  return { query, count: nodes.length, semantic: vecHits.length > 0, nodes };
 }

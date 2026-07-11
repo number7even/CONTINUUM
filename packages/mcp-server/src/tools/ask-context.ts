@@ -30,6 +30,6 @@ export const askContextTool: ToolDefinition = {
 export const handleAskContext: ToolHandler = async (args, storage) => {
   const { query, limit } = (args ?? {}) as { query?: string; limit?: number };
   if (!query?.trim()) throw new Error('query is required');
-  const result = retrieveContext(storage, query, { limit });
+  const result = await retrieveContext(storage, query, { limit });
   return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
 };

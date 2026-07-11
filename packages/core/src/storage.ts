@@ -133,6 +133,15 @@ export interface StorageBackend {
   searchObservations(query: string, limit?: number): SearchHit[];
 
   /**
+   * Optional SEMANTIC search (hybrid backend only): HNSW over MiniLM-384 embeddings,
+   * returning SearchHit[] ranked by cosine similarity. Feature-detect before calling —
+   * the sqlite backend omits it, and retrieval degrades to FTS5-only (same shape).
+   */
+  vectorSearch?(query: string, k?: number): Promise<SearchHit[]>;
+  /** Optional (hybrid backend only): await in-flight embeddings so a search sees them. */
+  flushVectorWrites?(): Promise<void>;
+
+  /**
    * Layer-2 Progressive Disclosure — observations in chronological order
    * around a reference point (observation ID OR ISO timestamp). Returns
    * compact TimelineHit[] with `offsetSec` so the agent reads "what
