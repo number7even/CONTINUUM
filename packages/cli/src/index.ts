@@ -30,11 +30,13 @@ import { execFileSync, execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
 import {
+  buildAuthorshipExport,
   buildDiscussionScript,
   computeNextTasks,
   continuumDataRoot,
   openStorage,
   parseStateMdToCheckpoint,
+  renderAuthorshipMarkdown,
   type RankedTask,
   type StorageBackend,
 } from '@number7even/continuum-core';
@@ -124,6 +126,12 @@ COMMANDS
                  supertonic (0-egress; Host A/B on two voices). Writes the script .md
                  always; the .wav when supertonic is up. Triggerable by a SessionEnd hook.
                  Env: SUPERTONIC_TTS_URL · SUPERTONIC_VOICE_A · SUPERTONIC_VOICE_B
+  authorship export
+                 The IP-provenance export (the legal shield). Walks the checkpoint chain,
+                 resolves every acceptedBy seal to its decision, re-derives every hash to
+                 prove the chain is unbroken, and writes a JSON + Markdown artifact listing
+                 each human-accepted state, its git commit, verifyCommand, operator, and
+                 sealed checkpoint hash. Exit 0 = INTACT, 2 = tamper detected.
   verify         Re-run every verify_command in the latest snapshot. Exit code
                  = number of failures (0 = all green). Use this to confirm
                  state-snapshot claims are still true on the current machine.
@@ -1643,6 +1651,33 @@ async function commandRecap(projectId: string): Promise<void> {
   process.exit(0);
 }
 
+// ── continuum authorship export — the IP-provenance export (legal shield) ──────
+//
+// Walks the local checkpoint chain, resolves every acceptedBy seal to its decision, and
+// re-derives each hash to prove the chain is unbroken. Writes a JSON artifact (machine
+// verification) + a Markdown rendering (filing / counsel). Prints INTACT/BROKEN + the path.
+function commandAuthorship(projectId: string): void {
+  const sub = process.argv[3];
+  if (sub !== 'export') {
+    process.stderr.write(`usage: continuum authorship export [-p <project>]\n`);
+    process.exit(sub ? 1 : 0);
+  }
+  const storage = openStorage(projectId);
+  const generatedAt = new Date().toISOString();
+  const exp = buildAuthorshipExport(storage, { project: projectId, generatedAt });
+
+  const dir = joinPath(continuumDataRoot(), projectId, 'authorship');
+  mkdirSync(dir, { recursive: true });
+  const base = joinPath(dir, `authorship-${generatedAt.replace(/[:.]/g, '-')}`);
+  writeFileSync(`${base}.json`, JSON.stringify(exp, null, 2) + '\n');
+  writeFileSync(`${base}.md`, renderAuthorshipMarkdown(exp));
+
+  console.log(`[authorship] ${exp.authorship.length} human-accepted state(s) across ${exp.chain.length} checkpoint(s)`);
+  console.log(`[authorship] chain integrity: ${exp.intact ? 'INTACT ✓ (every hash re-derived, every seal verified)' : 'BROKEN ✗ — a checkpoint or decision has been tampered with'}`);
+  console.log(`[authorship] artifact → ${base}.json  +  ${base}.md`);
+  process.exit(exp.intact ? 0 : 2);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -1698,6 +1733,10 @@ async function main(): Promise<void> {
 
     case 'recap':
       await commandRecap(projectId);
+      return;
+
+    case 'authorship':
+      commandAuthorship(projectId);
       return;
 
     case 'adapter':

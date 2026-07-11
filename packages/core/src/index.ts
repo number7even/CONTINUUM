@@ -57,6 +57,10 @@ export type { TrustTier, RetrievedNode, RetrievalResult } from './trust.js';
 export { buildDiscussionScript } from './discussion.js';
 export type { DiscussionScript, DiscussionTurn } from './discussion.js';
 
+// — The IP-Provenance Export (Authorship Ledger Phase 3): the legal shield, printed.
+export { buildAuthorshipExport, renderAuthorshipMarkdown } from './authorship-export.js';
+export type { AuthorshipExport, AuthorshipEntry } from './authorship-export.js';
+
 // — Observation graph (the 3D "brain" viz data: nodes + refs edges)
 export { buildObservationGraph, sourceOf } from './graph.js';
 export type { GraphNode, GraphEdge, ObservationGraph, GraphOptions, DeclaredRelation } from './graph.js';
