@@ -68,49 +68,50 @@ cross-repo dependency, egress to your own box only.** Default stays native RuVec
 
 ---
 
-## Part B — Hear it back (the audio recap)
+## Part B — Hear it back (as a discussion — creative input, not a recap)
 
-### B1. v1 — the session recap (low-hanging fruit)
-```
-session end (or on demand)
-  → continuum_get_digest                     # the "what we did" text (exists)
-  → POST /api/tts { text }                    # supertonic, local (exists)
-  → ARIAN speaks it · downloadable wav        # zero egress
-```
-Trigger: a `SessionEnd` hook (or a `continuum recap` CLI / an ARIAN "recap" button). This
-turns a standard utility into a **daily ambient ritual** — hear where you landed while you
-make coffee. Almost entirely wiring of parts that already exist.
+> **Design signal (operator — the deep one):** a *read-aloud* is agitating — you read at your
+> own speed and style, so recitation is friction. But the audio's purpose isn't information
+> at all (you read faster). It is **creative input.** When your brain *receives* well-formed
+> input — a concept explained, debated, questioned — your own creative assimilation *fires*:
+> you engage, disagree, extend, synthesise. A debate is high-octane fuel for that; a
+> recitation is inert. So the audio is designed to **fire the operator's brain (Team B — the
+> creative engine)**, not to inform it. The discussion is the PRIMARY format; read-aloud is a
+> trivial fallback.
 
-### B2. v2 — the Audio Overview (two-host debate) → delegate to Pod-geni (upsell)
-Your preferred format: **two hosts discussing a document's core concept + the questions
-around it.** CONTINUUM does **not** rebuild podcast production — that's **Pod-geni.com**
-(your own product). CONTINUUM is the SOURCE; Pod-geni is the PRODUCER:
+This is the HITL loop *at its source*: **discussion (input) → your creative assimilation →
+new ideas / direction → back into the system** (amend Team A · capture the judgment · route
+via the MVP-Roadmap valve). The audio *starts* the creative loop; it doesn't just close a
+session. ARIAN as sparring partner, literally.
+
+### B1. The Discussion (the primary format)
 ```
 a document / cluster (a Brain isolation)
-  → CONTINUUM produces the "podcast source package":
-      a two-host SCRIPT/brief (Host A explains the core concept, Host B probes with
-      questions — questions can come from session_review), grounded + cited, each point
-      carrying its TRUST TIER
-  → [publish-gate] → send to Pod-geni (creator capacity) → produces the audio
-  → the finished podcast returns as a linked artifact node (provenance = the source doc)
+  → script: a two-host discussion — Host A explains the core concept; Host B probes with
+    the QUESTIONS that define the understanding (from session_review + the doc),
+    grounded + cited, each point carrying its TRUST TIER
+  → two-voice audio
 ```
-This makes **Pod-geni a third consumer of the Brain** (you-via-ARIAN · AMF factory ·
-Pod-geni) through the same gated "send to" seam — and a fair **open-core upsell**: the trust
-core stays free; the rich podcast output routes to your own product, value in-house.
+Two production paths, **one script:**
 
-> **⚠️ Egress (P4).** Pod-geni.com is hosted — sending the source package **leaves the
-> machine**, breaking the zero-egress promise for *this* output (same shape as Gemini /
-> send-to-AMF). So it is **opt-in**, **publish-gated** (only cleared docs, never
-> private/secret), and **tier-aware** (two confident hosts must not launder a `claimed`
-> point into sounding `proven`). Max-privacy clients get the fully-local read-aloud (B1) or
-> a self-hosted Pod-geni.
+| Path | Voices | Egress | For |
+|---|---|---|---|
+| **Local (sovereign)** | supertonic, two distinct voices, stitched | **0 bytes** | the free core · max-privacy clients |
+| **Pod-geni (premium)** | your own product, creator capacity | hosted → **gated egress** | you · richer production · the upsell |
 
-**The honest tiering:** local read-aloud recap = **free + sovereign (0 egress)**; two-host
-podcast = **Pod-geni upsell (explicit, gated egress)**.
+**The discussion can be fully sovereign** — supertonic is local; the script uses the
+connected/local model. Pod-geni is the *premium* tier (your product, richer production), not
+the only path. Publish-gated + tier-aware on **both** (two confident hosts must not launder a
+`claimed` point into sounding `proven`).
+
+### B2. Read-aloud — trivial fallback only
+`get_digest → /api/tts` stays available as a plain "just read it" option (accessibility /
+quick glance), but it is **not** the featured experience — recitation is friction, not fuel.
 
 ### B3. Zero-egress guarantee (visible)
-Both paths run on `supertonic serve` locally — **0 bytes leave the machine.** Surface it: a
-"local voice · 0 bytes egress" indicator (the privacy moat, made visible).
+The local discussion path runs on `supertonic serve` — **0 bytes leave the machine.** Surface
+it: a "local voice · 0 bytes egress" indicator (the privacy moat, made visible). The Pod-geni
+path is the explicit, gated exception.
 
 ---
 
@@ -136,14 +137,16 @@ but layouts of a Brain isolation:**
    `verify:` a query returns hits with Observation IDs + tiers.
 2. **Ask UI** — conversational surface, hover-cited answers, filters.
    `verify:` ask a question in the console → cited answer renders.
-3. **Audio recap v1** — `get_digest` → `/api/tts` → wav; SessionEnd trigger.
-   `verify:` end a session → a spoken recap wav is produced locally.
+3. **Discussion audio (local, sovereign)** — the primary audio: two-host script
+   (session_review + the doc) → supertonic dual-voice → stitch. (Read-aloud
+   `get_digest → /api/tts` falls out as a trivial fallback.)
+   `verify:` a doc → a two-voice discussion wav, cited, produced **locally (0 egress)**.
 4. **Semantic upgrade** — flip `HybridStorageBackend` on; fuse vector into `SearchHit.score`.
    `verify:` a semantically-related (non-keyword) query surfaces the right node.
-5. **Audio Overview v2 (→ Pod-geni)** — CONTINUUM emits the cited, tier-aware two-host
-   source package + the **publish-gated send-to-Pod-geni** seam (not a built-in stitch).
-   `verify:` a *cleared* doc → a source package with citations + tiers; a *private* doc is
-   **refused at the gate**.
+5. **Discussion audio (Pod-geni premium)** — the **publish-gated send-to-Pod-geni** seam:
+   CONTINUUM emits the cited, tier-aware source package, Pod-geni produces the richer audio.
+   `verify:` a *cleared* doc → a source package sent; a *private* doc is **refused at the
+   gate**.
 6. *(option)* **rag-engine bridge** — `RagBackend` adapter behind `/api/ask`.
 
 ---
