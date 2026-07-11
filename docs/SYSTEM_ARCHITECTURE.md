@@ -306,22 +306,73 @@ The Continuum Brain feeds **two** places:
 
 ---
 
-## 9. The Studio — outputs *and* inputs
+## 9. The Studio — one graph, N layouts → the Output Package (per-sprint closure)
 
-Two triggers for one per-node function library, on **any file / cluster / folder**:
-the **radial menu** (click) and **ARIAN** (voice).
+**The masterstroke:** the **Document**, its **Mindmap**, its **Infographic**, and the
+**Universal Brain** are not four artifacts — they are **layouts of one graph.** A visual
+output is never a heavy "render job"; it is an **isolate-and-re-layout** of the Brain.
 
-- **Analyze (✅):** Dossier · Trace · Explain · History · Relations · Reverse.
-- **Generate (the Studio):** Audio (read-aloud ✅), Mindmap ✅, Mermaid ✅, **Infographic**
-  (🎯 next — Gemini render), Report (md ✅), Slides / Video / Flashcards / Quiz (🆕 heavier),
-  Data table (≈✅).
-- **Ingest / train (🆕):** add files, **point at a YouTube channel → transcribe →
-  searchable knowledge** (askable via ARIAN). Sources grow by upload *and* transcription.
+| View | Layout | Zoom |
+|---|---|---|
+| **Document** | linear | one node's content, expanded |
+| **Mindmap** | tree | an isolated subgraph (one doc/cluster) |
+| **Infographic** | designed panels | an isolated subgraph, styled |
+| **Universal Brain** | force-directed galaxy | everything |
 
-Scope is the power: a node is a file, an isolated cluster, or a whole folder/department —
-so you *"point at any part of your knowledge, at any zoom, and turn it into any output."*
-Privacy line: **knowledge stays local; only a render call (e.g. Gemini image) leaves — the
-document never does.**
+**A map IS an isolation of the Brain.** A document's mindmap is the galaxy, isolated to that
+doc's nodes, re-laid-out as a tree. One **toggle**: `UNIVERSAL (galaxy) ⇄ [isolate] ⇄ MAP
+(this doc, tree)`. The Brain's `isolate` (depth 1/2/3) is the mechanism.
+
+**Every node is a grounded, cited window — never a dead word.** At every zoom, hover reveals
+its standing (the trust gradient, in the UI): **what it is** (summary in relation to the
+grand doc) · **how it relates** (typed edge) · **how trusted** (tier) · **where from**
+(source). Evidence that proves its own standing — not a label.
+
+**Style is a prompt — brand-defaulted, override-on-edit.** Each render = CONTENT (the
+isolation) + LAYOUT (mindmap/infographic/slide) + **STYLE** (a prompt, e.g. "clean white,
+Helvetica, red lining"). The default is a **brand-DNA `visual_style` primitive**
+(`record_brand_dna` / `check_brand`), applied automatically; an edit field overrides
+per-render. Per-user/client → each brings their own look. Consistent style *is*
+interpretability.
+
+### The Output Package — the definitive per-sprint closure flow
+**Not ad-hoc — it runs at every sprint/feature closure** (the full-time whistle). A feature
+lands → the system produces one package (all from the same isolation) → and asks
+**"what do you want to do with this feature?"** (your P9 call, recorded in the ledger):
+
+- **The Record** (provable spine): summary · the doc · source/provenance · recorded in the Timeline.
+- **The Intelligence** (the advisor): the **questions to ask** (`session_review`) · the **advised answer** (the Ask).
+- **The Registers** (layouts of the isolation): infographic · mindmap · isolated Brain view · audio (two-host discussion) · video (deferred → best on a mindmap).
+- **The routing decision** (yours): ship · brand-syndicate · Walk-and-Talk · roadmap · next sprint.
+
+### Routing — the register meets the brain; the destination meets the plan
+The package produces all registers; *what happens to it* is routed by three dimensions:
+- **Cognitive wiring** — a per-user profile (auditory · visual · textual). The system defaults
+  each brain to its native register (Riaan = auditory + visual). *The HITL can only leap (P9)
+  if the info reaches them in a register they assimilate.*
+- **Complexity** — quick grasp → visual + mindmap; complex → audio discussion (unpacks it).
+- **Brand purpose ("worth it" = it builds the brand)** — company or personal brand-worthy
+  content routes to production: cleared/publish-gated → **AMF factory → social syndication**,
+  and the **Walk-and-Talk series** (audio, mobile) → **aligned to the 90-day content plan.**
+
+### Two "balls": the project plan and the content plan
+As the project Plan governs the build (MVP/roadmap/sprints), the **90-day content plan**
+governs brand output — Walk-and-Talk episodes + syndicated pieces must *align* with it. The
+**publish-gate** is the border: only cleared, brand-appropriate content crosses from private
+knowledge into public brand content.
+
+### Ingest / train (🆕)
+Add files, or **point at a YouTube channel → transcribe → searchable knowledge**. Sources
+grow by upload *and* transcription.
+
+**Privacy:** the graph + its layouts are local; only an external *styling/production* call
+(Gemini image · Pod-geni · AMF syndication) may leave — **publish-gated, scrubbed, tier-aware,
+never for a node above its cleared tier.** The knowledge never leaves; at most a cleared
+summary/source-package does.
+
+> **Roadmap note:** the generation/Studio layer (rich renders · two-host podcast) is the
+> natural open-core **pro tier** — the trust core stays free. Captured by the MVP/Roadmap
+> valve; the MVP is *the operator has the output, in their register.*
 
 ---
 
@@ -389,9 +440,14 @@ TTS + mermaid/mindmap.
 view-switcher · CONTINUUM→AMF connection.
 
 **🆕 New:** the Plan as a first-class object (scope/requirements/MVP/roadmap/model/
-brain-shape) · the scoreboard (three altitudes) · Timeline→budget→stakeholder ·
-ARIAN two-way voice + routing · the Studio (infographic/audio + YouTube ingest) · the
-publish-gate · closed delivery loop · judgment capture · the Sources surface.
+brain-shape) · the scoreboard (three altitudes) · Timeline→budget→stakeholder · ARIAN
+two-way voice + routing · **the Output Package** as the per-sprint closure flow ("what do
+you want to do with this feature?") · maps as Brain isolations (layout pipeline) · the
+**relational-summary node hover** (content + edge-role + tier + source) · the **Map ⇄
+Universal toggle** · brand-defaulted **`visual_style`** renders (override-on-edit) ·
+**cognitive-wiring output routing** (auditory/visual/textual) · the **90-day content plan**
+→ AMF social syndication + the Walk-and-Talk series · the publish-gate · closed delivery
+loop · judgment capture · the Sources surface.
 
 ---
 
