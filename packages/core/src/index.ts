@@ -61,6 +61,10 @@ export type { DiscussionScript, DiscussionTurn } from './discussion.js';
 export { buildAuthorshipExport, renderAuthorshipMarkdown } from './authorship-export.js';
 export type { AuthorshipExport, AuthorshipEntry } from './authorship-export.js';
 
+// — The BALL: Ticket→Sprint auto-intake (dedup · route · park · auto-dissolve).
+export { runIntake, runAutoDissolve, eventsFromObservations, AUTO } from './ball.js';
+export type { IntakeEvent, IntakeResult, DissolveResult, Domain } from './ball.js';
+
 // — Observation graph (the 3D "brain" viz data: nodes + refs edges)
 export { buildObservationGraph, sourceOf } from './graph.js';
 export type { GraphNode, GraphEdge, ObservationGraph, GraphOptions, DeclaredRelation } from './graph.js';
