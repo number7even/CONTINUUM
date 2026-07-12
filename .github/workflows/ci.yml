@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**']
   pull_request:
     branches: [main]
   workflow_dispatch: {}
@@ -57,7 +57,7 @@ jobs:
         run: npm audit --omit=dev || true
 
       - name: Build better-sqlite3 native addon
-        run: npm rebuild better-sqlite3 --workspace=@continuum/core
+        run: npm rebuild better-sqlite3 --workspace=@number7even/continuum-core
 
       - name: Build workspaces
         # Per-workspace build in dep order. apps/console (Next.js) is
@@ -65,12 +65,12 @@ jobs:
         # When apps/console gains an opt-in test suite we'll add it
         # back to CI.
         run: |
-          npm run build --workspace=@continuum/core
-          npm run build --workspace=@continuum/mcp-server
-          npm run build --workspace=@continuum/cli
-          npm run build --workspace=@continuum/adapter-docs
-          npm run build --workspace=@continuum/adapter-export
-          npm run build --workspace=@continuum/adapter-git
+          npm run build --workspace=@number7even/continuum-core
+          npm run build --workspace=@number7even/continuum-mcp-server
+          npm run build --workspace=@number7even/continuum-cli
+          npm run build --workspace=@number7even/continuum-adapter-docs
+          npm run build --workspace=@number7even/continuum-adapter-export
+          npm run build --workspace=@number7even/continuum-adapter-git
 
       - name: Run node --test across workspaces
         # Root npm test → `npm run test --workspaces --if-present`, so
@@ -79,19 +79,13 @@ jobs:
         # canonical pattern established in W23-2 (Issue #11).
         run: npm test
 
-      - name: AMF worker smokes — the "validates" edge
-        # The AMF content engine proves itself through per-module --smoke runs.
-        # These were manual until now; CI validates them on every push (the
-        # pattern a mature codegraph map draws as CI --validates--> code).
-        # All four are DETERMINISTIC, NETWORK-FREE, and NEED NO SECRETS — each
-        # uses inline mocks + a throwaway sqlite dir, and exits non-zero on
-        # regression. core is already built above; vault-guard needs no build.
-        #   vault-guard     → the rights wall (9/9 branches: decline-to-synthetic)
-        #   feedback-sync   → Seam ② XENOS decisions → ground_truth (canonical rewards, idempotent)
-        #   content-matcher → boolean gate + 6-D rank incl. the closed feedback loop
-        #   adapter-news    → 8-provider ingest → corpus (mocked providers, no live calls)
-        run: |
-          node apps/amf/worker/vault-guard.mjs --smoke
-          node apps/amf/worker/feedback-sync.mjs --smoke
-          node apps/amf/worker/content-matcher.mjs --smoke
-          node apps/amf/worker/adapter-news.mjs --smoke
+      - name: Smoke suite — the referee (make smoke; any gate fails → merge halts)
+        # Unified DETERMINISTIC, network-free gate. Supersedes the per-module AMF smokes —
+        # `make smoke` runs the AMF pipeline gates (vault-guard / feedback-sync /
+        # content-matcher / adapter-news) + the AMF fix proof-gates (odometer / render-hang)
+        # + the CONTINUUM proof-gates (ask-retrieval / authorship 1-2-3 / discussion-audio /
+        # ball). Each uses inline mocks + a throwaway sqlite dir and exits non-zero on
+        # regression, so any failure halts the merge (exit 1). Network-dependent tests
+        # (semantic model download, live news feed) live in `make smoke-integration`,
+        # deliberately OUTSIDE this blocking gate so a third-party outage can't false-fail CI.
+        run: make smoke
