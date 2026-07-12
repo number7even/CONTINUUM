@@ -73,14 +73,31 @@ if (audioSrc && existsSync(audioSrc)) {
 // recognized project layout, we overwrite index.html with our composition, then
 // `npm run render` (the scaffold's own script) produces the MP4. A hand-rolled
 // hyperframes.json is NOT recognized as a project root.
+// Watchdog — the render-hang fix. HyperFrames pulls a headless browser on first run; a
+// wedged download or render used to hang FOREVER (these steps had no timeout, and the
+// parent's SIGTERM can't kill a browser grandchild). Every heavy step now has a hard
+// timeout that SIGKILLs a stuck child (SIGTERM is caught/ignored by browsers), then fails
+// LOUD — never a silent hang. Tunable via AMF_RENDER_TIMEOUT_MS (default 5 min).
+const RENDER_TIMEOUT_MS = Number(process.env.AMF_RENDER_TIMEOUT_MS || 300_000);
+function sh(cmd, opts = {}) {
+  try {
+    return execSync(cmd, { stdio: 'inherit', timeout: RENDER_TIMEOUT_MS, killSignal: 'SIGKILL', ...opts });
+  } catch (e) {
+    const timedOut = e.signal === 'SIGKILL' || e.code === 'ETIMEDOUT' || /ETIMEDOUT/.test(String(e.message || ''));
+    console.error(`[L5] render step ${timedOut ? `TIMED OUT (${RENDER_TIMEOUT_MS}ms) → killed` : 'failed'}: ${cmd}`);
+    if (timedOut) console.error('      HyperFrames pulls a headless browser on first run — pre-install it, check the network, or raise AMF_RENDER_TIMEOUT_MS.');
+    process.exit(1);
+  }
+}
+
 console.error('[L5] scaffolding HyperFrames project…');
-execSync('npx --yes hyperframes@latest init proj', { cwd: outDir, stdio: 'inherit' });
+sh('npx --yes hyperframes@latest init proj', { cwd: outDir });
 const projDir = resolve(outDir, 'proj');
 writeFileSync(resolve(projDir, 'index.html'), composeVideo(payload, audioFile));
 if (audioFile) copyFileSync(resolve(outDir, audioFile), resolve(projDir, audioFile));
 
 console.error('[L5] rendering video via HyperFrames…');
-execSync('npm run render', { cwd: projDir, stdio: 'inherit' });
+sh('npm run render', { cwd: projDir });
 
 // find the rendered (silent) mp4
 const rendersDir = resolve(projDir, 'renders');
@@ -92,10 +109,7 @@ if (audioFile) {
   const voiceWav = resolve(projDir, audioFile);
   const voiced = resolve(rendersDir, 'voiced.mp4');
   console.error('[L5] muxing voice track via FFmpeg…');
-  execSync(
-    `ffmpeg -y -i "${silent}" -i "${voiceWav}" -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -shortest "${voiced}"`,
-    { stdio: 'inherit' },
-  );
+  sh(`ffmpeg -y -i "${silent}" -i "${voiceWav}" -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -shortest "${voiced}"`);
   console.error(`[L5] ✓ voiced MP4 → ${voiced}`);
 } else {
   console.error(`[L5] ✓ silent MP4 → ${silent}`);
