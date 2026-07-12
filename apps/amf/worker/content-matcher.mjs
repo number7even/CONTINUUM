@@ -217,6 +217,7 @@ async function run() {
   if (!ranked.length) { console.error('[matcher] no matching signals — run adapter-news first'); storage.close(); process.exit(1); }
   const brief = format === 'report' ? await buildReportBrief(ranked, brand, product) : await buildBrief(ranked[0], brand, product);
   storage.close();
+  console.error(`[matcher] stats kept=${ranked.length} drafted=${brief.drafted}`); // machine-parseable for the dogfood odometer
   console.log(JSON.stringify(brief, null, 2));
 }
 
