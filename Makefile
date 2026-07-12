@@ -27,7 +27,8 @@ smoke: build
 	node apps/amf/worker/adapter-news.mjs --smoke
 	node apps/amf/worker/verify-odometer.mjs
 	node apps/amf/worker/verify-render-hang.mjs
-	@echo "✓ SMOKE SUITE GREEN — 12 deterministic gates passed"
+	node apps/amf/worker/verify-dashboard.mjs
+	@echo "✓ SMOKE SUITE GREEN — 13 deterministic gates passed"
 
 smoke-integration: build
 	CONTINUUM_STORAGE_BACKEND=hybrid node scripts/verify-semantic-search.mjs

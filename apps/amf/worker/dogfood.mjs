@@ -74,6 +74,12 @@ if (brief) {
 // ── the honest odometer (per-run counts + every gate) ──
 console.log('\n' + '═'.repeat(68));
 console.log(rep.render());
+// persist this run's honest counts so the review dashboard can show them
+try {
+  mkdirSync(resolve(HERE, 'out'), { recursive: true });
+  writeFileSync(resolve(HERE, 'out', 'odometer-last.json'), JSON.stringify(
+    { label: rep.label, ingested: rep.ingested, matchedKept: rep.matchedKept, drafted: rep.drafted, draftMode: rep.draftMode, routed: rep.routed, at: new Date().toISOString() }, null, 2));
+} catch { /* noop */ }
 rep.notes.forEach((n) => console.log(`   · ${n}`));
 console.log('');
 process.stdout.write(renderCapability(capabilityReport()));

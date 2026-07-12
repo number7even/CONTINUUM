@@ -14,3 +14,7 @@ dogfood:
 # Just the honest state, no run.
 odometer:
 	@node odometer.mjs
+
+# The operator review dashboard — pending · preview · approve, honest odometer on top.
+dashboard:
+	@node dashboard.mjs
