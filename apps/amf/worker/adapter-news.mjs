@@ -311,7 +311,7 @@ const own = {
   },
 };
 
-const PROVIDERS = { worldmonitor, feedly, rss, googlenews, hackernews, reddit, youtube, own };
+export const PROVIDERS = { worldmonitor, feedly, rss, googlenews, hackernews, reddit, youtube, own };
 
 /** Derive AMF_OWN_FEEDS from a product's own_feeds[] in the universe (--brand). */
 function deriveOwnFeeds(slug) {
