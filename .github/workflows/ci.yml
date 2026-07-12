@@ -79,13 +79,33 @@ jobs:
         # canonical pattern established in W23-2 (Issue #11).
         run: npm test
 
-      - name: Smoke suite — the referee (make smoke; any gate fails → merge halts)
-        # Unified DETERMINISTIC, network-free gate. Supersedes the per-module AMF smokes —
-        # `make smoke` runs the AMF pipeline gates (vault-guard / feedback-sync /
-        # content-matcher / adapter-news) + the AMF fix proof-gates (odometer / render-hang)
-        # + the CONTINUUM proof-gates (ask-retrieval / authorship 1-2-3 / discussion-audio /
-        # ball). Each uses inline mocks + a throwaway sqlite dir and exits non-zero on
-        # regression, so any failure halts the merge (exit 1). Network-dependent tests
-        # (semantic model download, live news feed) live in `make smoke-integration`,
-        # deliberately OUTSIDE this blocking gate so a third-party outage can't false-fail CI.
+  smoke:
+    name: smoke suite (the referee)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['20']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build better-sqlite3 native addon
+        run: npm rebuild better-sqlite3 --workspace=@number7even/continuum-core
+
+      - name: make smoke — the referee (deterministic gates; any fail → exit 1)
+        # Runs in its OWN job, independent of the security-audit gate, so functional
+        # regressions are caught even while a security advisory is being triaged (separate
+        # concerns). `make smoke` builds core/mcp/cli then runs the AMF pipeline gates
+        # (vault-guard / feedback-sync / content-matcher / adapter-news) + AMF fix proof-gates
+        # (odometer / render-hang) + CONTINUUM proof-gates (ask-retrieval / authorship-1-2-3 /
+        # discussion-audio / ball). Network tests → `make smoke-integration`, outside this gate.
         run: make smoke
