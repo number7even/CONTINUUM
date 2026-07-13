@@ -116,3 +116,30 @@ export { sanitiseTenantId, tenantDataDir } from './tenant.js';
 // The PM brain — actionable-task computation over the todo dependency DAG.
 export { computeNextTasks } from './next-tasks.js';
 export type { NextTasksResult, RankedTask, NextTaskState } from './next-tasks.js';
+
+// — The multi-signature TruthBlock engine (verify-don't-trust made cryptographic).
+// A (executor) claims · V (a separate LLM) validates · T (mechanical exit 0) tests ·
+// H (human) accepts. Independence enforced by DISTINCT Ed25519 keys — collusion is
+// structurally impossible. Zero-egress: native crypto, local seal, H-only export.
+export {
+  generateIdentity,
+  signEntry,
+  verifyEntry,
+  evaluateVerdict,
+  computeBlockHash,
+  finalizeBlock,
+  verifyLedger,
+  GENESIS,
+} from './truth-ledger.js';
+export type {
+  Role,
+  Identity,
+  Keypair,
+  EntryKind,
+  EntryPayloads,
+  LedgerEntry,
+  Verdict,
+  TruthBlock,
+  LedgerIssue,
+  LedgerReport,
+} from './truth-ledger.js';
