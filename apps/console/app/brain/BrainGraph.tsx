@@ -1120,7 +1120,7 @@ const panel: Record<string, React.CSSProperties> = {
   sectionLabel: { fontSize: 11, letterSpacing: 1.5, color: '#6b7280', margin: '14px 0 8px' },
   empty: { position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#05070a', gap: 8 },
   controls: { position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 4, fontSize: 11, color: 'rgba(203,213,225,0.55)', background: 'rgba(10,14,20,0.72)', padding: '6px 14px', borderRadius: 20, fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap' },
-  freqBar: { position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 4, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(10,14,20,0.82)', padding: '6px 12px', borderRadius: 22, border: '1px solid rgba(255,255,255,0.06)' },
+  freqBar: { position: 'fixed', top: 58, left: '50%', transform: 'translateX(-50%)', zIndex: 4, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(10,14,20,0.82)', padding: '6px 12px', borderRadius: 22, border: '1px solid rgba(255,255,255,0.06)' },
 };
 
 const dossierStyle: Record<string, React.CSSProperties> = {

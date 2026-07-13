@@ -31,23 +31,37 @@ export const getTodosTool: ToolDefinition = {
   },
 };
 
+/** The ledger evidence a board card needs: the verdict + the verifyCommand T ran + the
+ *  exact commit hashes the claim landed + the test's exit code. Pulled from the latest
+ *  TruthBlock so the card can tie a task to its git reality. */
+interface LedgerSummary { verdict: string | null; verifyCommand: string | null; commitShas: string[]; testExitCode: number | null }
+
 export const handleGetTodos: ToolHandler = async (args, storage) => {
   const { status, limit } = (args ?? {}) as { status?: Todo['status']; limit?: number };
   const todos = storage.listTodos({ status, limit });
 
-  // Enrich each todo with its real ledger verdict + the gated board column. DONE is only
-  // ever surfaced for a PROVEN TruthBlock — a self-reported status='done' with no proof
-  // lands in SKIPPED, never DONE (the whole point of the ledger).
-  const verdictById = new Map(todos.map(t => [t.id, storage.verdictForTask(todoTaskRef(t.id))]));
+  // Enrich each todo with its real ledger verdict + evidence + the gated board column. DONE
+  // is only ever surfaced for a PROVEN TruthBlock — a self-reported status='done' with no
+  // proof lands in SKIPPED, never DONE (the whole point of the ledger).
+  const ledgerById = new Map<string, LedgerSummary>(todos.map(t => {
+    const latest = storage.getTruthThread(todoTaskRef(t.id)).at(-1);
+    if (!latest) return [t.id, { verdict: null, verifyCommand: null, commitShas: [], testExitCode: null }];
+    const claim = latest.entries.find(e => e.kind === 'claim')?.payload as { verifyCommand?: string; commitShas?: string[] } | undefined;
+    const test = latest.entries.find(e => e.kind === 'test')?.payload as { exitCode?: number } | undefined;
+    return [t.id, { verdict: latest.verdict, verifyCommand: claim?.verifyCommand ?? null, commitShas: claim?.commitShas ?? [], testExitCode: test?.exitCode ?? null }];
+  }));
   const columnFor = (t: Todo): string => truthBoardColumn({
     status: t.status,
-    verdict: verdictById.get(t.id) ?? null,
+    verdict: (ledgerById.get(t.id)?.verdict ?? null) as never,
     upstreamAllDone: (t.blockedBy ?? []).every(bid => {
       const b = todos.find(x => x.id === bid);
-      return b ? truthBoardColumn({ status: b.status, verdict: verdictById.get(bid) ?? null }) === 'DONE' : true;
+      return b ? truthBoardColumn({ status: b.status, verdict: (ledgerById.get(bid)?.verdict ?? null) as never }) === 'DONE' : true;
     }),
   });
-  const enriched = todos.map(t => ({ ...t, ledgerVerdict: verdictById.get(t.id) ?? null, boardColumn: columnFor(t) }));
+  const enriched = todos.map(t => {
+    const l = ledgerById.get(t.id)!;
+    return { ...t, ledgerVerdict: l.verdict, boardColumn: columnFor(t), verifyCommand: l.verifyCommand ?? t.verifyCommand ?? null, commitShas: l.commitShas, testExitCode: l.testExitCode };
+  });
 
   return {
     content: [

@@ -28,6 +28,7 @@ import { execSync } from 'node:child_process';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { resolveProject } from '@/lib/project';
+import { assembleBoard } from '../../../lib/board-model.mjs';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -43,9 +44,11 @@ interface Todo {
   verifyCommand?: string;
   blockedBy?: string[];
   createdAt?: string;
-  /** The engine's extended continuum_get_todos now emits the true ledger state. */
+  /** The engine's extended continuum_get_todos now emits the true ledger state + evidence. */
   ledgerVerdict?: LedgerVerdict | null;
   boardColumn?: BoardColumn;
+  commitShas?: string[];
+  testExitCode?: number | null;
 }
 export interface BoardCard {
   id: string;
@@ -56,6 +59,9 @@ export interface BoardCard {
   ledgerVerdict: LedgerVerdict | null;
   verifyCommand: string | null;
   hasVerify: boolean;
+  /** The exact commit hashes the claim landed (the git↔task tie), + T's exit code. */
+  commitShas: string[];
+  testExitCode: number | null;
   refs: string[];
   leverage: number;
   blockedByOpen: string[];
@@ -117,8 +123,19 @@ export async function GET(): Promise<Response> {
     await mcp.connect(transport);
 
     const todosRes = await mcp.callTool({ name: 'continuum_get_todos', arguments: { limit: 500 } }).catch(() => null);
+    // Commits (the work) — grouped into the same sprint lanes as the tasks (the plan).
+    const commitsRes = await mcp.callTool({
+      name: 'continuum_timeline',
+      arguments: { at: new Date().toISOString(), beforeHours: 24 * 365 * 3, afterHours: 0, limit: 500 },
+    }).catch(() => null);
     await mcp.close().catch(() => {});
     const todos = parseToolText<{ todos?: Todo[] }>(todosRes, {}).todos ?? [];
+
+    interface Obs { id: string; sourceId?: string; type?: string; content?: string; timestamp?: string }
+    const rawCommits = parseToolText<{ observations?: Obs[]; hits?: Obs[]; results?: Obs[] }>(commitsRes, {});
+    const commits = (rawCommits.observations ?? rawCommits.hits ?? rawCommits.results ?? [])
+      .filter(o => (o.sourceId ?? '').startsWith('git:') || o.type === 'commit')
+      .map(o => ({ id: o.id, title: (o.content ?? '').split('\n').map(l => l.trim()).find(Boolean) ?? o.id, ts: o.timestamp ?? '' }));
 
     // Compute the DAG state locally from blockedBy — robust, no dependency on the
     // engine build. (continuum_next_tasks is the LLM/CLI surface; the board owns
@@ -159,6 +176,8 @@ export async function GET(): Promise<Response> {
         ledgerVerdict: t.ledgerVerdict ?? null,
         verifyCommand: t.verifyCommand ?? null,
         hasVerify: !!t.verifyCommand?.trim(),
+        commitShas: t.commitShas ?? [],
+        testExitCode: t.testExitCode ?? null,
         refs: t.refs ?? [],
         leverage: leverageOf(t.id),
         blockedByOpen,
@@ -166,7 +185,11 @@ export async function GET(): Promise<Response> {
       };
     });
 
-    return Response.json({ cards, liveVerify });
+    // Align commits ↔ tasks ↔ sprints: sprint lanes, each with its cards + commit count +
+    // the orphan commits (work no task claims). The pure model is shared with the proof-gate.
+    const { sprints } = assembleBoard({ todos: cards, commits });
+
+    return Response.json({ cards, sprints, liveVerify, commitCount: commits.length });
   } catch (err) {
     await mcp?.close().catch(() => {});
     const msg = err instanceof Error ? err.message : String(err);
