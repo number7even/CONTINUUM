@@ -80,7 +80,7 @@ export type { KaizenGrade, AdversarialResult, BlindRun, KaizenLedgerEntry, Kaize
 export { embed, embeddingDimensions } from './embedder.js';
 
 // — Filesystem layout helpers (used by adapters/CLI for diagnostics)
-export { dbPathForProject, continuumDataRoot } from './db.js';
+export { openDb, dbPathForProject, continuumDataRoot } from './db.js';
 
 // — Pure helpers (storage-agnostic)
 export { privacyFilter, scrubMetadataDeep, type PrivacyResult, type MetadataScrubResult } from './observation.js';
@@ -143,3 +143,23 @@ export type {
   LedgerIssue,
   LedgerReport,
 } from './truth-ledger.js';
+
+// — Truth Ledger persistence: public-key registry + append-only block chain.
+export {
+  registerIdentity,
+  listIdentities,
+  latestTruthBlock,
+  allTruthBlocks,
+  getTruthThread,
+  verdictForTask,
+  appendTruthBlock,
+  sealAndAppend,
+} from './truth-ledger-store.js';
+
+// — The Board gate: the DONE column opens ONLY for a PROVEN verdict (multi-signature).
+export { truthBoardColumn, todoTaskRef } from './board-gate.js';
+export type { BoardColumn, BoardClassifyInput } from './board-gate.js';
+
+// — Todo CRUD (the raw functions the MCP tools wrap). updateTodo carries the hard
+// Truth-gate choke-point (CONTINUUM_TRUTH_GATE=1 → no DONE without a PROVEN block).
+export { createTodo, updateTodo, getTodo, listTodos } from './todo.js';

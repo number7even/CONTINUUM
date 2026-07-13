@@ -143,4 +143,32 @@ function runMigrations(db: Database.Database): void {
       INSERT INTO schema_version (version, applied_at) VALUES (1, datetime('now'));
     `);
   }
+
+  if (currentVersion < 2) {
+    // v2 — the Truth Ledger. Public-key registry + the append-only, hash-linked
+    // TruthBlock chain. Private keys NEVER live here (H's stays off-repo). Blocks are
+    // immutable once appended (append-only invariant enforced in truth-ledger-store.ts).
+    db.exec(`
+      CREATE TABLE truth_identities (
+        key_id        TEXT PRIMARY KEY,
+        role          TEXT NOT NULL CHECK (role IN ('executor','validator','human','tester','ball')),
+        public_key    TEXT NOT NULL,
+        registered_at TEXT NOT NULL
+      );
+
+      CREATE TABLE truth_blocks (
+        block_hash  TEXT PRIMARY KEY,
+        idx         INTEGER NOT NULL UNIQUE,
+        prev_hash   TEXT NOT NULL,
+        task_ref    TEXT NOT NULL,
+        entries     TEXT NOT NULL,
+        verdict     TEXT NOT NULL,
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX truth_blocks_task_ref_idx ON truth_blocks(task_ref);
+      CREATE INDEX truth_blocks_idx_idx ON truth_blocks(idx);
+
+      INSERT INTO schema_version (version, applied_at) VALUES (2, datetime('now'));
+    `);
+  }
 }

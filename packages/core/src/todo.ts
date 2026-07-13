@@ -12,6 +12,8 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import type { Todo } from './types.js';
+import { verdictForTask } from './truth-ledger-store.js';
+import { todoTaskRef } from './board-gate.js';
 
 type TodoRow = {
   id: string;
@@ -140,6 +142,25 @@ export function updateTodo(db: Database.Database, input: UpdateTodoInput): Todo 
   const existing = getTodo(db, input.id);
   if (!existing) {
     throw new Error(`No todo with id ${input.id}`);
+  }
+
+  // The hard Truth-Ledger choke-point. When CONTINUUM_TRUTH_GATE=1, a NEW transition
+  // into 'done' is refused unless a PROVEN TruthBlock backs this todo — the multi-signature
+  // boundary enforced at the data layer, so no consumer (CLI/MCP/console) can bypass it
+  // (P5: the rule binds its keeper). Off by default to preserve legacy pipelines; the board
+  // classifier (truthBoardColumn) always enforces the softer "unproven done ≠ DONE column".
+  if (
+    process.env.CONTINUUM_TRUTH_GATE === '1' &&
+    input.status === 'done' &&
+    existing.status !== 'done'
+  ) {
+    const verdict = verdictForTask(db, todoTaskRef(input.id));
+    if (verdict !== 'PROVEN') {
+      throw new Error(
+        `Truth gate: todo ${input.id} cannot enter DONE — its TruthBlock verdict is ${verdict ?? 'ABSENT'}, not PROVEN. ` +
+        `Requires distinct-key signatures from A (claim), V (validation), T (test exit 0), and H (accept).`,
+      );
+    }
   }
 
   const next: Todo = {
