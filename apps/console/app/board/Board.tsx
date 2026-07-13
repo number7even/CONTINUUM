@@ -12,8 +12,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
 type Column = 'RUNNING' | 'REVIEW' | 'DONE' | 'SKIPPED' | 'BLOCKED' | 'FAILED';
+type LedgerVerdict = 'PROVEN' | 'PENDING_HUMAN' | 'CONTESTED' | 'REFUTED' | 'UNVERIFIED' | 'INVALID' | null;
 interface Card {
-  id: string; title: string; status: string; column: Column;
+  id: string; title: string; status: string; column: Column; ledgerVerdict: LedgerVerdict;
   verifyCommand: string | null; hasVerify: boolean; refs: string[];
   leverage: number; blockedByOpen: string[]; createdAt: string | null;
 }
@@ -22,11 +23,21 @@ interface SprintFilter { label: string; from: string; to: string }
 const COLUMNS: { key: Column; label: string; color: string; hint: string }[] = [
   { key: 'BLOCKED', label: 'BLOCKED', color: '#f59e0b', hint: 'waiting on upstream' },
   { key: 'RUNNING', label: 'RUNNING', color: '#38bdf8', hint: 'actionable now' },
-  { key: 'REVIEW', label: 'REVIEW', color: '#a78bfa', hint: 'proof green · awaiting the human leap (P9)' },
-  { key: 'DONE', label: 'DONE', color: '#34d399', hint: 'verifyCommand passed' },
+  { key: 'REVIEW', label: 'REVIEW', color: '#a78bfa', hint: 'A+V+T green · awaiting YOUR signature (P9)' },
+  { key: 'DONE', label: 'DONE', color: '#34d399', hint: 'PROVEN — full A·V·T·H TruthBlock' },
   { key: 'SKIPPED', label: 'SKIPPED', color: '#94a3b8', hint: 'done without proof — not accepted' },
-  { key: 'FAILED', label: 'FAILED', color: '#f87171', hint: 'claimed done · verify red' },
+  { key: 'FAILED', label: 'FAILED', color: '#f87171', hint: 'V disputed or T failed — the veto' },
 ];
+
+// The one-line reason a card sits where it does — the true ledger verdict, in operator words.
+const VERDICT_NOTE: Record<string, { text: string; color: string }> = {
+  PENDING_HUMAN: { text: '⚖ needs your signature', color: '#a78bfa' },
+  REFUTED: { text: '✗ T failed — mechanical veto', color: '#f87171' },
+  CONTESTED: { text: '✗ V disputed the claim', color: '#f87171' },
+  INVALID: { text: '✗ signature/collusion invalid', color: '#f87171' },
+  PROVEN: { text: '✓ A·V·T·H proven', color: '#34d399' },
+  UNVERIFIED: { text: '· not yet validated/tested', color: '#6b7280' },
+};
 
 interface Obs { id: string; type?: string; content?: string; metadata?: Record<string, unknown> }
 
@@ -34,11 +45,11 @@ export default function Board() {
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [live, setLive] = useState(false);
   const [selected, setSelected] = useState<Card | null>(null);
   const [dossier, setDossier] = useState<{ loading: boolean; obs: Obs[] } | null>(null);
   // Sprint focus arrives from a timeline sprint click: /board?sprint=W27&from=…&to=…
   const [sprint, setSprint] = useState<SprintFilter | null>(null);
+  const [attesting, setAttesting] = useState<string | null>(null);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -54,13 +65,27 @@ export default function Board() {
       const d = await r.json();
       if (d.error && d.error !== 'login') throw new Error(d.error);
       setCards(d.cards ?? []);
-      setLive(!!d.liveVerify);
       if (d.error === 'login') setError('not authenticated — set CONTINUUM_HTTP_TOKEN');
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  // The P9 leap, from the Board. Signs a decision with the operator's LOCAL key (server-side
+  // via /api/attest) and calls continuum_attest. On success the card jumps PENDING_HUMAN → DONE.
+  const attest = useCallback(async (id: string) => {
+    setAttesting(id); setError(null);
+    try {
+      const r = await fetch('/api/attest', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ todoId: id }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'attest failed');
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setAttesting(null); }
+  }, [load]);
 
   const openDossier = useCallback(async (card: Card) => {
     setSelected(card);
@@ -95,9 +120,9 @@ export default function Board() {
         <div>
           <div style={{ fontSize: 14, letterSpacing: 1, color: '#6ee7b7' }}>CONTINUUM · THE BOARD</div>
           <div style={{ fontSize: 12, color: '#9ca3af' }}>
-            Done is not a button — it&apos;s a passing verifyCommand.
-            {' '}{doneWithProof}/{totalDoneClaims || 0} “done” claims are proof-backed.
-            {' · '}{live ? <span style={{ color: '#34d399' }}>live verify ON</span> : <span style={{ color: '#94a3b8' }}>classification gate (set CONTINUUM_BOARD_LIVE_VERIFY=1 for live)</span>}
+            Done is not a button — it&apos;s a PROVEN multi-signature TruthBlock (A·V·T·H).
+            {' '}{doneWithProof} proven · {totalDoneClaims || 0} “done” claims.
+            {' · '}<span style={{ color: '#a78bfa' }}>ledger-gated</span>
           </div>
         </div>
         <button type="button" onClick={() => void load()} style={s.refresh}>↻ refresh</button>
@@ -144,6 +169,22 @@ export default function Board() {
                     </div>
                     {card.column === 'BLOCKED' && card.blockedByOpen.length > 0 && (
                       <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>needs {card.blockedByOpen.map(x => x.slice(0, 8)).join(', ')}</div>
+                    )}
+                    {card.ledgerVerdict && VERDICT_NOTE[card.ledgerVerdict] && (
+                      <div style={{ fontSize: 10, color: VERDICT_NOTE[card.ledgerVerdict].color, marginTop: 5 }}>
+                        {VERDICT_NOTE[card.ledgerVerdict].text}
+                      </div>
+                    )}
+                    {card.ledgerVerdict === 'PENDING_HUMAN' && (
+                      <button
+                        type="button"
+                        disabled={attesting === card.id}
+                        onClick={(e) => { e.stopPropagation(); void attest(card.id); }}
+                        style={{ ...s.attest, opacity: attesting === card.id ? 0.6 : 1 }}
+                        title="Sign the P9 leap with your local key — mints acceptance, moves the card to DONE"
+                      >
+                        {attesting === card.id ? '⧗ signing…' : '⚖ Attest — sign to accept (P9)'}
+                      </button>
                     )}
                   </div>
                 ))}
@@ -193,6 +234,7 @@ const s: Record<string, React.CSSProperties> = {
   card: { background: 'rgba(20,28,40,0.7)', borderRadius: 8, padding: '9px 11px', cursor: 'pointer' },
   cardMeta: { display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 },
   badge: { fontSize: 9.5, padding: '1px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', color: '#9ca3af' },
+  attest: { marginTop: 8, width: '100%', fontSize: 11, padding: '6px 8px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, background: 'rgba(167,139,250,0.16)', border: '1px solid rgba(167,139,250,0.5)', color: '#c4b5fd' },
   dossier: { position: 'fixed', top: 0, right: 0, bottom: 0, width: 380, background: 'rgba(8,11,16,0.97)', borderLeft: '1px solid rgba(56,189,248,0.25)', padding: 18, overflowY: 'auto', zIndex: 5, boxShadow: '-8px 0 40px rgba(0,0,0,0.6)' },
   code: { fontSize: 11, color: '#d1d5db', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'ui-monospace, monospace', background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 6, margin: '4px 0 0' },
   obs: { marginBottom: 10 },

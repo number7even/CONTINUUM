@@ -34,6 +34,7 @@ export const maxDuration = 60;
 
 export type BoardColumn = 'RUNNING' | 'REVIEW' | 'DONE' | 'SKIPPED' | 'BLOCKED' | 'FAILED';
 
+type LedgerVerdict = 'PROVEN' | 'PENDING_HUMAN' | 'CONTESTED' | 'REFUTED' | 'UNVERIFIED' | 'INVALID';
 interface Todo {
   id: string;
   title: string;
@@ -42,12 +43,17 @@ interface Todo {
   verifyCommand?: string;
   blockedBy?: string[];
   createdAt?: string;
+  /** The engine's extended continuum_get_todos now emits the true ledger state. */
+  ledgerVerdict?: LedgerVerdict | null;
+  boardColumn?: BoardColumn;
 }
 export interface BoardCard {
   id: string;
   title: string;
   status: Todo['status'];
   column: BoardColumn;
+  /** The multi-signature TruthBlock verdict — the real reason a card sits where it does. */
+  ledgerVerdict: LedgerVerdict | null;
   verifyCommand: string | null;
   hasVerify: boolean;
   refs: string[];
@@ -141,11 +147,16 @@ export async function GET(): Promise<Response> {
     const cards: BoardCard[] = todos.map(t => {
       const blockedByOpen = (t.blockedBy ?? []).filter(id => !isDone(id));
       const dagState = t.status === 'blocked' || blockedByOpen.length > 0 ? 'BLOCKED' : undefined;
+      // The engine's ledger is the source of truth for the column. Only fall back to the
+      // legacy single-verifyCommand classification if talking to an older engine that
+      // doesn't emit boardColumn yet (P3: forward-compatible, no hard break).
+      const column = t.boardColumn ?? classify(t, dagState);
       return {
         id: t.id,
         title: t.title,
         status: t.status,
-        column: classify(t, dagState),
+        column,
+        ledgerVerdict: t.ledgerVerdict ?? null,
         verifyCommand: t.verifyCommand ?? null,
         hasVerify: !!t.verifyCommand?.trim(),
         refs: t.refs ?? [],
