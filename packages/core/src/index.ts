@@ -154,6 +154,7 @@ export {
   verdictForTask,
   appendTruthBlock,
   sealAndAppend,
+  submitLedgerEntry,
 } from './truth-ledger-store.js';
 
 // — The Board gate: the DONE column opens ONLY for a PROVEN verdict (multi-signature).

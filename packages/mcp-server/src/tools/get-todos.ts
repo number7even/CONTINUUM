@@ -1,8 +1,11 @@
 /**
- * continuum_get_todos — list todos with optional status filter.
+ * continuum_get_todos — list todos with optional status filter, each carrying its TRUE
+ * Truth-Ledger verdict + board column so the console renders the real 6-state model
+ * (DONE only for a PROVEN block) rather than a self-reported status.
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
+import { todoTaskRef, truthBoardColumn } from '@number7even/continuum-core';
 import type { Todo } from '@number7even/continuum-core';
 import type { ToolDefinition, ToolHandler } from '../tool-types.js';
 
@@ -31,9 +34,24 @@ export const getTodosTool: ToolDefinition = {
 export const handleGetTodos: ToolHandler = async (args, storage) => {
   const { status, limit } = (args ?? {}) as { status?: Todo['status']; limit?: number };
   const todos = storage.listTodos({ status, limit });
+
+  // Enrich each todo with its real ledger verdict + the gated board column. DONE is only
+  // ever surfaced for a PROVEN TruthBlock — a self-reported status='done' with no proof
+  // lands in SKIPPED, never DONE (the whole point of the ledger).
+  const verdictById = new Map(todos.map(t => [t.id, storage.verdictForTask(todoTaskRef(t.id))]));
+  const columnFor = (t: Todo): string => truthBoardColumn({
+    status: t.status,
+    verdict: verdictById.get(t.id) ?? null,
+    upstreamAllDone: (t.blockedBy ?? []).every(bid => {
+      const b = todos.find(x => x.id === bid);
+      return b ? truthBoardColumn({ status: b.status, verdict: verdictById.get(bid) ?? null }) === 'DONE' : true;
+    }),
+  });
+  const enriched = todos.map(t => ({ ...t, ledgerVerdict: verdictById.get(t.id) ?? null, boardColumn: columnFor(t) }));
+
   return {
     content: [
-      { type: 'text', text: JSON.stringify({ count: todos.length, todos }, null, 2) },
+      { type: 'text', text: JSON.stringify({ count: enriched.length, todos: enriched }, null, 2) },
     ],
   };
 };

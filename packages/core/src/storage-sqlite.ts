@@ -33,6 +33,18 @@ import {
 } from './todo.js';
 import { buildObservationGraph } from './graph.js';
 import type { GraphOptions, ObservationGraph } from './graph.js';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import {
+  registerIdentity as _registerIdentity,
+  listIdentities as _listIdentities,
+  submitLedgerEntry as _submitLedgerEntry,
+  verdictForTask as _verdictForTask,
+  getTruthThread as _getTruthThread,
+  allTruthBlocks as _allTruthBlocks,
+} from './truth-ledger-store.js';
+import { generateIdentity, signEntry } from './truth-ledger.js';
+import type { Identity, Keypair, LedgerEntry, TruthBlock, Verdict } from './truth-ledger.js';
 import type {
   Observation,
   SearchHit,
@@ -54,10 +66,25 @@ import type {
 export class SQLiteStorageBackend implements StorageBackend {
   private readonly db: Database.Database;
   private readonly projectId: string;
+  /** The mechanical referee's (T) keypair — machine-local, off-db. T is not a party we
+   *  protect against (it's the environment), so the server legitimately holds this key. */
+  private readonly tester: Keypair;
 
   constructor(projectId: string) {
     this.projectId = projectId;
     this.db = openDb(projectId);
+    this.tester = this.loadOrCreateTesterKey();
+    _registerIdentity(this.db, this.tester);
+  }
+
+  private loadOrCreateTesterKey(): Keypair {
+    const path = join(dirname(dbPathForProject(this.projectId)), '.tester-key.json');
+    if (existsSync(path)) {
+      try { return JSON.parse(readFileSync(path, 'utf8')) as Keypair; } catch { /* corrupt → regenerate */ }
+    }
+    const kp = generateIdentity('tester', `tester:${this.projectId}`);
+    writeFileSync(path, JSON.stringify(kp), { mode: 0o600 });
+    return kp;
   }
 
   // ── Checkpoints ───────────────────────────────────────────────────────────
@@ -90,6 +117,42 @@ export class SQLiteStorageBackend implements StorageBackend {
 
   updateTodo(input: UpdateTodoInput): Todo {
     return _updateTodo(this.db, input);
+  }
+
+  // ── Truth Ledger ──────────────────────────────────────────────────────────
+
+  registerIdentity(id: Identity): void {
+    _registerIdentity(this.db, id);
+  }
+
+  listIdentities(): Identity[] {
+    return _listIdentities(this.db);
+  }
+
+  submitLedgerEntry(taskRef: string, entry: LedgerEntry): TruthBlock {
+    return _submitLedgerEntry(this.db, taskRef, entry);
+  }
+
+  /** The mechanical referee (T). The caller runs the command; this signs the result with
+   *  the server-held tester key and welds it into the thread. Not an LLM decision. */
+  submitTest(taskRef: string, result: { verifyCommand: string; exitCode: number; outputHash: string }): TruthBlock {
+    const entry = signEntry({
+      kind: 'test', taskRef, at: new Date().toISOString(), by: this.tester.keyId, role: 'tester',
+      payload: { verifyCommand: result.verifyCommand, exitCode: result.exitCode, outputHash: result.outputHash, verifier: 'server' },
+    }, this.tester);
+    return _submitLedgerEntry(this.db, taskRef, entry);
+  }
+
+  verdictForTask(taskRef: string): Verdict | null {
+    return _verdictForTask(this.db, taskRef);
+  }
+
+  getTruthThread(taskRef: string): TruthBlock[] {
+    return _getTruthThread(this.db, taskRef);
+  }
+
+  allTruthBlocks(): TruthBlock[] {
+    return _allTruthBlocks(this.db);
   }
 
   // ── Observations ──────────────────────────────────────────────────────────

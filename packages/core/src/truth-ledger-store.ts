@@ -13,7 +13,7 @@
  * IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans
  */
 import type Database from 'better-sqlite3';
-import { finalizeBlock, GENESIS } from './truth-ledger.js';
+import { finalizeBlock, verifyEntry, GENESIS } from './truth-ledger.js';
 import type { Identity, LedgerEntry, TruthBlock, Verdict } from './truth-ledger.js';
 
 interface IdentityRow { key_id: string; role: Identity['role']; public_key: string }
@@ -78,6 +78,25 @@ export function appendTruthBlock(db: Database.Database, block: TruthBlock): Trut
      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
   ).run(block.blockHash, block.index, block.prevHash, block.taskRef, JSON.stringify(block.entries), block.verdict);
   return block;
+}
+
+/** Submit ONE signed entry for a task and re-seal the thread. This is the over-the-wire
+ *  entry point: the entry MUST already be signed by a registered key (verified here — a
+ *  forged or unregistered signature is rejected, so an LLM cannot impersonate another actor).
+ *  Entries accumulate one-per-kind (a newer entry of the same kind supersedes); the resulting
+ *  block's verdict reflects the whole accumulated round. */
+export function submitLedgerEntry(db: Database.Database, taskRef: string, entry: LedgerEntry): TruthBlock {
+  if (entry.taskRef !== taskRef) throw new Error(`submitLedgerEntry: entry.taskRef (${entry.taskRef}) ≠ ${taskRef}`);
+  const idById = new Map(listIdentities(db).map(i => [i.keyId, i]));
+  if (!verifyEntry(entry, idById.get(entry.by))) {
+    throw new Error(`submitLedgerEntry: rejected — ${entry.kind} by ${entry.by} has an unregistered key or an invalid signature`);
+  }
+  const thread = getTruthThread(db, taskRef);
+  const latest = thread[thread.length - 1];
+  const byKind = new Map<string, LedgerEntry>();
+  for (const e of latest?.entries ?? []) byKind.set(e.kind, e);
+  byKind.set(entry.kind, entry);       // newest of a kind wins (e.g. a re-validation)
+  return sealAndAppend(db, { taskRef, entries: [...byKind.values()] });
 }
 
 /** Seal a set of entries into the next block on the chain and persist it. The verdict is

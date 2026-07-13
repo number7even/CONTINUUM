@@ -32,6 +32,9 @@ import { snapshotsTool, handleSnapshots } from './snapshots.js';
 import { recordDecisionTool, handleRecordDecision } from './record-decision.js';
 import { sessionReviewTool, handleSessionReview } from './session-review.js';
 import { askContextTool, handleAskContext } from './ask-context.js';
+import { openClaimTool, handleOpenClaim } from './open-claim.js';
+import { validateTool, handleValidate } from './validate.js';
+import { attestTool, handleAttest } from './attest.js';
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   recordCheckpointTool,
@@ -53,6 +56,9 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   recordDecisionTool,
   sessionReviewTool,
   askContextTool,
+  openClaimTool,
+  validateTool,
+  attestTool,
 ] as const;
 
 const DISPATCH_TABLE: Record<string, ToolHandler> = {
@@ -75,6 +81,9 @@ const DISPATCH_TABLE: Record<string, ToolHandler> = {
   continuum_record_decision: handleRecordDecision,
   continuum_session_review: handleSessionReview,
   continuum_ask_context: handleAskContext,
+  continuum_open_claim: handleOpenClaim,
+  continuum_validate: handleValidate,
+  continuum_attest: handleAttest,
 };
 
 /**

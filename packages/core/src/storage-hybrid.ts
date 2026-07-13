@@ -56,6 +56,7 @@ import type {
   UpdateTodoInput,
 } from './storage.js';
 import type { GraphOptions, ObservationGraph } from './graph.js';
+import type { Identity, LedgerEntry, TruthBlock, Verdict } from './truth-ledger.js';
 
 // Narrow shape we actually need from the ruvector VectorDB class.
 // Keeping this local avoids importing ruvector's full type tree into core
@@ -255,6 +256,15 @@ export class HybridStorageBackend implements StorageBackend {
   updateTodo(input: UpdateTodoInput): Todo {
     return this.sqlite.updateTodo(input);
   }
+
+  // — Truth Ledger — relational; delegate wholesale to the SQLite tier.
+  registerIdentity(id: Identity): void { this.sqlite.registerIdentity(id); }
+  listIdentities(): Identity[] { return this.sqlite.listIdentities(); }
+  submitLedgerEntry(taskRef: string, entry: LedgerEntry): TruthBlock { return this.sqlite.submitLedgerEntry(taskRef, entry); }
+  submitTest(taskRef: string, result: { verifyCommand: string; exitCode: number; outputHash: string }): TruthBlock { return this.sqlite.submitTest(taskRef, result); }
+  verdictForTask(taskRef: string): Verdict | null { return this.sqlite.verdictForTask(taskRef); }
+  getTruthThread(taskRef: string): TruthBlock[] { return this.sqlite.getTruthThread(taskRef); }
+  allTruthBlocks(): TruthBlock[] { return this.sqlite.allTruthBlocks(); }
 
   upsertSource(
     id: string,

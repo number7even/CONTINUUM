@@ -26,6 +26,7 @@ import type {
   Todo,
 } from './types.js';
 import type { GraphOptions, ObservationGraph } from './graph.js';
+import type { Identity, LedgerEntry, TruthBlock, Verdict } from './truth-ledger.js';
 
 // ── Input types for write operations ────────────────────────────────────────
 
@@ -94,6 +95,18 @@ export interface StorageBackend {
   listTodos(opts?: ListTodosOptions): Todo[];
   getTodo(id: string): Todo | null;
   updateTodo(input: UpdateTodoInput): Todo;
+
+  // — Truth Ledger — multi-signature attestation (A·V·T·H). Identities are the
+  // public-key registry (set up out-of-band by the human — NOT over MCP, so no LLM
+  // can register a human key). submitLedgerEntry verifies the signature before
+  // accepting; submitTest is the mechanical referee (server-held tester key).
+  registerIdentity(id: Identity): void;
+  listIdentities(): Identity[];
+  submitLedgerEntry(taskRef: string, entry: LedgerEntry): TruthBlock;
+  submitTest(taskRef: string, result: { verifyCommand: string; exitCode: number; outputHash: string }): TruthBlock;
+  verdictForTask(taskRef: string): Verdict | null;
+  getTruthThread(taskRef: string): TruthBlock[];
+  allTruthBlocks(): TruthBlock[];
 
   // — Observations — privacy-filtered event log
   upsertSource(id: string, type: SourceType, config?: Record<string, unknown>): void;
