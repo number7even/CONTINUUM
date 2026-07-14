@@ -120,22 +120,24 @@ export function adapterKey(): Keypair {
  * `read:project`. Only exercised when wired to a real project — the pure mapping/ingest above
  * is what the proof-gate covers.
  */
-export async function fetchProjectItems(opts: { token: string; org: string; projectNumber: number; first?: number }): Promise<ProjectItem[]> {
-  const query = `query($org:String!,$number:Int!,$first:Int!){
-    organization(login:$org){ projectV2(number:$number){ items(first:$first){ nodes {
+export async function fetchProjectItems(opts: { token: string; owner: string; projectNumber: number; ownerType?: 'user' | 'org'; first?: number }): Promise<ProjectItem[]> {
+  // Projects v2 hang off either a user or an organization — pick the right root.
+  const root = opts.ownerType === 'org' ? 'organization' : 'user';
+  const query = `query($owner:String!,$number:Int!,$first:Int!){
+    ${root}(login:$owner){ projectV2(number:$number){ items(first:$first){ nodes {
       id
       content{ __typename ... on Issue { number title url } ... on PullRequest { number title url } ... on DraftIssue { title } }
       fieldValues(first:20){ nodes { ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2SingleSelectField { name } } } } }
     } } } } }`;
   const r = await fetch('https://api.github.com/graphql', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${opts.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables: { org: opts.org, number: opts.projectNumber, first: opts.first ?? 100 } }),
+    headers: { Authorization: `Bearer ${opts.token}`, 'Content-Type': 'application/json', 'User-Agent': 'continuum-adapter' },
+    body: JSON.stringify({ query, variables: { owner: opts.owner, number: opts.projectNumber, first: opts.first ?? 100 } }),
   });
   if (!r.ok) throw new Error(`GitHub GraphQL ${r.status}: ${await r.text()}`);
-  const json = await r.json() as { data?: { organization?: { projectV2?: { items?: { nodes?: unknown[] } } } }; errors?: unknown };
+  const json = await r.json() as { data?: Record<string, { projectV2?: { items?: { nodes?: unknown[] } } }>; errors?: unknown };
   if (json.errors) throw new Error(`GitHub GraphQL error: ${JSON.stringify(json.errors)}`);
-  const nodes = json.data?.organization?.projectV2?.items?.nodes ?? [];
+  const nodes = json.data?.[root]?.projectV2?.items?.nodes ?? [];
   return nodes.map((n) => {
     const node = n as { id: string; content?: { number?: number; title?: string; url?: string }; fieldValues?: { nodes?: Array<{ name?: string; field?: { name?: string } }> } };
     const statusField = (node.fieldValues?.nodes ?? []).find(f => f?.field?.name?.toLowerCase() === 'status');
@@ -144,17 +146,21 @@ export async function fetchProjectItems(opts: { token: string; org: string; proj
 }
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
-// continuum-adapter-github-projects   (env: GITHUB_TOKEN, GH_ORG, GH_PROJECT_NUMBER, CONTINUUM_PROJECT)
+// continuum-adapter-github-projects
+//   env: GITHUB_TOKEN, GH_OWNER (user/org login), GH_PROJECT_NUMBER,
+//        GH_OWNER_TYPE=user|org (default user), CONTINUUM_PROJECT (default continuum)
+//   tip: GITHUB_TOKEN=$(gh auth token)  — never printed
 if (import.meta.url === `file://${process.argv[1]}`) {
   const token = process.env.GITHUB_TOKEN;
-  const org = process.env.GH_ORG;
+  const owner = process.env.GH_OWNER || process.env.GH_ORG;
   const projectNumber = Number(process.env.GH_PROJECT_NUMBER);
+  const ownerType = (process.env.GH_OWNER_TYPE === 'org' ? 'org' : 'user') as 'user' | 'org';
   const project = process.env.CONTINUUM_PROJECT || 'continuum';
-  if (!token || !org || !projectNumber) {
-    console.error('Set GITHUB_TOKEN, GH_ORG, GH_PROJECT_NUMBER (+ optional CONTINUUM_PROJECT).');
+  if (!token || !owner || !projectNumber) {
+    console.error('Set GITHUB_TOKEN, GH_OWNER, GH_PROJECT_NUMBER (+ optional GH_OWNER_TYPE, CONTINUUM_PROJECT).');
     process.exit(2);
   }
-  const items = await fetchProjectItems({ token, org, projectNumber });
+  const items = await fetchProjectItems({ token, owner, projectNumber, ownerType });
   const storage = await openStorage(project);
   const res = ingestProjectItems(storage, items, adapterKey());
   console.log(`ingested ${res.upserted} items (${res.created} new) into "${project}"; ${res.claimsDowngraded} foreign "Done" → claims (awaiting V·T·H).`);
