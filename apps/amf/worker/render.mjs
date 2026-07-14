@@ -91,7 +91,9 @@ function sh(cmd, opts = {}) {
 }
 
 console.error('[L5] scaffolding HyperFrames project…');
-sh('npx --yes hyperframes@latest init proj', { cwd: outDir });
+// --example blank: hyperframes' non-interactive init requires an explicit starter
+// (upstream CLI contract change, caught live 2026-07-14; we overwrite index.html anyway).
+sh('npx --yes hyperframes@latest init proj --example blank', { cwd: outDir });
 const projDir = resolve(outDir, 'proj');
 writeFileSync(resolve(projDir, 'index.html'), composeVideo(payload, audioFile));
 if (audioFile) copyFileSync(resolve(outDir, audioFile), resolve(projDir, audioFile));
