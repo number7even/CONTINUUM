@@ -67,7 +67,7 @@
 | **I · Review** | `review.mjs` | ✅ human gate, idempotent (approve ≠ publish — P7/P9) |
 | **J · Handoff** | `stage-j.mjs` | 🟡 **built + gated** — replaces the dead `DEMO_WEBHOOK_URL`; awaiting `XENOS_LEADS_KEY` + XENOS's `meta` passthrough (blocker B1) so leads route to the owner tenant UUID |
 | **K · Memory** | CONTINUUM | ✅ live (dogfooded — this repo's own checkpoints) |
-| **L · Autopilot** | `event-loop.mjs` · `cron-trigger.mjs` · `pipeline.mjs` | 🟡 built; **not yet run unattended** |
+| **L · Autopilot** | `event-loop.mjs` · `cron-trigger.mjs` · `pipeline.mjs` · **`supervisor.mjs`** | ✅ **RUNS UNATTENDED (ignited 2026-07-16)** — supervisor detached (Redis-ensured, health beats, capped-backoff restarts), daily 09:00 content pulse + 03:00 portfolio pulse registered; queue job 184 proven end-to-end (enqueue → worker → T-checked 42s 9:16 MP4, sha 5e7614c4) with zero human steps; the 03:00 pulse already produced sekago unattended overnight. 7-night soak in progress |
 | **↺ · Return loop** | `pulse.mjs` · `feedback-sync.mjs` · `pulse-return.mjs` · **`content-matcher` (fb)** | ✅ **learning loop CLOSED in code** (2026-07-03, `516d3a1`): `content-matcher.feedbackWeight` reads `ground_truth` rewards → re-weights the 6-D rank (approved topics ↑, rejected ↓, bounded). 🟡 **gated only on live fuel** — `XENOS_HITL_KEY` + `/api/hitl/recent-decisions` supply the decisions; co-locate `feedback-sync` output with the content pool to activate |
 
 ### Gating detail (verified in code 2026-07-03)
