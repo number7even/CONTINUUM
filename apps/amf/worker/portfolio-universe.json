@@ -161,8 +161,8 @@
         "display_case": "lowercase",
         "style_preset": "broadside",
         "style": "dark-cinematic",
-        "logo": null,
-        "logo_note": "no mark file yet — lockups are typeset until the real SVG lands (P4)",
+        "logo": "assets/brands/voicecosmos/logo-primary-dark.svg",
+        "logo_note": "path ratified 2026-07-15; operator deposits the SVG (P9)",
         "voice": {
           "engine": "supertonic",
           "ref": null
