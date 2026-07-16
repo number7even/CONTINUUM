@@ -28,7 +28,11 @@ const gatedProviderLoud = !!wm && wm.live === false && typeof wm.fix === 'string
   && !!feedly && feedly.live === false && typeof feedly.fix === 'string';
 const llmGatedLoud = !!llm && llm.live === false && !!llm.cost && !!llm.fix;
 const leadsGatedLoud = !!leads && leads.live === false && /silently/i.test(leads.cost);
-const silentLeadLossSurfaced = rep.tenants.total > 0 && rep.tenants.missing.length > 0;
+// State-aware honesty check: with NULLs, the missing list must be loud; with all UUIDs
+// minted, any PROVISIONAL (unratified) ids must be loud instead — filled never silently
+// reads as XENOS-confirmed (P4). Fully-ratified is legitimately quiet.
+const t = rep.tenants;
+const silentLeadLossSurfaced = t.total > 0 && (t.missing.length > 0 || (t.provisional?.length ?? 0) > 0 ? (t.missing.length > 0 || renderCapability(rep).includes("PROVISIONAL")) : true);
 
 console.log('');
 console.log(`checks: providersPresent=${allProvidersPresent} gatedProviderLoud=${gatedProviderLoud} llmGated=${llmGatedLoud} leadsGated=${leadsGatedLoud} nullTenantsSurfaced=${silentLeadLossSurfaced}(${rep.tenants.filled}/${rep.tenants.total})`);

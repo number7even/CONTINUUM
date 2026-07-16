@@ -46,14 +46,18 @@ export function capabilityReport() {
     { name: 'VAULT rented talent', live: set('STUDIOMUNICH_VAULT_SECRET'), cost: 'rented faces decline → synthetic only', fix: 'set STUDIOMUNICH_VAULT_SECRET (+ playbook)' },
   ];
 
-  // XENOS owner-tenant UUIDs — the silent lead-loss root cause.
-  const tenants = { filled: 0, total: 0, missing: [] };
+  // XENOS owner-tenant UUIDs — the silent lead-loss root cause. A filled UUID may still be
+  // PROVISIONAL (minted locally at onboarding, awaiting XENOS ratification) — never claim
+  // "ratified" for a provisional id (P4): filled ≠ confirmed-by-the-partner.
+  const tenants = { filled: 0, total: 0, missing: [], provisional: [] };
   try {
     const reg = JSON.parse(readFileSync(resolve(HERE, 'xenos-registry.json'), 'utf8'));
     for (const [slug, v] of Object.entries(reg.map || {})) {
       tenants.total += 1;
-      if (v.owner_tenant_id) tenants.filled += 1;
-      else tenants.missing.push(slug);
+      if (v.owner_tenant_id) {
+        tenants.filled += 1;
+        if (v.status === 'provisional-local') tenants.provisional.push(slug);
+      } else tenants.missing.push(slug);
     }
   } catch { /* registry absent — reported as 0/0 */ }
 
@@ -91,10 +95,14 @@ export function renderCapability(rep) {
 
   const t = rep.tenants;
   const ok = t.total > 0 && t.filled === t.total;
+  const prov = t.provisional?.length ?? 0;
   L.push(c.b('LEAD ROUTING') + '   ' + (ok
-    ? c.grn(`${t.filled}/${t.total} owner tenant UUIDs`)
+    ? (prov
+      ? c.grn(`${t.filled}/${t.total} owner tenant UUIDs minted`) + c.dim(` — ${prov} PROVISIONAL (awaiting XENOS ratification; filled ≠ confirmed, P4)`)
+      : c.grn(`${t.filled}/${t.total} owner tenant UUIDs ratified`))
     : c.red(`${t.filled}/${t.total} owner tenant UUIDs`) + c.dim(` — leads for ${t.missing.length} product(s) VANISH silently`)));
   if (t.missing.length) L.push(c.dim('   missing: ' + t.missing.join(', ')));
+  if (!t.missing.length && prov) L.push(c.dim('   provisional: ' + t.provisional.join(', ')));
 
   return L.join('\n') + '\n';
 }
