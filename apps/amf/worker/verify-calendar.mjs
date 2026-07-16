@@ -74,8 +74,10 @@ check('re-run creates 0 duplicates (idempotent by ref)', wouldCreate === 0);
 
 console.log('── the uniqueness law upstream ─────────────────────────────────────────');
 const { brandIdentity } = await import('./brand-tokens.mjs');
+// All 14 products are onboarded (2026-07-16); the `personal` profile is the standing
+// un-onboarded fixture (its identity is the operator's to define — P9).
 let refused = false;
-try { brandIdentity('podgeni'); } catch { refused = true; }
+try { brandIdentity('personal'); } catch { refused = true; }
 check('a non-onboarded brand cannot generate a calendar', refused);
 
 rmSync(process.env.CONTINUUM_DATA_DIR, { recursive: true, force: true });
