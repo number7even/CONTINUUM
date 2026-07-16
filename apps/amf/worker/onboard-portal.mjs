@@ -58,15 +58,57 @@ export function validatePacket(p) {
 /** D4 — mint a PROVISIONAL owner tenant UUID into the XENOS registry. Loud, never silent. */
 export function provisionXenosTenant(slug, xenosKey, registryPath = REGISTRY) {
   const reg = JSON.parse(readFileSync(registryPath, 'utf8'));
+  const existing = reg.map[slug];
+  if (existing?.owner_tenant_id) return existing.owner_tenant_id;          // already provisioned — never re-mint
   const uuid = randomUUID();
   reg.map[slug] = {
-    xenos_key: xenosKey || slug,
+    ...(existing ?? {}),                                                    // preserve a confirmed xenos_key/status context
+    xenos_key: existing?.xenos_key ?? xenosKey ?? slug,
     owner_tenant_id: uuid,
     status: 'provisional-local',
     note: `UUID minted locally at signup ${new Date().toISOString().slice(0, 10)} — XENOS must ratify (their registry comment: owner_tenant_id is XENOS's to fill). Stage-J carries it; odometer reports it provisional until confirmed.`,
   };
   writeFileSync(registryPath, JSON.stringify(reg, null, 2) + '\n');
   return uuid;
+}
+
+/** Identity-only validation — for COMPLETING an existing brand (position/feeds already
+ *  ratified in the registry; only the identity block is missing). Same rigor, smaller set. */
+export function validateIdentity(p, { needsVoiceKernel = false } = {}) {
+  const issues = [];
+  for (const role of ['canvas', 'ink', 'muted', 'accent']) if (!HEX.test(p[`color_${role}`] ?? '')) issues.push(`identity.colors.${role}: hex #rrggbb required`);
+  for (const role of ['display', 'body', 'mono']) if (!(p[`font_${role}`] ?? '').trim()) issues.push(`identity.fonts.${role}: required`);
+  if (!(p.style_preset ?? '').trim()) issues.push('identity.style_preset: required');
+  if (!(p.tts_voice ?? '').trim()) issues.push('identity.voice: TTS engine/voice required');
+  if (needsVoiceKernel && (!p.voice_rules || p.voice_rules.trim().length < 20)) issues.push('voice_kernel: required (this brand has none yet)');
+  return issues;
+}
+
+/** COMPLETE an existing brand's missing identity (the "edit, don't re-onboard" path made
+ *  real). Refuses if the brand already HAS an identity — a ratified identity is edited by
+ *  the human in the registry, never silently overwritten. */
+export function completeIdentity(p, universePath = UNIVERSE) {
+  const uni = JSON.parse(readFileSync(universePath, 'utf8'));
+  const prod = uni.products.find(x => x.slug === p.slug);
+  if (!prod) throw new Error(`no such brand "${p.slug}"`);
+  if (prod.brand_identity) throw new Error(`brand "${p.slug}" already has a ratified identity — edit it deliberately in the registry, never via re-onboarding`);
+  const issues = validateIdentity(p, { needsVoiceKernel: !prod.voice_kernel });
+  if (issues.length) return { ok: false, issues };
+  prod.brand_identity = {
+    ratified: `identity completed ${new Date().toISOString().slice(0, 10)} (position/feeds pre-existing)`,
+    colors: { canvas: p.color_canvas, ink: p.color_ink, muted: p.color_muted, accent: p.color_accent },
+    fonts: { display: p.font_display, body: p.font_body, mono: p.font_mono },
+    display_case: p.display_case || null,
+    style_preset: p.style_preset,
+    style: p.style || null,
+    logo: p.logo_path || null,
+    logo_note: p.logo_path ? null : 'not supplied — renders run without a mark until deposited',
+    voice: { engine: p.tts_voice.split(':')[0], ref: p.tts_voice.split(':')[1] ?? null },
+    caption_identity: null,
+  };
+  if (p.voice_rules?.trim()) prod.voice_kernel = p.voice_rules;
+  writeFileSync(universePath, JSON.stringify(uni, null, 2) + '\n');
+  return { ok: true };
 }
 
 /** Write the completed packet into the define-once registry (the factory's source of truth). */
@@ -83,7 +125,7 @@ export function writePacket(p, tenantId, universePath = UNIVERSE) {
     feeds: csv(p.feeds).map(url => ({ url, tier: 2 })),
     own_feeds: [],
     voice_kernel: p.voice_rules,
-    tenant: tenantId,                                                     // ← the payment gate's hook
+    ...(tenantId ? { tenant: tenantId } : {}),                            // house brands carry NO tenant → never gated
     brand_identity: {
       ratified: `self-serve onboarding ${new Date().toISOString().slice(0, 10)}`,
       colors: { canvas: p.color_canvas, ink: p.color_ink, muted: p.color_muted, accent: p.color_accent },
@@ -107,22 +149,45 @@ export function triggerCalendar(slug, { profile = 'company' } = {}) {
   return { fired: true, cmd: `calendar.mjs --brand ${slug} --profile ${profile}` };
 }
 
-/** The full onboarding transaction: gate → validate → packet → provision → calendar. */
-export function onboard(input, { store = loadTenants(), universePath = UNIVERSE, registryPath = REGISTRY, fireCalendar = triggerCalendar } = {}) {
-  // D2 — completeness is structural.
-  const issues = validatePacket(input);
+/** The full onboarding transaction: gate → validate → packet → provision → calendar.
+ *  house:true = the OPERATOR onboarding their OWN platform (locally, P9): the payment gate
+ *  is skipped and NO tenant field is written — house brands are never gated in the pipeline.
+ *  Completeness + uniqueness + provisioning + auto-calendar apply identically. */
+export function onboard(input, { store = loadTenants(), universePath = UNIVERSE, registryPath = REGISTRY, fireCalendar = triggerCalendar, house = false } = {}) {
+  // Route FIRST: an existing brand with a null identity is a COMPLETION, not a new packet —
+  // its position/feeds are already ratified, so only identity-level validation applies.
+  const uniPre = JSON.parse(readFileSync(universePath, 'utf8'));
+  const existing = uniPre.products.find(x => x.slug === input.slug);
+  const isCompletion = !!existing && !existing.brand_identity;
+  if (existing && existing.brand_identity) {
+    return { ok: false, stage: 'duplicate', issues: [`brand "${input.slug}" already exists with a ratified identity — packets are define-once (edit deliberately, don't re-onboard)`] };
+  }
+
+  // D2 — completeness is structural (full packet for new brands; identity-set for completions).
+  const issues = isCompletion ? validateIdentity(input, { needsVoiceKernel: !existing.voice_kernel }) : validatePacket(input);
   if (issues.length) return { ok: false, stage: 'validate', issues };
-  // D1 — no active subscription, no factory.
-  let tenantId = input.tenantId;
-  if (!tenantId) { tenantId = registerTenant(store, { email: input.email ?? '(unset)', brandSlug: input.slug }); saveTenants(store); }
-  try { requireActiveTenant(store, tenantId); }
-  catch (e) { return { ok: false, stage: 'payment-gate', tenantId, issues: [e.message] }; }
-  // packet + D4 + D3.
-  try { writePacket(input, tenantId, universePath); }
-  catch (e) { return { ok: false, stage: 'duplicate', tenantId, issues: [String(e.message)] }; }
+
+  // D1 — no active subscription, no factory (external tenants only).
+  let tenantId = null;
+  if (!house) {
+    tenantId = input.tenantId;
+    if (!tenantId) { tenantId = registerTenant(store, { email: input.email ?? '(unset)', brandSlug: input.slug }); saveTenants(store); }
+    try { requireActiveTenant(store, tenantId); }
+    catch (e) { return { ok: false, stage: 'payment-gate', tenantId, issues: [e.message] }; }
+  }
+
+  // packet (new) or identity block (completion) + D4 + D3.
+  const mode = isCompletion ? 'identity-completed' : 'new-brand';
+  if (isCompletion) {
+    const c = completeIdentity(input, universePath);
+    if (!c.ok) return { ok: false, stage: 'validate', tenantId, issues: c.issues };
+  } else {
+    try { writePacket(input, tenantId, universePath); }
+    catch (e) { return { ok: false, stage: 'duplicate', tenantId, issues: [String(e.message)] }; }
+  }
   const xenosUuid = provisionXenosTenant(input.slug, input.xenos_key, registryPath);
   const cal = fireCalendar(input.slug);
-  return { ok: true, tenantId, slug: input.slug, xenosTenant: { uuid: xenosUuid, status: 'provisional-local' }, calendar: cal };
+  return { ok: true, mode, house, tenantId, slug: input.slug, xenosTenant: { uuid: xenosUuid, status: 'provisional-local' }, calendar: cal };
 }
 
 // ── the form (zero-dep) ───────────────────────────────────────────────────────
@@ -164,7 +229,7 @@ export const portalServer = createServer((req, res) => {
     req.on('data', c => { body += c; });
     req.on('end', () => {
       const p = Object.fromEntries(new URLSearchParams(body));
-      const result = onboard(p);
+      const result = onboard(p, { house: process.env.AMF_PORTAL_HOUSE === '1' });
       if (!result.ok) {
         res.writeHead(result.stage === 'payment-gate' ? 402 : 422, { 'content-type': 'application/json' });
         res.end(JSON.stringify(result, null, 2));

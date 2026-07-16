@@ -99,6 +99,31 @@ const blocked = onboard({ ...GOOD, slug: 'free-rider', tenantId: tid2 }, { store
 check('payment gate blocks the packet write (stage=payment-gate)', blocked.ok === false && blocked.stage === 'payment-gate');
 check('…and no brand was written', !JSON.parse(readFileSync(UNI, 'utf8')).products.some(p => p.slug === 'free-rider'));
 
+console.log('── HOUSE MODE (the operator\'s own platforms — P9, no Stripe) ───────────');
+let houseCal = null;
+const houseRes = onboard({ ...GOOD, slug: 'sezine-house', tenantId: undefined }, { store, universePath: UNI, registryPath: REG, fireCalendar: (s) => { houseCal = s; return { fired: true }; }, house: true });
+check('house onboarding succeeds with NO subscription', houseRes.ok === true && /^[0-9a-f-]{36}$/.test(houseRes.xenosTenant?.uuid ?? ''));
+check('house brand carries NO tenant field (never gated in the pipeline)', !('tenant' in (JSON.parse(readFileSync(UNI, 'utf8')).products.find(p => p.slug === 'sezine-house') ?? { tenant: 1 })));
+check('house onboarding still fires the calendar + passes the uniqueness bridge', houseCal === 'sezine-house' && brandIdentity('sezine-house', UNI).identity.style_preset === 'biennale-yellow');
+
+console.log('── IDENTITY COMPLETION (existing brands: fill the null block, don\'t re-onboard) ──');
+// podgeni exists in the real registry with brand_identity: null — the exact 9-platform case.
+const IDENTITY_ONLY = {
+  slug: 'podgeni',
+  color_canvas: '#0d0a14', color_ink: '#efeaf6', color_muted: '#9a90ac', color_accent: '#c084fc',
+  font_display: 'Space Grotesk', font_body: 'Inter', font_mono: 'JetBrains Mono',
+  style_preset: 'capsule', tts_voice: 'supertonic',
+  voice_rules: 'Curious, generous, audio-native. Teach; never gatekeep. No hype words.',
+};
+let compCal = null;
+const comp = onboard(IDENTITY_ONLY, { store, universePath: UNI, registryPath: REG, fireCalendar: (s) => { compCal = s; return { fired: true }; }, house: true });
+check('existing brand + null identity → COMPLETION path (not duplicate)', comp.ok === true && comp.mode === 'identity-completed', comp.mode ?? comp.stage);
+const podAfter = JSON.parse(readFileSync(UNI, 'utf8')).products.find(p => p.slug === 'podgeni');
+check('position/feeds/topics preserved; only the identity landed', podAfter.brand_identity?.colors?.accent === '#c084fc' && Array.isArray(podAfter.topics) && podAfter.topics.length > 0);
+check('completion fires the calendar + provisions XENOS without clobbering the entry', compCal === 'podgeni' && /^[0-9a-f-]{36}$/.test(JSON.parse(readFileSync(REG, 'utf8')).map['podgeni']?.owner_tenant_id ?? ''));
+const again = onboard(IDENTITY_ONLY, { store, universePath: UNI, registryPath: REG, fireCalendar: () => ({}), house: true });
+check('a RATIFIED identity cannot be silently overwritten (duplicate refusal)', again.ok === false && again.stage === 'duplicate');
+
 rmSync(TMP, { recursive: true, force: true });
 const passed = results.filter(Boolean).length;
 console.log(`\n${passed}/${results.length} gates green`);
