@@ -66,7 +66,7 @@ export function rejectDraft(id, reason = 'unspecified') {
   return { ok: true };
 }
 
-function run() {
+async function run() {
   ensure();
   const a = process.argv, cmd = a[2], id = a[3];
   if (cmd === '--list') {
@@ -83,7 +83,18 @@ function run() {
     if (!res.ok) { console.error(`[review] cannot approve ${id}: ${res.reason}`); process.exit(1); }
     console.error(`[review] ✅ approved ${id} (${res.slug})`);
     if (res.render) console.error(`[review] render via ${res.render.tool}: ${res.render.rendered ? '✅ ' + res.render.note : '⚠️ ' + res.render.note}`);
-    console.error('[review] NOTE: publish is still manual — approved ≠ published (P7). Push to channel yourself.');
+    if (a.includes('--publish')) {
+      // The Layer-5 closure: the P9 approval IS the publish trigger. publish() is honest
+      // per channel — a token sends live, no token appends a dry-run Earn-Ledger row (P4).
+      const rec = JSON.parse(readFileSync(join(dir('approved'), `${id}.json`), 'utf8'));
+      const { publish } = await import('./publish.mjs');
+      const rows = await publish(rec, { live: true });
+      for (const r of rows) console.error(`[publish] ${r.channel}: ${r.mode}${r.result?.reason ? ` — ${r.result.reason}` : ''}`);
+      const liveN = rows.filter(r => r.mode === 'live').length;
+      console.error(`[review] publish seam fired: ${liveN} live · ${rows.length - liveN} gated/dry-run (Earn Ledger updated)`);
+    } else {
+      console.error('[review] NOTE: publish not requested — pass --publish to fire the seam on approval (P7: approved ≠ published).');
+    }
   } else if (cmd === '--reject') {
     const res = rejectDraft(id, a.slice(4).join(' ') || 'unspecified');
     if (!res.ok) { console.error(`[review] cannot reject ${id}: ${res.reason}`); process.exit(1); }
@@ -110,5 +121,5 @@ async function smoke() {
 // only run the CLI when invoked directly — safe to `import { approveDraft, ... }` (Pulse return-path)
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--smoke')) smoke().catch((e) => { console.error('smoke error:', e.message); process.exit(1); });
-  else run();
+  else run().catch((e) => { console.error("review error:", e.message); process.exit(1); });
 }

@@ -28,7 +28,7 @@ function composeVideo(payload, audioFile, opts = {}) {
   lines.forEach((ln, li) => {
     const id = `line${li}`, lstart = ln[0].start, lend = ln[ln.length - 1].end;
     const spans = ln.map((w, wi) => `<span id="${id}w${wi}" style="opacity:0.32">${esc(w.word)}</span>`).join(' ');
-    clips += `\n      <div id="${id}" class="cap" data-start="${lstart.toFixed(2)}" data-duration="${(lend - lstart).toFixed(2)}" data-track-index="1">${spans}</div>`;
+    clips += `\n      <div id="${id}" class="cap clip" data-start="${lstart.toFixed(2)}" data-duration="${(lend - lstart).toFixed(2)}" data-track-index="1">${spans}</div>`;
     ln.forEach((w, wi) => { tl += `\n      tl.to("#${id}w${wi}",{color:"${CREME}",opacity:1,duration:0.08},${w.start.toFixed(2)});`; });
     tl += `\n      tl.fromTo("#${id}",{opacity:0,y:30},{opacity:1,y:0,duration:0.3},${lstart.toFixed(2)});`;
     tl += `\n      tl.to("#${id}",{opacity:0,duration:0.25},${(lend + 0.05).toFixed(2)});`;

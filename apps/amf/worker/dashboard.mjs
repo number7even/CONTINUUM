@@ -96,7 +96,8 @@ export const dashboardServer = createServer((req, res) => {
   if (req.method === 'POST' && (u.pathname === '/api/approve' || u.pathname === '/api/reject')) {
     const id = u.searchParams.get('id');
     const flag = u.pathname === '/api/approve' ? '--approve' : '--reject';
-    const r = id ? spawnSync('node', [resolve(HERE, 'review.mjs'), flag, id], { encoding: 'utf8' }) : { status: 1 };
+    const args = flag === '--approve' ? [resolve(HERE, 'review.mjs'), flag, id, '--publish'] : [resolve(HERE, 'review.mjs'), flag, id];
+    const r = id ? spawnSync('node', args, { encoding: 'utf8' }) : { status: 1 };
     res.writeHead(r.status === 0 ? 200 : 400, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: r.status === 0, out: (r.stdout || '').slice(-200) }));
     return;
