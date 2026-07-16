@@ -232,7 +232,31 @@
           "name": "TheHackerNews"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "agent-drafted 2026-07-16 — PENDING OPERATOR RATIFICATION (P9): review colors/fonts/preset and ratify or amend",
+        "colors": {
+          "canvas": "#030712",
+          "ink": "#f9fafb",
+          "muted": "#6b7280",
+          "accent": "#22d3ee"
+        },
+        "fonts": {
+          "display": "Sora",
+          "body": "Inter",
+          "mono": "Space Mono"
+        },
+        "display_case": null,
+        "style_preset": "broadside",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Vigilant, forensic, calm under threat."
     },
     {
       "slug": "continuum",
@@ -294,7 +318,31 @@
           "name": "HN (AI/Dev Tools)"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "agent-drafted 2026-07-16 — PENDING OPERATOR RATIFICATION (P9): review colors/fonts/preset and ratify or amend",
+        "colors": {
+          "canvas": "#05070a",
+          "ink": "#e5e7eb",
+          "muted": "#6b7280",
+          "accent": "#6ee7b7"
+        },
+        "fonts": {
+          "display": "IBM Plex Sans",
+          "body": "Inter",
+          "mono": "IBM Plex Mono"
+        },
+        "display_case": null,
+        "style_preset": "cobalt-grid",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Verify, do not trust. Plain, exact, receipt-backed."
     },
     {
       "slug": "thenine",
@@ -342,7 +390,31 @@
           "name": "AI Safety Newsletter (safe.ai)"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "agent-drafted 2026-07-16 — PENDING OPERATOR RATIFICATION (P9): review colors/fonts/preset and ratify or amend",
+        "colors": {
+          "canvas": "#faf9f7",
+          "ink": "#1a1a1a",
+          "muted": "#8a8178",
+          "accent": "#b45309"
+        },
+        "fonts": {
+          "display": "Cormorant Garamond",
+          "body": "Inter",
+          "mono": "JetBrains Mono"
+        },
+        "display_case": null,
+        "style_preset": "cartesian",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Measured, principled, verifiable. Never claims more than it can prove."
     },
     {
       "slug": "studiomunich",
@@ -454,7 +526,31 @@
           "status": "secondary — strong deepfake / creator-economy coverage; validated live 2026-07-02 (10 items). Broad: gated by filter."
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "agent-drafted 2026-07-16 — PENDING OPERATOR RATIFICATION (P9): review colors/fonts/preset and ratify or amend",
+        "colors": {
+          "canvas": "#0c0a09",
+          "ink": "#fafaf9",
+          "muted": "#78716c",
+          "accent": "#e11d48"
+        },
+        "fonts": {
+          "display": "Bodoni Moda",
+          "body": "Archivo",
+          "mono": "Space Mono"
+        },
+        "display_case": null,
+        "style_preset": "bold-poster",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Cinematic, rights-first, premium European craft."
     },
     {
       "slug": "podgeni",
@@ -501,7 +597,31 @@
           "name": "TWIML AI Podcast"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#0a0a0a",
+          "ink": "#ffffff",
+          "muted": "#666666",
+          "accent": "#ff4500"
+        },
+        "fonts": {
+          "display": "Helvetica",
+          "body": "Inter",
+          "mono": "Roboto Mono"
+        },
+        "display_case": null,
+        "style_preset": "broadside",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Authoritative, premium, uncompromisingly creator-focused."
     },
     {
       "slug": "sezine",
@@ -555,7 +675,31 @@
           "name": "Indeed Hiring Lab"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#f4f4f5",
+          "ink": "#18181b",
+          "muted": "#a1a1aa",
+          "accent": "#3b82f6"
+        },
+        "fonts": {
+          "display": "Playfair Display",
+          "body": "Lato",
+          "mono": "JetBrains Mono"
+        },
+        "display_case": null,
+        "style_preset": "cartesian",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Curious, generous, audio-native. Never gatekeep."
     },
     {
       "slug": "viwago",
@@ -673,7 +817,31 @@
           "name": "Risk.net"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#111827",
+          "ink": "#f9fafb",
+          "muted": "#9ca3af",
+          "accent": "#10b981"
+        },
+        "fonts": {
+          "display": "Montserrat",
+          "body": "Open Sans",
+          "mono": "Fira Code"
+        },
+        "display_case": null,
+        "style_preset": "blue-professional",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Data-driven, precise, calm. The silent operator."
     },
     {
       "slug": "phantaqsm",
@@ -730,7 +898,31 @@
           "name": "HN (Infrastructure)"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#2e0249",
+          "ink": "#a3d8f4",
+          "muted": "#570a57",
+          "accent": "#f806cc"
+        },
+        "fonts": {
+          "display": "Oswald",
+          "body": "Roboto",
+          "mono": "Source Code Pro"
+        },
+        "display_case": null,
+        "style_preset": "bold-poster",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Visionary, slightly disruptive, electric."
     },
     {
       "slug": "qintercept",
@@ -779,7 +971,31 @@
           "name": "MIT News — Quantum"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#0f172a",
+          "ink": "#e2e8f0",
+          "muted": "#64748b",
+          "accent": "#ef4444"
+        },
+        "fonts": {
+          "display": "Space Grotesk",
+          "body": "Inter",
+          "mono": "JetBrains Mono"
+        },
+        "display_case": null,
+        "style_preset": "broadside",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Analytical, sharp, investigative. We find the leak."
     },
     {
       "slug": "voinista",
@@ -885,7 +1101,31 @@
           "name": "Zacks Investment Research"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#fffbeb",
+          "ink": "#451a03",
+          "muted": "#d97706",
+          "accent": "#fbbf24"
+        },
+        "fonts": {
+          "display": "Merriweather",
+          "body": "Nunito",
+          "mono": "Inconsolata"
+        },
+        "display_case": null,
+        "style_preset": "biennale-yellow",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Warm, artisanal, fiercely independent."
     },
     {
       "slug": "fluxcore",
@@ -937,7 +1177,31 @@
           "name": "HN (Infrastructure)"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#000000",
+          "ink": "#f8fafc",
+          "muted": "#94a3b8",
+          "accent": "#38bdf8"
+        },
+        "fonts": {
+          "display": "Syncopate",
+          "body": "Manrope",
+          "mono": "IBM Plex Mono"
+        },
+        "display_case": null,
+        "style_preset": "cartesian",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Hyper-modern, fast, infrastructure-first."
     },
     {
       "slug": "digitalcoaching",
@@ -983,7 +1247,31 @@
           "name": "Leading Blog"
         }
       ],
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#ffffff",
+          "ink": "#1e3a8a",
+          "muted": "#93c5fd",
+          "accent": "#2563eb"
+        },
+        "fonts": {
+          "display": "Poppins",
+          "body": "PT Sans",
+          "mono": "Ubuntu Mono"
+        },
+        "display_case": null,
+        "style_preset": "capsule",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Empathetic, structured, relentlessly encouraging."
     },
     {
       "slug": "sekago",
@@ -1035,7 +1323,31 @@
         }
       ],
       "note": "Category + params fully ratified by operator 2026-07-01: observes-never-strikes perimeter/deception posture.",
-      "brand_identity": null
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#1c1917",
+          "ink": "#fafaf9",
+          "muted": "#a8a29e",
+          "accent": "#d946ef"
+        },
+        "fonts": {
+          "display": "Cinzel",
+          "body": "Work Sans",
+          "mono": "Fira Mono"
+        },
+        "display_case": null,
+        "style_preset": "coral",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Minimalist, elite, culturally plugged-in."
     }
   ],
   "$brand_identity_comment": "brand_identity: the visual half of the Brand Onboarding Packet (positioning/feeds/voice-kernel are the other halves). EACH BRAND IS UNIQUE — null means not yet onboarded; brand-tokens.mjs hard-refuses null so no brand ever renders in another brand's clothes. Define at onboarding: colors (canvas/ink/muted/accent), fonts (display/body/mono), display_case, style_preset (hyperframes frame-preset to remix), logo file, TTS voice, caption identity."

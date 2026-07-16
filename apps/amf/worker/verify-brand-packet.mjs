@@ -42,10 +42,20 @@ check('bridge emits tokens: colors[] + fonts[] + brand block',
 check('tokens carry the style_preset for build-frame', tokens.brand.style_preset === vc.style_preset);
 
 console.log('── the uniqueness law (P4) ─────────────────────────────────────────────');
-const notOnboarded = j.products.find(p => !p.brand_identity);
+// All 14 products are onboarded (2026-07-16) — the un-onboarded fixture is the `personal`
+// profile (still null) or, failing that, a synthetic nulled copy of the registry.
 let refused = false, msg = '';
-try { brandIdentity(notOnboarded.slug); } catch (e) { refused = true; msg = String(e.message); }
-check(`non-onboarded brand ("${notOnboarded?.slug}") HARD-REFUSED`, refused && /NOT ONBOARDED/.test(msg));
+if (!j.personal.brand_identity) {
+  try { brandIdentity('personal'); } catch (e) { refused = true; msg = String(e.message); }
+} else {
+  const { mkdtempSync, writeFileSync: wf } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const tmpUni = join(mkdtempSync(join(tmpdir(), 'amf-bp-')), 'u.json');
+  const clone = JSON.parse(JSON.stringify(j)); clone.products[0].brand_identity = null;
+  wf(tmpUni, JSON.stringify(clone));
+  try { brandIdentity(clone.products[0].slug, tmpUni); } catch (e) { refused = true; msg = String(e.message); }
+}
+check('a non-onboarded brand is HARD-REFUSED', refused && /NOT ONBOARDED/.test(msg));
 let unknownRefused = false;
 try { brandIdentity('no-such-brand'); } catch { unknownRefused = true; }
 check('unknown slug refused', unknownRefused);
