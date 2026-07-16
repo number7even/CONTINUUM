@@ -145,6 +145,14 @@ export async function intake({ raw, brand, day = null, title = null, captions = 
     render: { rendered: true, tool: 'intake.mjs', note: finalPath },
     angle: 'Operator recording — the human core. Machine packaging only; the voice is untouched.',
   };
+  // The SEO optimization gate (Site Directive 1): meta-title/description, AI-citable
+  // keywords + JSON-LD attached BEFORE the artifact parks; SEO Office merges when installed.
+  const { optimize } = await import('./seo-meta.mjs');
+  const seoRes = optimize(brief);
+  brief.seo = seoRes.seo;
+  brief.seoOffice = seoRes.seoOffice;
+  receipt.steps.push({ step: 'seo-optimize', ok: true, source: seoRes.seo.source, note: seoRes.seoOffice.dispatched ? 'SEO Office merged' : seoRes.seoOffice.reason });
+
   const pendingDir = join(HERE, 'out', 'review-queue', 'pending');
   mkdirSync(pendingDir, { recursive: true });
   const briefPath = join(pendingDir, `${slugName}.json`);

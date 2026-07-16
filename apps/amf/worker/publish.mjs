@@ -33,11 +33,12 @@ import './env.mjs';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildSeoMeta } from './seo-meta.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APPROVED = join(HERE, 'out', 'review-queue', 'approved');
 const LEDGER = join(HERE, 'out', 'ledger.jsonl');
-const ALL_CHANNELS = ['x', 'linkedin', 'youtube', 'instagram', 'tiktok'];
+const ALL_CHANNELS = ['x', 'linkedin', 'youtube', 'instagram', 'tiktok', 'site'];
 
 const clip = (s, n) => { s = (s || '').trim(); return s.length <= n ? s : s.slice(0, n - 1).trimEnd() + '…'; };
 const hashtags = (rec) => (rec.slug ? [rec.slug.replace(/[^a-z0-9]/gi, '')] : []).concat(['AI']).slice(0, 3).map((t) => '#' + t);
@@ -77,6 +78,25 @@ export const COMPOSERS = {
     if (!rec.render?.rendered) return { ok: false, needsAsset: true, reason: 'tiktok needs a rendered 9:16 video' };
     return { ok: true, text: clip(`${rec.brief?.headline || ''} ${hashtags(rec).join(' ')}`, 2200) };
   },
+  /** owned_site_story — publish to YOUR OWN site's CMS, SEO-optimized (Site Directive 2).
+   *  Carries the optimization gate's output: meta-title/description, AI-citable keywords,
+   *  Schema.org JSON-LD (rec.seo when the pipeline attached it; else the deterministic
+   *  local baseline is composed inline — pure either way). */
+  site(rec) {
+    const seo = rec.seo ?? buildSeoMeta(rec);
+    const b = rec.brief || {};
+    return {
+      ok: true,
+      title: seo.metaTitle,
+      description: seo.metaDescription,
+      keywords: seo.keywords,
+      jsonld: seo.jsonld,
+      slug: seo.urlSlug,
+      body: [b.angle, '', ...pointsLines(rec), '', b.cta ? `→ ${b.cta}` : ''].filter(Boolean).join('\n'),
+      videoUrl: rec.render?.rendered ? (rec.render?.note ?? null) : null,
+      text: seo.metaTitle,
+    };
+  },
 };
 
 // ── send layer — dry-run unless the channel's token is present ─────────────────
@@ -88,6 +108,9 @@ function credFor(channel) {
     case 'youtube': return e.YOUTUBE_ACCESS_TOKEN ? { token: e.YOUTUBE_ACCESS_TOKEN } : null;
     case 'instagram': return e.IG_ACCESS_TOKEN ? { token: e.IG_ACCESS_TOKEN } : null;
     case 'tiktok': return e.TIKTOK_ACCESS_TOKEN ? { token: e.TIKTOK_ACCESS_TOKEN } : null;
+    // owned_site_story: your OWN CMS (WordPress/Webflow/Next.js API). Both the endpoint and
+    // the token must land before a live push — else dry-run, exactly like the socials.
+    case 'site': return e.CMS_ACCESS_TOKEN && e.CMS_ENDPOINT ? { token: e.CMS_ACCESS_TOKEN, endpoint: e.CMS_ENDPOINT } : null;
     default: return null;
   }
 }
@@ -102,6 +125,16 @@ async function sendLive(channel, composed, cred, rec) {
     const body = { author: cred.author, lifecycleState: 'PUBLISHED', specificContent: { 'com.linkedin.ugc.ShareContent': { shareCommentary: { text: composed.text }, shareMediaCategory: 'NONE' } }, visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' } };
     const r = await fetch('https://api.linkedin.com/v2/ugcPosts', { method: 'POST', headers: { Authorization: `Bearer ${cred.token}`, 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0' }, body: JSON.stringify(body) });
     return { httpStatus: r.status, ok: r.ok, id: r.headers.get('x-restli-id') };
+  }
+  if (channel === 'site') {
+    // Generic REST POST to YOUR CMS endpoint: the SEO-optimized story payload, Bearer-authed.
+    const body = {
+      title: composed.title, slug: composed.slug, description: composed.description,
+      keywords: composed.keywords, jsonld: composed.jsonld, body: composed.body,
+      videoUrl: composed.videoUrl, brand: rec.slug, sourceId: rec.id, status: 'publish',
+    };
+    const r = await fetch(cred.endpoint, { method: 'POST', headers: { Authorization: `Bearer ${cred.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return { httpStatus: r.status, ok: r.ok, id: (await r.json().catch(() => ({})))?.id ?? null };
   }
   // youtube / instagram / tiktok: resumable/container uploads need the asset bytes + OAuth
   // scopes; wired as an explicit not-yet-implemented live path so it declines loudly rather

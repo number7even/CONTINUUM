@@ -25,7 +25,7 @@ const check = (name, ok, detail) => { results.push(ok); console.log(`  ${ok ? '�
 console.log('── kernel + prompt + parsing ───────────────────────────────────────────');
 const kernel = voiceKernel('voicecosmos');
 check('kernel assembles from the registry', /voicecosmos/.test(kernel) && /POSITIONING/.test(kernel));
-let refused = false; try { voiceKernel('podgeni'); } catch { refused = true; }
+let refused = false; try { voiceKernel('personal'); } catch { refused = true; }
 check('non-onboarded brand refused (uniqueness law)', refused);
 const prompt = buildScorePrompt(kernel, { channel: 'x', text: 'ARIAN answers the 8pm call.' });
 check('prompt carries kernel + channel + content', /CHANNEL: x/.test(prompt) && /8pm call/.test(prompt));
