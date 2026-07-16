@@ -90,7 +90,7 @@ export function html(snap) {
   </body></html>`;
 }
 
-export const dashboardServer = createServer((req, res) => {
+export const dashboardServer = createServer(async (req, res) => {
   const u = new URL(req.url, 'http://localhost');
   if (req.method === 'GET' && u.pathname === '/api/queue') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(snapshot())); return; }
   if (req.method === 'POST' && (u.pathname === '/api/approve' || u.pathname === '/api/reject')) {
@@ -98,8 +98,16 @@ export const dashboardServer = createServer((req, res) => {
     const flag = u.pathname === '/api/approve' ? '--approve' : '--reject';
     const args = flag === '--approve' ? [resolve(HERE, 'review.mjs'), flag, id, '--publish'] : [resolve(HERE, 'review.mjs'), flag, id];
     const r = id ? spawnSync('node', args, { encoding: 'utf8' }) : { status: 1 };
+    // The unified P9 click: queue-move + publish (review.mjs above) + the cryptographic
+    // H-attest (below). Attest failures are LOUD in the response, never silent — and they
+    // never fake a signature (no human key / not welded → reported, not papered over).
+    let attest = null;
+    if (r.status === 0 && flag === '--approve') {
+      const { attestArtifact } = await import('./attest.mjs');
+      attest = await attestArtifact(id).catch((e) => ({ ok: false, why: 'error', note: String(e.message) }));
+    }
     res.writeHead(r.status === 0 ? 200 : 400, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: r.status === 0, out: (r.stdout || '').slice(-200) }));
+    res.end(JSON.stringify({ ok: r.status === 0, attest, out: ((r.stdout || '') + (r.stderr || '')).slice(-200) }));
     return;
   }
   if (req.method === 'GET' && u.pathname === '/') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(html(snapshot())); return; }
