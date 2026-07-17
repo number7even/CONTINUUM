@@ -37,7 +37,7 @@ const out = (r.stdout || '') + (r.stderr || '');
 check('approve exits 0 and reports the seam fired', r.status === 0 && /publish seam fired/.test(out));
 check('approved file moved out of pending', existsSync(join(HERE, 'out', 'review-queue', 'approved', `${id}.json`)));
 check('0 live · all gated/dry-run (no fake "live" claim, P4)', /0 live/.test(out) && !/: live($| )/m.test(out));
-check('every channel attempted (x/linkedin/youtube/instagram/tiktok)', ['x', 'linkedin', 'youtube', 'instagram', 'tiktok'].every(c => new RegExp(`\\[publish\\] ${c}:`).test(out)));
+check('every channel attempted (x/linkedin/youtube/instagram/tiktok)', ['x', 'linkedin', 'youtube', 'instagram', 'tiktok', 'site'].every(c => new RegExp(`\\[publish\\] ${c}:`).test(out)));
 check('video channels honestly note the missing render', /(youtube|instagram|tiktok).*(render|asset)/i.test(out) || /blocked/.test(out));
 
 console.log('── the Earn Ledger ─────────────────────────────────────────────────────');
@@ -45,7 +45,7 @@ const ledgerPath = join(HERE, 'out', 'ledger.jsonl');
 const rows = existsSync(ledgerPath)
   ? readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)).filter(x => x.id === id)
   : [];
-check('5 ledger rows appended for this approval', rows.length === 5, `rows=${rows.length}`);
+check('6 ledger rows appended for this approval (site included)', rows.length === 6, `rows=${rows.length}`);
 check('all rows unit=published_asset · billable=false (dry-run)', rows.every(x => x.unit === 'published_asset' && x.billable === false));
 
 console.log('── the dashboard fires the same wire ───────────────────────────────────');
