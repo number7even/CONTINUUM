@@ -107,7 +107,14 @@ check('house brand carries NO tenant field (never gated in the pipeline)', !('te
 check('house onboarding still fires the calendar + passes the uniqueness bridge', houseCal === 'sezine-house' && brandIdentity('sezine-house', UNI).identity.style_preset === 'biennale-yellow');
 
 console.log('── IDENTITY COMPLETION (existing brands: fill the null block, don\'t re-onboard) ──');
-// podgeni exists in the real registry with brand_identity: null — the exact 9-platform case.
+// All real brands are onboarded (2026-07-16) — recreate the pre-onboarding state in the
+// TEMP copy: null podgeni's identity there, exactly the 9-platform case as it was.
+{
+  const u = JSON.parse(readFileSync(UNI, 'utf8'));
+  u.products.find(p => p.slug === 'podgeni').brand_identity = null;
+  const { writeFileSync: wf } = await import('node:fs');
+  wf(UNI, JSON.stringify(u, null, 2));
+}
 const IDENTITY_ONLY = {
   slug: 'podgeni',
   color_canvas: '#0d0a14', color_ink: '#efeaf6', color_muted: '#9a90ac', color_accent: '#c084fc',
