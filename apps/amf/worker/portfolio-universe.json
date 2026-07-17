@@ -233,20 +233,20 @@
         }
       ],
       "brand_identity": {
-        "ratified": "agent-drafted 2026-07-16 — PENDING OPERATOR RATIFICATION (P9): review colors/fonts/preset and ratify or amend",
+        "ratified": "OPERATOR-RATIFIED 2026-07-17 (P9) — supersedes the agent draft, specs verbatim from the ratification directive",
         "colors": {
-          "canvas": "#030712",
-          "ink": "#f9fafb",
-          "muted": "#6b7280",
-          "accent": "#22d3ee"
+          "canvas": "#0f172a",
+          "ink": "#e0e7ff",
+          "muted": "#cbd5e1",
+          "accent": "#3b82f6"
         },
         "fonts": {
-          "display": "Sora",
-          "body": "Inter",
-          "mono": "Space Mono"
+          "display": "Space Grotesk",
+          "body": "Roboto",
+          "mono": "Inconsolata"
         },
         "display_case": null,
-        "style_preset": "broadside",
+        "style_preset": "blue-professional",
         "style": null,
         "logo": null,
         "logo_note": "not supplied — renders run without a mark until deposited",
@@ -256,7 +256,7 @@
         },
         "caption_identity": null
       },
-      "voice_kernel": "Vigilant, forensic, calm under threat."
+      "voice_kernel": "Secure, authoritative, cryptographic."
     },
     {
       "slug": "continuum",
@@ -319,20 +319,20 @@
         }
       ],
       "brand_identity": {
-        "ratified": "agent-drafted 2026-07-16 — PENDING OPERATOR RATIFICATION (P9): review colors/fonts/preset and ratify or amend",
+        "ratified": "OPERATOR-RATIFIED 2026-07-17 (P9) — supersedes the agent draft, specs verbatim from the ratification directive",
         "colors": {
-          "canvas": "#05070a",
-          "ink": "#e5e7eb",
-          "muted": "#6b7280",
-          "accent": "#6ee7b7"
+          "canvas": "#000000",
+          "ink": "#22c55e",
+          "muted": "#334155",
+          "accent": "#10b981"
         },
         "fonts": {
-          "display": "IBM Plex Sans",
+          "display": "JetBrains Mono",
           "body": "Inter",
-          "mono": "IBM Plex Mono"
+          "mono": "Fira Code"
         },
         "display_case": null,
-        "style_preset": "cobalt-grid",
+        "style_preset": "bold-poster",
         "style": null,
         "logo": null,
         "logo_note": "not supplied — renders run without a mark until deposited",
@@ -342,7 +342,7 @@
         },
         "caption_identity": null
       },
-      "voice_kernel": "Verify, do not trust. Plain, exact, receipt-backed."
+      "voice_kernel": "Cold, precise, strictly factual. Refuses to lie."
     },
     {
       "slug": "thenine",
@@ -391,17 +391,17 @@
         }
       ],
       "brand_identity": {
-        "ratified": "agent-drafted 2026-07-16 — PENDING OPERATOR RATIFICATION (P9): review colors/fonts/preset and ratify or amend",
+        "ratified": "OPERATOR-RATIFIED 2026-07-17 (P9) — supersedes the agent draft, specs verbatim from the ratification directive",
         "colors": {
-          "canvas": "#faf9f7",
-          "ink": "#1a1a1a",
-          "muted": "#8a8178",
-          "accent": "#b45309"
+          "canvas": "#ffffff",
+          "ink": "#000000",
+          "muted": "#1a1a1a",
+          "accent": "#dc2626"
         },
         "fonts": {
-          "display": "Cormorant Garamond",
+          "display": "Helvetica",
           "body": "Inter",
-          "mono": "JetBrains Mono"
+          "mono": "Courier"
         },
         "display_case": null,
         "style_preset": "cartesian",
@@ -414,7 +414,7 @@
         },
         "caption_identity": null
       },
-      "voice_kernel": "Measured, principled, verifiable. Never claims more than it can prove."
+      "voice_kernel": "Philosophical, absolute, uncompromising. The protocol speaks."
     },
     {
       "slug": "studiomunich",
@@ -527,20 +527,20 @@
         }
       ],
       "brand_identity": {
-        "ratified": "agent-drafted 2026-07-16 — PENDING OPERATOR RATIFICATION (P9): review colors/fonts/preset and ratify or amend",
+        "ratified": "OPERATOR-RATIFIED 2026-07-17 (P9) — supersedes the agent draft, specs verbatim from the ratification directive",
         "colors": {
-          "canvas": "#0c0a09",
-          "ink": "#fafaf9",
-          "muted": "#78716c",
-          "accent": "#e11d48"
+          "canvas": "#1f2937",
+          "ink": "#f3f4f6",
+          "muted": "#9ca3af",
+          "accent": "#d97706"
         },
         "fonts": {
-          "display": "Bodoni Moda",
-          "body": "Archivo",
-          "mono": "Space Mono"
+          "display": "Playfair Display",
+          "body": "Lato",
+          "mono": "JetBrains Mono"
         },
         "display_case": null,
-        "style_preset": "bold-poster",
+        "style_preset": "broadside",
         "style": null,
         "logo": null,
         "logo_note": "not supplied — renders run without a mark until deposited",
@@ -550,7 +550,7 @@
         },
         "caption_identity": null
       },
-      "voice_kernel": "Cinematic, rights-first, premium European craft."
+      "voice_kernel": "Cinematic, premium, architectural."
     },
     {
       "slug": "podgeni",
