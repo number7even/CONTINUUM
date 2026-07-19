@@ -31,6 +31,7 @@ import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
 import {
   buildAuthorshipExport,
+  buildOkfTree,
   buildDiscussionScript,
   computeNextTasks,
   continuumDataRoot,
@@ -1678,6 +1679,31 @@ function commandAuthorship(projectId: string): void {
   process.exit(exp.intact ? 0 : 2);
 }
 
+// ── continuum export-okf ──────────────────────────────────────────────────────
+//
+// Export the project's knowledge as an OKF (Open Knowledge Format) tree: topic
+// folders, an index.md map in every folder, YAML front matter (name/description/
+// type) on every document, one concept per file. Any OKF-speaking agent can then
+// navigate this brain surgically — read the maps, load only what it needs —
+// without MCP access. Portable, platform-independent, machine-readable.
+function commandExportOkf(projectId: string): void {
+  const outFlagIdx = process.argv.indexOf('--out');
+  const outDir = outFlagIdx > 0
+    ? process.argv[outFlagIdx + 1]!
+    : joinPath(continuumDataRoot(), projectId, 'okf');
+  const storage = openStorage(projectId);
+  const tree = buildOkfTree(storage, { project: projectId });
+  for (const f of tree.files) {
+    const p = joinPath(outDir, f.path);
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, f.content);
+  }
+  const topics = Object.entries(tree.counts).map(([t, n]) => `${t}:${n}`).join(' · ');
+  console.log(`[okf] ${tree.files.length} file(s) exported → ${outDir}`);
+  console.log(`[okf] topics: ${topics}`);
+  console.log(`[okf] entry point: ${joinPath(outDir, 'index.md')} — maps first, surgical loads after.`);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -1735,6 +1761,9 @@ async function main(): Promise<void> {
       await commandRecap(projectId);
       return;
 
+    case 'export-okf':
+      commandExportOkf(projectId);
+      break;
     case 'authorship':
       commandAuthorship(projectId);
       return;

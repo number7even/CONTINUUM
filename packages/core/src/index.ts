@@ -164,3 +164,9 @@ export type { BoardColumn, BoardClassifyInput } from './board-gate.js';
 // — Todo CRUD (the raw functions the MCP tools wrap). updateTodo carries the hard
 // Truth-gate choke-point (CONTINUUM_TRUTH_GATE=1 → no DONE without a PROVEN block).
 export { createTodo, updateTodo, getTodo, listTodos } from './todo.js';
+
+// — OKF export (Open Knowledge Format): a project's knowledge as a portable tree —
+// topic folders · index.md maps · YAML front matter · one concept per file. Any
+// OKF-speaking agent navigates the brain surgically, no MCP required.
+export { buildOkfTree, renderDoc, renderIndex, topicOf } from './okf-export.js';
+export type { OkfFile, OkfTree } from './okf-export.js';

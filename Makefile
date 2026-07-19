@@ -10,7 +10,7 @@
 export CONTINUUM_STORAGE_BACKEND = sqlite
 
 build:
-	npm run build -w @number7even/continuum-core -w @number7even/continuum-mcp-server -w @number7even/continuum-cli -w @number7even/continuum-adapter-github-projects
+	npm run build -w @number7even/continuum-core -w @number7even/continuum-mcp-server -w @number7even/continuum-cli -w @number7even/continuum-adapter-github-projects -w @number7even/continuum-adapter-docs
 
 smoke: build
 	@echo "── CONTINUUM proof-gates ──────────────────────────────────"
@@ -21,6 +21,7 @@ smoke: build
 	node scripts/verify-discussion-audio.mjs
 	node scripts/verify-ball.mjs
 	node scripts/verify-truth-ledger.mjs
+	node scripts/verify-okf.mjs
 	node scripts/verify-board-gate.mjs
 	node scripts/verify-mcp-truth-loop.mjs
 	node scripts/verify-console-board.mjs
@@ -43,7 +44,7 @@ smoke: build
 	node apps/amf/worker/verify-site-syndication.mjs
 	node apps/amf/worker/verify-render-hang.mjs
 	node apps/amf/worker/verify-dashboard.mjs
-	@echo "✓ SMOKE SUITE GREEN — 28 deterministic gates passed"
+	@echo "✓ SMOKE SUITE GREEN — 29 deterministic gates passed"
 
 smoke-integration: build
 	CONTINUUM_STORAGE_BACKEND=hybrid node scripts/verify-semantic-search.mjs

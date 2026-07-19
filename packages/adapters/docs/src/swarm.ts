@@ -52,6 +52,8 @@ export interface DocFile {
   refs?: string[];
   /** Authored typed relationships: target observation ID → verb (from link titles). */
   relations?: Array<{ to: string; as: string }>;
+  /** OKF YAML front matter (name/description/type…), parsed at read time (OKF Slice 2). */
+  frontMatter?: Record<string, string>;
 }
 
 export interface DocsSwarmResult {
@@ -257,6 +259,8 @@ export async function ingestViaMeshSwarm(
               path: file.relativePath,
               bytes: file.content.length,
               title,
+              // OKF front matter (name/description/type) — surgical pre-load context (Slice 2).
+              ...(file.frontMatter ? { okf: file.frontMatter } : {}),
               // Authored typed edges (link-title verbs) — the graph's "meaning".
               ...(file.relations?.length ? { relations: file.relations } : {}),
               // Audit: how was this title chosen?

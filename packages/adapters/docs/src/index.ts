@@ -165,7 +165,31 @@ function readDocFile(filePath: string, docsDir: string): DocFile | null {
     id: pathToObservationId(relativePath),
     content,
     timestamp: mtime,
+    frontMatter: parseFrontMatter(content),
   };
+}
+
+/**
+ * OKF Slice 2 — parse a leading YAML front-matter block (`---` … `---` at byte 0) into
+ * flat key:value pairs (name / description / type …). Deliberately minimal (no nested
+ * YAML, no deps): OKF's contract is flat scalar fields. A file without a block, or with
+ * a malformed one, returns undefined — never a guess (P4). The body is left intact.
+ */
+export function parseFrontMatter(content: string): Record<string, string> | undefined {
+  if (!content.startsWith('---\n')) return undefined;
+  const end = content.indexOf('\n---', 4);
+  if (end < 0 || end > 4000) return undefined;
+  const out: Record<string, string> = {};
+  for (const line of content.slice(4, end).split('\n')) {
+    const m = line.match(/^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.+)$/);
+    if (!m) continue;
+    let v = m[2]!.trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\');   // unescape (renderDoc round-trip)
+    }
+    out[m[1]!] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -231,7 +255,10 @@ async function main() {
   storage.close();
 }
 
-main().catch(err => {
-  console.error('[docs] fatal:', err);
-  process.exit(1);
-});
+// Run the CLI only when invoked directly — safe to `import { parseFrontMatter }` (OKF gate).
+if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+  main().catch(err => {
+    console.error('[docs] fatal:', err);
+    process.exit(1);
+  });
+}
