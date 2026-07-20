@@ -28,7 +28,7 @@ import { execSync } from 'node:child_process';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { resolveProject } from '@/lib/project';
-import { assembleBoard } from '../../../lib/board-model.mjs';
+import { assembleBoard, computeCriticalPath } from '../../../lib/board-model.mjs';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -65,8 +65,21 @@ export interface BoardCard {
   refs: string[];
   leverage: number;
   blockedByOpen: string[];
+  /** DEPTH — length of the longest blocker chain ending at this task (leverage is BREADTH). */
+  depth: number;
+  /** True when this task lies on the critical path (the DAG's longest dependency chain). */
+  onCriticalPath: boolean;
   /** When the task came into being — used to bind it to a timeline sprint window. */
   createdAt: string | null;
+}
+
+/** One node of the critical-path ribbon rendered on the board. */
+export interface CriticalNode {
+  id: string;
+  title: string;
+  column: BoardColumn;
+  /** True until every upstream blocker of this node is itself done — the gate, made visible. */
+  blocked: boolean;
 }
 
 async function resolveToken(): Promise<string | null> {
@@ -161,6 +174,10 @@ export async function GET(): Promise<Response> {
       return seen.size;
     };
 
+    // The critical path — the longest blocker chain through the DAG (depth, not breadth).
+    // Computed from the raw todos (which carry blockedBy) via the pure, gate-tested model.
+    const crit = computeCriticalPath(todos.map(t => ({ id: t.id, blockedBy: t.blockedBy ?? [] })));
+
     const cards: BoardCard[] = todos.map(t => {
       const blockedByOpen = (t.blockedBy ?? []).filter(id => !isDone(id));
       const dagState = t.status === 'blocked' || blockedByOpen.length > 0 ? 'BLOCKED' : undefined;
@@ -181,15 +198,25 @@ export async function GET(): Promise<Response> {
         refs: t.refs ?? [],
         leverage: leverageOf(t.id),
         blockedByOpen,
+        depth: crit.depth.get(t.id) ?? 1,
+        onCriticalPath: crit.onPath.has(t.id),
         createdAt: t.createdAt ?? null,
       };
+    });
+
+    // The ordered critical-path ribbon (root → sink), each node carrying its live column +
+    // whether it is still gated by an unfinished upstream — the proof-gate made visible.
+    const cardById = new Map(cards.map(c => [c.id, c]));
+    const criticalPath: CriticalNode[] = crit.path.map(id => {
+      const c = cardById.get(id)!;
+      return { id, title: c.title, column: c.column, blocked: c.blockedByOpen.length > 0 };
     });
 
     // Align commits ↔ tasks ↔ sprints: sprint lanes, each with its cards + commit count +
     // the orphan commits (work no task claims). The pure model is shared with the proof-gate.
     const { sprints } = assembleBoard({ todos: cards, commits });
 
-    return Response.json({ cards, sprints, liveVerify, commitCount: commits.length });
+    return Response.json({ cards, sprints, criticalPath, liveVerify, commitCount: commits.length });
   } catch (err) {
     await mcp?.close().catch(() => {});
     const msg = err instanceof Error ? err.message : String(err);

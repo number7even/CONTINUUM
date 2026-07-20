@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { renderTemplate, scoreDocument, listTemplates } from '@number7even/continuum-core';
 import type { StorageBackend } from '@number7even/continuum-core';
 import type { ToolDefinition, ToolHandler } from '../tool-types.js';
+import { codebaseContext, renderGrounding } from '../codebase-bridge.js';
 
 const SOURCE = 'documents';
 const now = () => new Date().toISOString();
@@ -39,27 +40,35 @@ export const handleListTemplates: ToolHandler = async () => ok({ templates: list
 // ── create_document ─────────────────────────────────────────────────────────
 export const createDocumentTool: ToolDefinition = {
   name: 'continuum_create_document',
-  description: 'Create a PM document from a template. Returns the id, the rendered markdown, and the coaching SCORE (Strategy/Structure/Clarity/Completeness 0-10 + top-3 improvements). Pass fields{} to pre-fill sections by heading.',
+  description: 'Create a PM document from a template. Returns the id, the rendered markdown, and the coaching SCORE (Strategy/Structure/Clarity/Completeness 0-10 + top-3 improvements). Pass fields{} to pre-fill sections by heading. Pass groundProject to append a "Codebase Grounding" block of REAL AST symbols (DeusData, local) so the dossier is grounded in actual code.',
   inputSchema: {
     type: 'object',
     properties: {
       templateId: { type: 'string', description: 'A template id from continuum_list_templates (e.g. "prd", "pr-faq", "tdd").' },
       title: { type: 'string' },
       fields: { type: 'object', description: 'Optional {sectionHeading: content} to pre-fill.' },
+      groundProject: { type: 'string', description: 'Optional indexed code-graph project name — grounds the doc in real AST symbols matching its title (falls back to $CONTINUUM_CMM_PROJECT).' },
     },
     required: ['templateId'],
   },
 };
 export const handleCreateDocument: ToolHandler = async (args, storage) => {
-  const { templateId, title, fields } = (args ?? {}) as { templateId?: string; title?: string; fields?: Record<string, string> };
+  const { templateId, title, fields, groundProject } = (args ?? {}) as { templateId?: string; title?: string; fields?: Record<string, string>; groundProject?: string };
   if (!templateId) throw new Error('templateId is required (see continuum_list_templates)');
-  const text = renderTemplate(templateId, { title, fields });
-  const score = scoreDocument(text, templateId);
+  const body = renderTemplate(templateId, { title, fields });
+  // The SCORE grades the author's content — grounding is additive context, appended AFTER scoring
+  // so real-code symbols never inflate the coaching signal.
+  const score = scoreDocument(body, templateId);
+  // D3: ground the dossier in real code when a code-graph project is named (arg or env).
+  const project = groundProject?.trim() || process.env.CONTINUUM_CMM_PROJECT?.trim();
+  const grounding = project ? codebaseContext(title ?? templateId, { project }) : null;
+  const text = grounding ? body + renderGrounding(grounding) : body;
   storage.upsertSource(SOURCE, 'docs', { adapter: 'pm-workspace' });
   const id = randomUUID();
-  const saved = storage.upsertObservation({ id, sourceId: SOURCE, type: 'document', content: text, timestamp: now(), refs: [], metadata: { docType: templateId, title: title ?? templateId, version: 1, overall: score.overall } });
+  const codebaseRefs = grounding?.available ? grounding.symbols.map(s => s.qualified) : [];
+  const saved = storage.upsertObservation({ id, sourceId: SOURCE, type: 'document', content: text, timestamp: now(), refs: [], metadata: { docType: templateId, title: title ?? templateId, version: 1, overall: score.overall, codebaseRefs } });
   if (!saved) throw new Error('document rejected by the privacy filter (contained only redacted content)');
-  return ok({ id, docType: templateId, title: saved.metadata?.title, score, text });
+  return ok({ id, docType: templateId, title: saved.metadata?.title, score, text, ...(grounding ? { grounding: { available: grounding.available, symbolCount: grounding.symbols.length, reason: grounding.reason } } : {}) });
 };
 
 // ── get_document ──────────────────────────────────────────────────────────────

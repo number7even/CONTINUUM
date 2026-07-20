@@ -35,6 +35,49 @@ const short = (sha) => String(sha || '').slice(0, 8);
 const day = (ts) => String(ts || '').slice(0, 10);
 
 /**
+ * The CRITICAL PATH — the longest chain of `blockedBy` dependencies through the task DAG.
+ * Leverage (in the route) is BREADTH (how many tasks one unblocks); this is DEPTH (the
+ * longest chain that must resolve in order), which sets the true minimum time-to-DONE and
+ * makes the proof-gate VISIBLE: you can see the chain and exactly where it is still stuck.
+ *
+ * Edges are blocker → task. `depth(t)` = length of the longest blocker chain ending at t
+ * (t included). The critical path is the chain achieving the global max depth, ordered
+ * root → sink. Dangling blockers (an id no task carries) are dropped — never a fabricated
+ * node (P4). Cycle-safe via an in-progress guard (a DAG is assumed, but a bad cycle must
+ * not hang the board).
+ *
+ * @param {{id:string, blockedBy?:string[]}[]} tasks
+ * @returns {{ path: string[], depth: Map<string,number>, onPath: Set<string>, length: number }}
+ */
+export function computeCriticalPath(tasks = []) {
+  const byId = new Map(tasks.map(t => [t.id, t]));
+  const memo = new Map();          // id -> { len, path[] }
+  const visiting = new Set();
+  const longest = (id) => {
+    if (memo.has(id)) return memo.get(id);
+    if (visiting.has(id)) return { len: 0, path: [] };   // cycle guard — break, don't hang
+    visiting.add(id);
+    let best = { len: 0, path: [] };
+    for (const b of byId.get(id)?.blockedBy ?? []) {
+      if (!byId.has(b)) continue;                        // dangling blocker → drop (P4)
+      const r = longest(b);
+      if (r.len > best.len) best = r;
+    }
+    const res = { len: best.len + 1, path: [...best.path, id] };
+    visiting.delete(id);
+    memo.set(id, res);
+    return res;
+  };
+  let crit = { len: 0, path: [] };
+  for (const t of tasks) {
+    const r = longest(t.id);
+    if (r.len > crit.len) crit = r;                      // first-seen wins ties (stable order in)
+  }
+  const depth = new Map(tasks.map(t => [t.id, longest(t.id).len]));
+  return { path: crit.path, depth, onPath: new Set(crit.path), length: crit.len };
+}
+
+/**
  * @param {{todos?: any[], commits?: {id:string,title:string,ts:string}[]}} input
  * @returns {{sprints: any[]}}
  */

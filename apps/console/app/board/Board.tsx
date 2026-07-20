@@ -18,7 +18,9 @@ interface Card {
   verifyCommand: string | null; hasVerify: boolean; refs: string[];
   commitShas: string[]; testExitCode: number | null;
   leverage: number; blockedByOpen: string[]; createdAt: string | null;
+  depth: number; onCriticalPath: boolean;
 }
+interface CriticalNode { id: string; title: string; column: Column; blocked: boolean }
 interface Orphan { sha: string; title: string }
 interface Sprint {
   label: string; from: string; to: string; cards: Card[];
@@ -35,6 +37,13 @@ const COLUMNS: { key: Column; label: string; color: string; hint: string }[] = [
   { key: 'FAILED', label: 'FAILED', color: '#f87171', hint: 'V disputed or T failed — the veto' },
 ];
 
+const COL_COLOR: Record<Column, string> = Object.fromEntries(
+  [
+    ['BLOCKED', '#f59e0b'], ['RUNNING', '#38bdf8'], ['REVIEW', '#a78bfa'],
+    ['DONE', '#34d399'], ['SKIPPED', '#94a3b8'], ['FAILED', '#f87171'],
+  ],
+) as Record<Column, string>;
+
 // The one-line reason a card sits where it does — the true ledger verdict, in operator words.
 const VERDICT_NOTE: Record<string, { text: string; color: string }> = {
   PENDING_HUMAN: { text: '⚖ needs your signature', color: '#a78bfa' },
@@ -49,6 +58,7 @@ interface Obs { id: string; type?: string; content?: string; metadata?: Record<s
 
 export default function Board() {
   const [cards, setCards] = useState<Card[]>([]);
+  const [criticalPath, setCriticalPath] = useState<CriticalNode[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [commitCount, setCommitCount] = useState(0);
   const [showOrphans, setShowOrphans] = useState<Set<string>>(new Set());
@@ -74,6 +84,7 @@ export default function Board() {
       const d = await r.json();
       if (d.error && d.error !== 'login') throw new Error(d.error);
       setCards(d.cards ?? []);
+      setCriticalPath(d.criticalPath ?? []);
       setSprints(d.sprints ?? []);
       setCommitCount(d.commitCount ?? 0);
       if (d.error === 'login') setError('not authenticated — set CONTINUUM_HTTP_TOKEN');
@@ -125,6 +136,7 @@ export default function Board() {
       style={{ ...s.card, borderLeft: `3px solid ${colColor}`, outline: selected?.id === card.id ? `1px solid ${colColor}` : 'none' }}>
       <div style={{ fontSize: 12.5, color: '#e5e7eb', lineHeight: 1.4 }}>{card.title}</div>
       <div style={s.cardMeta}>
+        {card.onCriticalPath && <span style={{ ...s.badge, color: '#fca5a5', borderColor: 'rgba(248,113,113,0.4)', border: '1px solid rgba(248,113,113,0.4)' }} title={`On the critical path · depth ${card.depth}`}>▚ critical</span>}
         {card.leverage > 0 && <span style={s.badge}>unblocks {card.leverage}</span>}
         {card.hasVerify
           ? <span style={{ ...s.badge, color: '#6ee7b7' }} title={card.verifyCommand ?? ''}>✓ verify{card.testExitCode != null ? ` · exit ${card.testExitCode}` : ''}</span>
@@ -167,6 +179,29 @@ export default function Board() {
         </div>
         <button type="button" onClick={() => void load()} style={s.refresh}>↻ refresh</button>
       </header>
+
+      {criticalPath.length > 1 && (
+        <div style={s.critWrap} title="The critical path — the longest chain of blockedBy dependencies. A downstream task cannot reach DONE until every upstream link is PROVEN.">
+          <span style={s.critLabel}>▚ CRITICAL PATH · {criticalPath.length} deep</span>
+          <div style={s.critChain}>
+            {criticalPath.map((n, i) => (
+              <span key={n.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                {i > 0 && (
+                  <span style={{ color: n.blocked ? '#f59e0b' : '#34d399', margin: '0 2px', fontSize: 13 }}>
+                    {n.blocked ? '⊸' : '→'}
+                  </span>
+                )}
+                <span
+                  onClick={() => { const c = cards.find(k => k.id === n.id); if (c) void openDossier(c); }}
+                  style={{ ...s.critNode, borderColor: COL_COLOR[n.column], color: COL_COLOR[n.column] }}
+                  title={`${n.title} · ${n.column}${n.blocked ? ' · still gated by upstream' : ''}`}>
+                  {n.column === 'DONE' ? '✓ ' : n.blocked ? '🔒 ' : ''}{n.title.length > 26 ? n.title.slice(0, 25) + '…' : n.title}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {sprint && (
         <div style={s.sprintBanner}>
@@ -279,6 +314,10 @@ const s: Record<string, React.CSSProperties> = {
   dossier: { position: 'fixed', top: 0, right: 0, bottom: 0, width: 380, background: 'rgba(8,11,16,0.97)', borderLeft: '1px solid rgba(56,189,248,0.25)', padding: 18, overflowY: 'auto', zIndex: 5, boxShadow: '-8px 0 40px rgba(0,0,0,0.6)' },
   code: { fontSize: 11, color: '#d1d5db', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'ui-monospace, monospace', background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 6, margin: '4px 0 0' },
   obs: { marginBottom: 10 },
+  critWrap: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '9px 20px', background: 'rgba(248,113,113,0.05)', borderBottom: '1px solid rgba(248,113,113,0.16)' },
+  critLabel: { color: '#fca5a5', fontWeight: 700, fontSize: 11, letterSpacing: 1, whiteSpace: 'nowrap' },
+  critChain: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, rowGap: 6 },
+  critNode: { fontSize: 11, padding: '3px 8px', borderRadius: 7, border: '1px solid', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', whiteSpace: 'nowrap' },
   sprintBanner: { display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '9px 20px', fontSize: 12, background: 'rgba(52,211,153,0.06)', borderBottom: '1px solid rgba(52,211,153,0.18)' },
   clear: { marginLeft: 'auto', fontSize: 11, padding: '4px 10px', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#e5e7eb' },
 };

@@ -40,6 +40,7 @@ import {
   getDocumentTool, handleGetDocument, updateDocumentTool, handleUpdateDocument,
   listDocumentsTool, handleListDocuments, searchDocumentsTool, handleSearchDocuments,
 } from './documents.js';
+import { codebaseContextTool, handleCodebaseContext } from './codebase-context.js';
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   recordCheckpointTool,
@@ -65,6 +66,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   validateTool,
   attestTool,
   listTemplatesTool, createDocumentTool, getDocumentTool, updateDocumentTool, listDocumentsTool, searchDocumentsTool,
+  codebaseContextTool,
 ] as const;
 
 const DISPATCH_TABLE: Record<string, ToolHandler> = {
@@ -96,6 +98,7 @@ const DISPATCH_TABLE: Record<string, ToolHandler> = {
   continuum_update_document: handleUpdateDocument,
   continuum_list_documents: handleListDocuments,
   continuum_search_documents: handleSearchDocuments,
+  continuum_codebase_context: handleCodebaseContext,
 };
 
 /**
