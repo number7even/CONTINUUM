@@ -170,3 +170,7 @@ export { createTodo, updateTodo, getTodo, listTodos } from './todo.js';
 // OKF-speaking agent navigates the brain surgically, no MCP required.
 export { buildOkfTree, renderDoc, renderIndex, topicOf } from './okf-export.js';
 export type { OkfFile, OkfTree } from './okf-export.js';
+
+// — The PM document layer (PRD/PR-FAQ/TDD/GTM… templates + the 4-dim coaching scorer).
+export { TEMPLATES, listTemplates, getTemplate, renderTemplate, scoreDocument } from './documents.js';
+export type { DocTemplate, DocSection, DocScore, Improvement } from './documents.js';

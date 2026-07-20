@@ -35,6 +35,11 @@ import { askContextTool, handleAskContext } from './ask-context.js';
 import { openClaimTool, handleOpenClaim } from './open-claim.js';
 import { validateTool, handleValidate } from './validate.js';
 import { attestTool, handleAttest } from './attest.js';
+import {
+  listTemplatesTool, handleListTemplates, createDocumentTool, handleCreateDocument,
+  getDocumentTool, handleGetDocument, updateDocumentTool, handleUpdateDocument,
+  listDocumentsTool, handleListDocuments, searchDocumentsTool, handleSearchDocuments,
+} from './documents.js';
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   recordCheckpointTool,
@@ -59,6 +64,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   openClaimTool,
   validateTool,
   attestTool,
+  listTemplatesTool, createDocumentTool, getDocumentTool, updateDocumentTool, listDocumentsTool, searchDocumentsTool,
 ] as const;
 
 const DISPATCH_TABLE: Record<string, ToolHandler> = {
@@ -84,6 +90,12 @@ const DISPATCH_TABLE: Record<string, ToolHandler> = {
   continuum_open_claim: handleOpenClaim,
   continuum_validate: handleValidate,
   continuum_attest: handleAttest,
+  continuum_list_templates: handleListTemplates,
+  continuum_create_document: handleCreateDocument,
+  continuum_get_document: handleGetDocument,
+  continuum_update_document: handleUpdateDocument,
+  continuum_list_documents: handleListDocuments,
+  continuum_search_documents: handleSearchDocuments,
 };
 
 /**
