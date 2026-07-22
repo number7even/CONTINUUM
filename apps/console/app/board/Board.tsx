@@ -10,6 +10,7 @@
  * IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans
  */
 import { useCallback, useEffect, useState } from 'react';
+import CriticalPathRibbon, { type CriticalNode } from './CriticalPathRibbon';
 
 type Column = 'RUNNING' | 'REVIEW' | 'DONE' | 'SKIPPED' | 'BLOCKED' | 'FAILED';
 type LedgerVerdict = 'PROVEN' | 'PENDING_HUMAN' | 'CONTESTED' | 'REFUTED' | 'UNVERIFIED' | 'INVALID' | null;
@@ -20,7 +21,6 @@ interface Card {
   leverage: number; blockedByOpen: string[]; createdAt: string | null;
   depth: number; onCriticalPath: boolean;
 }
-interface CriticalNode { id: string; title: string; column: Column; blocked: boolean }
 interface Orphan { sha: string; title: string }
 interface Sprint {
   label: string; from: string; to: string; cards: Card[];
@@ -36,13 +36,6 @@ const COLUMNS: { key: Column; label: string; color: string; hint: string }[] = [
   { key: 'SKIPPED', label: 'SKIPPED', color: '#94a3b8', hint: 'done without proof — not accepted' },
   { key: 'FAILED', label: 'FAILED', color: '#f87171', hint: 'V disputed or T failed — the veto' },
 ];
-
-const COL_COLOR: Record<Column, string> = Object.fromEntries(
-  [
-    ['BLOCKED', '#f59e0b'], ['RUNNING', '#38bdf8'], ['REVIEW', '#a78bfa'],
-    ['DONE', '#34d399'], ['SKIPPED', '#94a3b8'], ['FAILED', '#f87171'],
-  ],
-) as Record<Column, string>;
 
 // The one-line reason a card sits where it does — the true ledger verdict, in operator words.
 const VERDICT_NOTE: Record<string, { text: string; color: string }> = {
@@ -180,28 +173,7 @@ export default function Board() {
         <button type="button" onClick={() => void load()} style={s.refresh}>↻ refresh</button>
       </header>
 
-      {criticalPath.length > 1 && (
-        <div style={s.critWrap} title="The critical path — the longest chain of blockedBy dependencies. A downstream task cannot reach DONE until every upstream link is PROVEN.">
-          <span style={s.critLabel}>▚ CRITICAL PATH · {criticalPath.length} deep</span>
-          <div style={s.critChain}>
-            {criticalPath.map((n, i) => (
-              <span key={n.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                {i > 0 && (
-                  <span style={{ color: n.blocked ? '#f59e0b' : '#34d399', margin: '0 2px', fontSize: 13 }}>
-                    {n.blocked ? '⊸' : '→'}
-                  </span>
-                )}
-                <span
-                  onClick={() => { const c = cards.find(k => k.id === n.id); if (c) void openDossier(c); }}
-                  style={{ ...s.critNode, borderColor: COL_COLOR[n.column], color: COL_COLOR[n.column] }}
-                  title={`${n.title} · ${n.column}${n.blocked ? ' · still gated by upstream' : ''}`}>
-                  {n.column === 'DONE' ? '✓ ' : n.blocked ? '🔒 ' : ''}{n.title.length > 26 ? n.title.slice(0, 25) + '…' : n.title}
-                </span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      <CriticalPathRibbon nodes={criticalPath} onOpen={(id) => { const c = cards.find(k => k.id === id); if (c) void openDossier(c); }} />
 
       {sprint && (
         <div style={s.sprintBanner}>
@@ -314,10 +286,6 @@ const s: Record<string, React.CSSProperties> = {
   dossier: { position: 'fixed', top: 0, right: 0, bottom: 0, width: 380, background: 'rgba(8,11,16,0.97)', borderLeft: '1px solid rgba(56,189,248,0.25)', padding: 18, overflowY: 'auto', zIndex: 5, boxShadow: '-8px 0 40px rgba(0,0,0,0.6)' },
   code: { fontSize: 11, color: '#d1d5db', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'ui-monospace, monospace', background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 6, margin: '4px 0 0' },
   obs: { marginBottom: 10 },
-  critWrap: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '9px 20px', background: 'rgba(248,113,113,0.05)', borderBottom: '1px solid rgba(248,113,113,0.16)' },
-  critLabel: { color: '#fca5a5', fontWeight: 700, fontSize: 11, letterSpacing: 1, whiteSpace: 'nowrap' },
-  critChain: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, rowGap: 6 },
-  critNode: { fontSize: 11, padding: '3px 8px', borderRadius: 7, border: '1px solid', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', whiteSpace: 'nowrap' },
   sprintBanner: { display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '9px 20px', fontSize: 12, background: 'rgba(52,211,153,0.06)', borderBottom: '1px solid rgba(52,211,153,0.18)' },
   clear: { marginLeft: 'auto', fontSize: 11, padding: '4px 10px', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#e5e7eb' },
 };

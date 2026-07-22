@@ -30,6 +30,7 @@ smoke: build
 	node scripts/verify-validator-v.mjs
 	node scripts/verify-pm-documents.mjs
 	node scripts/verify-critical-path.mjs
+	node scripts/verify-ribbon-paint.mjs
 	node scripts/verify-codebase-bridge.mjs
 	@echo "── AMF pipeline gates + fix proof-gates ───────────────────"
 	node apps/amf/worker/vault-guard.mjs --smoke
@@ -47,7 +48,7 @@ smoke: build
 	node apps/amf/worker/verify-site-syndication.mjs
 	node apps/amf/worker/verify-render-hang.mjs
 	node apps/amf/worker/verify-dashboard.mjs
-	@echo "✓ SMOKE SUITE GREEN — 32 deterministic gates passed"
+	@echo "✓ SMOKE SUITE GREEN — 33 deterministic gates passed"
 
 smoke-integration: build
 	CONTINUUM_STORAGE_BACKEND=hybrid node scripts/verify-semantic-search.mjs
