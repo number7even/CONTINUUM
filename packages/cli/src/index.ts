@@ -106,6 +106,9 @@ COMMANDS
   start          Run the MCP stdio server for this project.
   serve          Run the MCP HTTP/SSE server (V1 — remote / hosted clients).
                  Requires $CONTINUUM_HTTP_TOKEN (Bearer shared secret).
+  provision-tenant <id>   Concierge onboarding: register a tenant in the control
+                 plane and mint its scoped RS256 Bearer token (JWT mode). Flags:
+                 --plan --issuer --audience --ttl-days --sub.
   status         Print current state, todo counts, and data location.
                  Also nudges if a newer CLI is published (never auto-installs).
   upgrade        Re-sync the ICM "folders over agents" scaffold into this project
@@ -1486,10 +1489,16 @@ async function commandStart(projectId: string): Promise<void> {
 // ── continuum serve (V1 HTTP/SSE) ────────────────────────────────────────────
 
 async function commandServe(projectId: string): Promise<void> {
-  if (!process.env.CONTINUUM_HTTP_TOKEN || !process.env.CONTINUUM_HTTP_TOKEN.trim()) {
+  // Two auth modes (auth.ts): shared-secret (CONTINUUM_HTTP_TOKEN) OR JWT
+  // (CONTINUUM_JWT_ISSUER + CONTINUUM_JWT_AUDIENCE). A multi-tenant JWT deploy must
+  // NOT be forced to also carry a bogus shared secret — accept either.
+  const hasToken = !!process.env.CONTINUUM_HTTP_TOKEN?.trim();
+  const hasJwt = !!process.env.CONTINUUM_JWT_ISSUER?.trim() && !!process.env.CONTINUUM_JWT_AUDIENCE?.trim();
+  if (!hasToken && !hasJwt) {
     process.stderr.write(
-      'continuum serve: $CONTINUUM_HTTP_TOKEN required. Generate one with `openssl rand -hex 32` ' +
-        'and re-launch, e.g.\n  CONTINUUM_HTTP_TOKEN=$(openssl rand -hex 32) continuum serve\n',
+      'continuum serve: configure ONE auth mode.\n' +
+        '  shared-secret:  CONTINUUM_HTTP_TOKEN=$(openssl rand -hex 32) continuum serve\n' +
+        '  JWT (per-tenant): CONTINUUM_JWT_ISSUER=<url> CONTINUUM_JWT_AUDIENCE=<aud> continuum serve\n',
     );
     process.exit(1);
   }
@@ -1497,6 +1506,68 @@ async function commandServe(projectId: string): Promise<void> {
   // The http.ts module is the bin entry — importing it boots Express +
   // SSEServerTransport and listens on $CONTINUUM_HTTP_PORT (default 7878).
   await import('@number7even/continuum-mcp-server/dist/http.js');
+}
+
+// ── continuum provision-tenant — concierge onboarding in one command ──────────
+//
+// Signs the "last mile" of the enterprise sale into a single executable action:
+// register the tenant in the control plane AND mint the scoped RS256 Bearer token
+// its ARIA client presents. CONTINUUM is its own issuer (see mcp-server/issuer.ts),
+// so no external IdP is needed — the engine serves the matching JWKS and validates
+// the very token this command prints.
+//
+//   continuum provision-tenant grand-harbour --plan enterprise \
+//       --issuer https://api.continuum.rest --audience continuum-api
+//
+async function commandProvisionTenant(): Promise<void> {
+  const argv = process.argv.slice(3);
+  let tenantId = '';
+  let plan = 'enterprise';
+  let ttlDays = 90;
+  let issuer = process.env.CONTINUUM_JWT_ISSUER?.trim() || 'http://localhost:7878';
+  let audience = process.env.CONTINUUM_JWT_AUDIENCE?.trim() || 'continuum-api';
+  let sub = '';
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] ?? '';
+    const val = (): string => (a.includes('=') ? a.slice(a.indexOf('=') + 1) : (argv[++i] ?? ''));
+    if (a.startsWith('-')) {
+      if (a === '--plan' || a.startsWith('--plan=')) plan = val();
+      else if (a === '--issuer' || a.startsWith('--issuer=')) issuer = val();
+      else if (a === '--audience' || a.startsWith('--audience=')) audience = val();
+      else if (a === '--sub' || a.startsWith('--sub=')) sub = val();
+      else if (a === '--ttl-days' || a.startsWith('--ttl-days=')) { const n = Number(val()); if (Number.isFinite(n) && n > 0) ttlDays = n; }
+    } else if (!tenantId) {
+      tenantId = a;
+    }
+  }
+  if (!tenantId) {
+    process.stderr.write('continuum provision-tenant: <tenantId> required.\n  e.g. continuum provision-tenant grand-harbour --plan enterprise\n');
+    process.exit(1);
+  }
+
+  const { openTenancyDirectory } = await import('@number7even/continuum-core');
+  const { mintTenantToken } = await import('@number7even/continuum-mcp-server/dist/issuer.js');
+
+  const minted = await mintTenantToken({ tenantId, issuer, audience, sub: sub || undefined, ttlSeconds: ttlDays * 24 * 3600 });
+  // Register (or refresh) the tenant in the control plane, pinning the signing key id.
+  const dir = openTenancyDirectory();
+  const record = dir.registerTenant({ tenantId, plan, status: 'active', keyId: minted.kid });
+  dir.close();
+
+  const out = process.stdout;
+  out.write(`\n✓ Tenant provisioned — ${record.tenantId}\n`);
+  out.write(`  plan        ${record.plan}\n`);
+  out.write(`  status      ${record.status}\n`);
+  out.write(`  issuer      ${issuer}\n`);
+  out.write(`  audience    ${audience}\n`);
+  out.write(`  subject     ${minted.sub}\n`);
+  out.write(`  key id      ${minted.kid}\n`);
+  out.write(`  expires     ${minted.expiresAt}\n`);
+  out.write(`\n  X-Continuum-Project: ${record.tenantId}\n`);
+  out.write(`  Authorization: Bearer ${minted.token}\n`);
+  out.write(`\n  Hand the client the endpoint + this token. The engine must run in JWT mode\n`);
+  out.write(`  (CONTINUUM_JWT_ISSUER=${issuer} CONTINUUM_JWT_AUDIENCE=${audience}) so it serves the\n`);
+  out.write(`  matching JWKS and validates this token. Never commit the token (P1).\n\n`);
 }
 
 // ── continuum observe — capture terminal output as a live Observation ─────────
@@ -1735,6 +1806,10 @@ async function main(): Promise<void> {
 
     case 'serve':
       await commandServe(projectId);
+      return;
+
+    case 'provision-tenant':
+      await commandProvisionTenant();
       return;
 
     case 'import-state':

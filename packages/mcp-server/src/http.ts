@@ -41,6 +41,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { openStorage } from '@number7even/continuum-core';
 import { buildServer, type ServerHandle } from './server.js';
 import { createAuthMiddleware, resolveAuthConfig } from './auth.js';
+import { publicJwks } from './issuer.js';
 import { TenantRegistry, defaultTenantRegistryConfig } from './tenant-registry.js';
 
 const PORT = Number(process.env.CONTINUUM_HTTP_PORT ?? 7878);
@@ -263,6 +264,22 @@ void probeReadiness();
 // Re-probe every 5 minutes to catch drift (DB file deleted, ruvector
 // corruption, etc.). Cheap — one SQLite read + one vectorCount.
 setInterval(() => void probeReadiness(), 5 * 60 * 1000).unref();
+
+// ── /.well-known/jwks.json  no-auth issuer keyset ────────────────────────────
+//
+// CONTINUUM as its own OIDC-lite issuer: the public JWKS that verifies the RS256
+// tokens `continuum provision-tenant` mints. Auth-exempt (the JWT middleware
+// fetches this to validate; a chicken-and-egg 401 would deadlock). Only ever the
+// PUBLIC key — the private half never leaves ~/.continuum/issuer/ (P1).
+
+app.get('/.well-known/jwks.json', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    res.json(await publicJwks());
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: `jwks unavailable: ${msg}` });
+  }
+});
 
 // ── /healthz  no-auth probe ──────────────────────────────────────────────────
 //
