@@ -65,6 +65,26 @@ const DEFAULT_PRIVATE_PATTERNS: NamedPattern[] = [
   { label: 'stripe-live-publishable', rx: /\bpk_live_[0-9a-zA-Z]{24,}\b/g },
 ];
 
+// ── Guest / customer PII (opt-in) ────────────────────────────────────────────
+//
+// The default patterns scrub SECRETS (keys/tokens) — correct for the dev-memory
+// dogfood, where a git commit author's email is legitimate provenance we must NOT
+// destroy. But a multi-tenant KNOWLEDGE base (a hotel's FAQs, guest correspondence,
+// booking records) carries guest PII — email, phone, card, passport, IBAN — that
+// must never embed into the vector space. These are enabled per-process by
+// CONTINUUM_PRIVACY_PII=1 (the SaaS/tenant deployment sets it; dev leaves it off,
+// so nothing changes for the self-hosted single-tenant path). Applied in Pass 2
+// BEFORE the phone rule so grouped card digits are redacted first. Over-redaction
+// is the safe failure here (P1 — minimise the secret): a stray digit-block lost
+// beats a guest card number embedded.
+const PII_PATTERNS: NamedPattern[] = [
+  { label: 'pii-email', rx: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
+  { label: 'pii-credit-card', rx: /\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{1,4}\b/g },
+  { label: 'pii-iban', rx: /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/g },
+  { label: 'pii-passport', rx: /\b[A-Z]{1,2}\d{6,9}\b/g },
+  { label: 'pii-phone', rx: /\+?\d{1,3}[ .()-]{1,2}\d{2,4}[ .()-]{1,2}\d{2,4}(?:[ .()-]{1,2}\d{1,4})?/g },
+];
+
 // Operator patterns are loaded once per process and cached. Reloading on
 // every observation would re-read the JSON file on each insert — wasteful.
 let _cachedOperatorPatterns: NamedPattern[] | null = null;
@@ -243,6 +263,7 @@ export function privacyFilter(content: string, extraPatterns: RegExp[] = []): Pr
   // Pass 2 — named-pattern scrubbing (defaults + operator + caller extras).
   const patterns: NamedPattern[] = [
     ...DEFAULT_PRIVATE_PATTERNS,
+    ...(process.env.CONTINUUM_PRIVACY_PII === '1' ? PII_PATTERNS : []),
     ...getOperatorPatterns(),
     ...extraPatterns.map((rx, i) => ({ label: `extra-${i}`, rx })),
   ];

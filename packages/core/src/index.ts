@@ -174,3 +174,9 @@ export type { OkfFile, OkfTree } from './okf-export.js';
 // — The PM document layer (PRD/PR-FAQ/TDD/GTM… templates + the 4-dim coaching scorer).
 export { TEMPLATES, listTemplates, getTemplate, renderTemplate, scoreDocument } from './documents.js';
 export type { DocTemplate, DocSection, DocScore, Improvement } from './documents.js';
+
+// — Multi-tenant SaaS: the hotel-KB domain adapter (data plane) + the tenancy control plane.
+export { ingestHotelKb } from './hotel-kb.js';
+export type { HotelKb, HotelRoom, HotelFaq, HotelPolicy, HotelProperty, HotelKbIngestResult } from './hotel-kb.js';
+export { SqliteTenancyDirectory, openTenancyDirectory } from './tenancy.js';
+export type { TenancyDirectory, TenantRecord, TenantStatus, RegisterTenantInput } from './tenancy.js';
