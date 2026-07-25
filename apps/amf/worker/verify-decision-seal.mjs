@@ -100,6 +100,22 @@ console.log('── PART B · review.mjs P9 wire: atomic seal + tamper-evidence 
   check('reject seals a decision with the reason SCRUBBED', rejObs?.metadata?.verdict === 'reject' && !JSON.stringify(rejObs).includes(SECRET));
 }
 
+console.log('── PART C · operator identity is scrub-exempt provenance (secrets still scrub) ──');
+{
+  const storage = await openStorage('seal-test');
+  const emailOp = sealDecision(storage, { verdict: 'accept', operator: 'riaan@number7even.com', subject: { kind: 'todo', id: 'op-1', title: 'x' }, rationale: 'ok' });
+  const [o1] = storage.getObservations([emailOp.id]);
+  check('an operator EMAIL survives as provenance (NOT redacted, even in PII mode)', o1.metadata.operator === 'riaan@number7even.com', o1.metadata.operator);
+  check('the sealed identity is preserved end-to-end', emailOp.operator === 'riaan@number7even.com');
+  const { contentHash: h1, ...c1 } = o1.metadata;
+  check('the hash still re-derives with the exempt operator preserved', consentHash(c1) === h1);
+  // The exemption is PII-only: a SECRET stuffed into the operator field is STILL scrubbed (no exfil channel).
+  const secretOp = sealDecision(storage, { verdict: 'accept', operator: SECRET, subject: { kind: 'todo', id: 'op-2', title: 'y' } });
+  const [o2] = storage.getObservations([secretOp.id]);
+  check('a SECRET in the operator field is STILL scrubbed (no exfiltration)', o2.metadata.operator !== SECRET && /\[REDACTED:stripe-live-secret\]/.test(o2.metadata.operator));
+  storage.close?.();
+}
+
 rmSync(DATA, { recursive: true, force: true });
 rmSync(REVIEW, { recursive: true, force: true });
 const passed = results.filter(Boolean).length;

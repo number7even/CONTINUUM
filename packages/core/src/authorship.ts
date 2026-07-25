@@ -15,10 +15,10 @@
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
 import { createHash } from 'node:crypto';
-import { scrubMetadataDeep } from './observation.js';
+import { scrubMetadataDeep, AUTHORSHIP_SOURCE_ID } from './observation.js';
 import type { StorageBackend } from './storage.js';
 
-export const AUTHORSHIP_SOURCE_ID = 'authorship';
+export { AUTHORSHIP_SOURCE_ID };
 export const DECISION_VERDICTS = ['accept', 'override', 'reject'] as const;
 export type DecisionVerdict = (typeof DECISION_VERDICTS)[number];
 
@@ -79,7 +79,9 @@ export function sealDecision(storage: StorageBackend, input: SealDecisionInput):
   //    contentHash commits to the redacted bytes and re-derives from the stored record —
   //    the write's own re-scrub is idempotent, so stored === hashed, always.
   const rawConsent = { verdict, operator, subject: subjectRaw, basis, rationale, timestamp };
-  const consent = (scrubMetadataDeep(rawConsent as Record<string, unknown>).scrubbed ?? rawConsent) as {
+  // Exempt `operator` from PII redaction (authorized provenance) — matching insertObservation's
+  // re-scrub — so the hash preimage and the stored record agree on a preserved identity.
+  const consent = (scrubMetadataDeep(rawConsent as Record<string, unknown>, { piiExemptKeys: ['operator'] }).scrubbed ?? rawConsent) as {
     verdict: string; operator: string; subject: DecisionSubject; basis: DecisionBasis | null; rationale: string | null; timestamp: string;
   };
   const contentHash = consentHash(consent);
