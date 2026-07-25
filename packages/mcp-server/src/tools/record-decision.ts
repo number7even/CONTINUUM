@@ -13,12 +13,11 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
-import { createHash } from 'node:crypto';
+import { sealDecision, DECISION_VERDICTS, AUTHORSHIP_SOURCE_ID } from '@number7even/continuum-core';
 import type { ToolDefinition, ToolHandler } from '../tool-types.js';
 
-export const AUTHORSHIP_SOURCE_ID = 'authorship';
-const VERDICTS = ['accept', 'override', 'reject'] as const;
-type Verdict = (typeof VERDICTS)[number];
+export { AUTHORSHIP_SOURCE_ID };
+const VERDICTS = DECISION_VERDICTS;
 
 interface Subject { kind?: string; id?: string; title?: string; contentHash?: string }
 interface Basis { verifyCommand?: string; exitCode?: number; qualifierRef?: string }
@@ -29,22 +28,6 @@ interface RecordDecisionArgs {
   rationale?: string;
   basis?: Basis;
   refs?: string[];
-}
-
-/** Recursive canonical JSON (sorted keys at every depth) — mirrors core's
- *  canonicalStringify so a decision's hash is stable + reproducible. */
-function canonical(v: unknown): string {
-  if (v === null || typeof v !== 'object') return JSON.stringify(v);
-  if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
-  const o = v as Record<string, unknown>;
-  return (
-    '{' +
-    Object.keys(o)
-      .sort()
-      .map((k) => JSON.stringify(k) + ':' + canonical(o[k]))
-      .join(',') +
-    '}'
-  );
 }
 
 export const recordDecisionTool: ToolDefinition = {
@@ -88,49 +71,16 @@ export const recordDecisionTool: ToolDefinition = {
 
 export const handleRecordDecision: ToolHandler = async (args, storage) => {
   const input = (args ?? {}) as RecordDecisionArgs;
-  const verdict = String(input.verdict ?? '').trim() as Verdict;
-  if (!VERDICTS.includes(verdict)) {
-    throw new Error(`verdict must be one of: ${VERDICTS.join(', ')}`);
-  }
-  const subject: Subject = input.subject ?? {};
-  if (!subject.id && !subject.kind && !subject.title) {
-    throw new Error('subject must identify what is being accepted (id, kind, or title)');
-  }
-  const operator = String(input.operator ?? process.env.CONTINUUM_OPERATOR ?? '').trim() || 'unknown';
-  const rationale = input.rationale ? String(input.rationale).trim() : undefined;
-  const basis: Basis | undefined = input.basis && typeof input.basis === 'object' ? input.basis : undefined;
-  const refs = Array.isArray(input.refs) ? input.refs.map(String) : [];
-  const timestamp = new Date().toISOString();
-
-  // The canonical consent record — the exact bytes the contentHash commits to.
-  const consent = { verdict, operator, subject, basis: basis ?? null, rationale: rationale ?? null, timestamp };
-  const contentHash = 'sha256:' + createHash('sha256').update(canonical(consent)).digest('hex');
-
-  // Idempotent source (genre 'export' — captured operator activity; the sourceId
-  // 'authorship' is what marks it as the authorship ledger).
-  storage.upsertSource(AUTHORSHIP_SOURCE_ID, 'export', { ledger: 'authorship', pillar: 'provenance-of-authorship' });
-
-  const subjectLabel = subject.title || subject.id || subject.kind || '(unspecified)';
-  const basisLine = basis?.verifyCommand
-    ? `\nbasis: ${basis.verifyCommand}${basis.exitCode !== undefined ? ` → exit ${basis.exitCode}` : ''}`
-    : '';
-  const content =
-    `${verdict.toUpperCase()} · ${subjectLabel} · by ${operator}` +
-    basisLine +
-    (rationale ? `\nrationale: ${rationale}` : '');
-
-  const obs = storage.insertObservation({
-    sourceId: AUTHORSHIP_SOURCE_ID,
-    type: 'decision',
-    content,
-    timestamp,
-    refs,
-    metadata: { verdict, operator, subject, basis: basis ?? null, rationale: rationale ?? null, contentHash },
+  // The cryptographic seal (scrub → hash → store) is the shared core primitive — one implementation
+  // for this tool AND the AMF review.mjs P9 gate, so the hash-verified ledger cannot drift.
+  const sealed = sealDecision(storage, {
+    verdict: String(input.verdict ?? '').trim(),
+    subject: input.subject ?? {},
+    operator: input.operator,
+    rationale: input.rationale,
+    basis: input.basis,
+    refs: input.refs,
   });
-
-  if (!obs) {
-    throw new Error('decision record was dropped by the privacy filter');
-  }
 
   return {
     content: [
@@ -139,12 +89,12 @@ export const handleRecordDecision: ToolHandler = async (args, storage) => {
         text: JSON.stringify(
           {
             recorded: true,
-            id: obs.id,
+            id: sealed.id,
             type: 'decision',
-            verdict,
-            operator,
-            subject,
-            contentHash,
+            verdict: sealed.verdict,
+            operator: sealed.operator,
+            subject: sealed.subject,
+            contentHash: sealed.contentHash,
             sealHint: 'stamp StateEntry.acceptedBy = { operator, decisionId: id, decisionHash: contentHash, at } then record_checkpoint to seal',
           },
           null,

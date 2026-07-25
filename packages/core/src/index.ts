@@ -180,3 +180,7 @@ export { ingestHotelKb } from './hotel-kb.js';
 export type { HotelKb, HotelRoom, HotelFaq, HotelPolicy, HotelProperty, HotelKbIngestResult } from './hotel-kb.js';
 export { SqliteTenancyDirectory, openTenancyDirectory } from './tenancy.js';
 export type { TenancyDirectory, TenantRecord, TenantStatus, RegisterTenantInput } from './tenancy.js';
+
+// — The Authorship Ledger: the single source of truth for sealing a human P9 decision.
+export { sealDecision, consentHash, AUTHORSHIP_SOURCE_ID, DECISION_VERDICTS } from './authorship.js';
+export type { SealDecisionInput, SealedDecision, DecisionSubject, DecisionBasis, DecisionVerdict } from './authorship.js';
