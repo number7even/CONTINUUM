@@ -37,8 +37,9 @@ function canonical(v) {
   if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
   return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + canonical(v[k])).join(',') + '}';
 }
-/** The hash that binds "which exact draft was approved" — over the brief the human saw. */
-function draftContentHash(rec) {
+/** The hash that binds "which exact draft was approved" — over the brief the human saw.
+ *  Exported so campaign-handoff re-derives through the SAME function that sealed it (no drift). */
+export function draftContentHash(rec) {
   return 'sha256:' + createHash('sha256').update(canonical(rec.brief ?? rec)).digest('hex');
 }
 
