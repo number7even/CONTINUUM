@@ -184,3 +184,7 @@ export type { TenancyDirectory, TenantRecord, TenantStatus, RegisterTenantInput 
 // — The Authorship Ledger: the single source of truth for sealing a human P9 decision.
 export { sealDecision, consentHash, AUTHORSHIP_SOURCE_ID, DECISION_VERDICTS } from './authorship.js';
 export type { SealDecisionInput, SealedDecision, DecisionSubject, DecisionBasis, DecisionVerdict } from './authorship.js';
+
+// — The Verifiable Interview: claims proven by re-runnable mechanical verification, not LLM opinion.
+export { recordClaim, interview, claimHash, verifyClaimIntegrity, INTERVIEW_SOURCE_ID } from './interview.js';
+export type { ClaimInput, SealedClaim, ClaimVerification, ClaimEvidence, ClaimTier, InterviewHit } from './interview.js';
