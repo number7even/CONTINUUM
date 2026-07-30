@@ -243,6 +243,7 @@ async function run() {
     }
   }
   storage.close();
+  brief.contentProject = project; // self-containment: the project the fromSignal lives in, so campaignHandoff walks the chain with no manual override
   console.error(`[matcher] stats kept=${ranked.length} skipped=${skipped} drafted=${brief.drafted}`); // machine-parseable for the dogfood odometer
   console.log(JSON.stringify(brief, null, 2));
 }

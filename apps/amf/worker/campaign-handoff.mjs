@@ -31,12 +31,16 @@ const DECISION_PROJECT = () => process.env.AMF_DECISION_PROJECT || 'amf';
  */
 export async function campaignHandoff(approvedDraftId, opts = {}) {
   const decisionProject = DECISION_PROJECT();
-  const contentProject = opts.contentProject || process.env.AMF_CONTENT_PROJECT || decisionProject;
 
   // 1. The asset must be in approved/ — a sealed P9 decision is what moved it there (review.mjs).
   const path = join(reviewDir(), 'approved', `${approvedDraftId}.json`);
   if (!existsSync(path)) return { ok: false, reason: 'not an approved draft — no P9 seal (refuse to export)' };
   const rec = JSON.parse(readFileSync(path, 'utf8'));
+
+  // Self-contained: the draft stamps its own originating content project (pipeline.mjs / content-matcher).
+  // Precedence: explicit opt → the draft's own stamp → env fallback → the decision project. No manual
+  // override needed for a stamped draft — the bundle carries all cross-project provenance itself.
+  const contentProject = opts.contentProject || rec.contentProject || rec.brief?.contentProject || process.env.AMF_CONTENT_PROJECT || decisionProject;
 
   // 2. The seal must be stamped on the record (decisionId + contentHash, set at approval time).
   if (!rec.decisionId || !rec.contentHash) return { ok: false, reason: 'approved draft carries no ledger seal (refuse)' };

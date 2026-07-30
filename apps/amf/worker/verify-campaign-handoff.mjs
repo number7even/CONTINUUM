@@ -28,7 +28,7 @@ process.env.CONTINUUM_STORAGE_BACKEND = 'sqlite';
 process.env.CONTINUUM_PRIVACY_PII = '1';
 process.env.AMF_REVIEW_DIR = REVIEW;
 process.env.AMF_DECISION_PROJECT = 'amf-decisions';   // the P9 seal lands here
-process.env.AMF_CONTENT_PROJECT = 'amf-content';      // the source signal lives HERE (cross-project)
+delete process.env.AMF_CONTENT_PROJECT;               // NO manual override — the draft must be self-contained
 process.env.CONTINUUM_OPERATOR = 'riaan-k';
 
 const results = [];
@@ -51,7 +51,8 @@ const SRC_URL = 'https://skift.com/hotels-after-hours';
 // 2. Enqueue a draft whose brief points back at that source signal.
 const pendingDir = join(REVIEW, 'pending');
 mkdirSync(pendingDir, { recursive: true });
-const DRAFT = { id: 'voicecosmos-camp', slug: 'voicecosmos', format: 'post', queuedAt: '2026-07-25T09:00', brief: { headline: 'Recover the bookings you lose after 6pm', cta: 'DEMO', points: [{ stat: '30%', label: 'calls unanswered' }], fromSignal: SIGNAL_ID, sources: [SRC_URL] } };
+// The draft stamps its OWN contentProject (as content-matcher/pipeline now do) → self-contained, no env override.
+const DRAFT = { id: 'voicecosmos-camp', slug: 'voicecosmos', format: 'post', queuedAt: '2026-07-25T09:00', brief: { headline: 'Recover the bookings you lose after 6pm', cta: 'DEMO', points: [{ stat: '30%', label: 'calls unanswered' }], fromSignal: SIGNAL_ID, sources: [SRC_URL], contentProject: 'amf-content' } };
 writeFileSync(join(pendingDir, `${DRAFT.id}.json`), JSON.stringify(DRAFT));
 
 console.log('── the P9 WALL · an UNSEALED draft cannot be exported ───────────────────');
@@ -72,7 +73,7 @@ const roles = bundle.sourceChain.map(n => n.role);
 check('the chain is unbroken (decision · draft · signal)', bundle.chainUnbroken === true && roles.join(',') === 'decision,draft,signal', roles.join('→'));
 const sig = bundle.sourceChain.find(n => n.role === 'signal');
 check('the signal node resolves the ORIGIN source (id + sourceId + url)', sig?.id === SIGNAL_ID && sig?.sourceId === 'googlenews' && sig?.url === SRC_URL, sig?.url);
-check('the chain spans TWO projects (decision ≠ content), self-contained', bundle.decisionProject === 'amf-decisions' && sig?.project === 'amf-content');
+check('SELF-CONTAINED: the chain resolves from the draft\'s OWN contentProject — NO env override', bundle.decisionProject === 'amf-decisions' && sig?.project === 'amf-content' && process.env.AMF_CONTENT_PROJECT === undefined, `signal.project=${sig?.project} (env unset)`);
 
 console.log('── the P9 WALL · a TAMPERED asset is refused (hash no longer re-derives) ──');
 {

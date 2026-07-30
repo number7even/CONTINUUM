@@ -1,5 +1,4 @@
-<!--
-  CROOMA Ecosystem — Coordination Map (who does what, where). The centralized "same page" doc.
+CROOMA Ecosystem — Coordination Map (who does what, where). The centralized "same page" doc.
   Grounded in: docs/PRODUCT_AMALGAMATION.md, docs/STUDIOMUNICH_RELATIONSHIP.md, docs/CROOMA_PRODUCT_SPEC.md.
   Honest note: repos/rules are from those docs; where PEOPLE/team assignments aren't written down,
   they're flagged "⟨assign⟩" — the founder fills them, I don't invent them (P4).
@@ -28,11 +27,11 @@ Read the architecture in `CROOMA_PRODUCT_SPEC.md`. This doc is the **execution +
 
 | Repo | What it holds | Deploy / data | Owner |
 |---|---|---|---|
-| **`CONTINUUM`** (this repo) | the **spine**: AMF content factory, ledgers, the P9 seal, multi-tenant isolation, MCP/HTTP surface, the adapter + `campaignHandoff` contracts | continuum.rest · SQLite/RuVector · 41 gates ✅ | **Engine / platform** — Riaan + agent (here) |
-| **`continuum-visual-ops`** (Crooma) | the **product**: shell + 5 modules, UX, tenancy/auth/billing | crooma.cloud · Vercel · Supabase `mpjlyfrzwrlwgzqquwjx` | **Crooma team** ⟨assign⟩ |
-| **`studiomunich-main`** (StudioMunich) | the separate peer product (its own stack) | studiomunich.digital (**LIVE**) · Supabase `jjdjifkadyqykaamsirr` | **SM team** ⟨assign⟩ |
-| **`pod-geni`** (PodGeni) | podcast/audio + Cadence campaign features — **folding into Crooma** | Firebase (until folded) | **Crooma team** (fold) ⟨assign⟩ |
-| worktree **`studiomunich-crooma`** | where Crooma authors its SM-Galleries integration | (a git worktree, not a product) | **Crooma team** |
+| **`CONTINUUM`** (this repo) | the **spine**: AMF content factory, ledgers, the P9 seal, multi-tenant isolation, MCP/HTTP surface, the adapter + `campaignHandoff` contracts | continuum.rest · SQLite/RuVector · 42 gates ✅ | **Riaan** (founder) + agent — here |
+| **`continuum-visual-ops`** (Crooma) | the **product**: shell + 5 modules, UX, tenancy/auth/billing | crooma.cloud · Vercel · Supabase `mpjlyfrzwrlwgzqquwjx` | **Riaan** (founder), "Crooma hat" |
+| **`studiomunich-main`** (StudioMunich) | the separate peer product (its own stack) | studiomunich.digital (**LIVE**) · Supabase `jjdjifkadyqykaamsirr` | **Riaan** (founder), "SM-review hat" |
+| **`pod-geni`** (PodGeni) | podcast/audio + Cadence campaign features — **folding into Crooma** | Firebase (until folded) | **Riaan** (founder), "Crooma hat" (fold) |
+| worktree **`studiomunich-crooma`** | where Crooma authors its SM-Galleries integration | (a git worktree, not a product) | **Riaan** (founder), "Crooma hat" |
 
 **Founder (Riaan) — the human in the loop, across all of it:** applies DDL (additive tables, SQL editor),
 makes the **P9 leaps** (approvals/decisions), owns the strategic calls. The seal is *his* click, never an agent's.
@@ -47,18 +46,19 @@ makes the **P9 leaps** (approvals/decisions), owns the strategic calls. The seal
   one demo asset; `provision-tenant` for each `workspace_id`.
 - Owns the invariant: **the seal is a Continuum cryptographic record** — never re-implemented in a Supabase/Firebase rule.
 
-### B. The Crooma product (`continuum-visual-ops`) — Crooma team ⟨assign⟩
+### B. The Crooma product (`continuum-visual-ops`) — Riaan (founder), "Crooma hat"
 - ▸ Build the **shell** (one brand, one nav listing the modules) on the `workspace_id` tenant model.
 - ▸ Unify **auth** (single login) then **billing** (one credit ledger) — the amalgamation sequence.
 - ▸ Wire the **Continuum Source/Sink adapter**: emit gallery selections/annotations as observations
   (`{workspace_id, gallery, asset, actor, kind, payload, ts}`); read digests + semantic search back.
 - ▸ Fold **PodGeni** data **last** (once scope locked; Cadence campaign features come with it).
 
-### C. StudioMunich integration (`studiomunich-main`) — SM team + Crooma team ⟨assign⟩
-- Crooma team authors Galleries in the `studiomunich-crooma` **worktree** → hands off as **PR #45**.
-- **SM team** reviews + merges PR #45, enables the `galleries` feature flag, and sets `CONTINUUM_URL`
-  to light up the shared brain (`workspace_id := studio_id`).
-- **Founder** applies the additive sibling-table DDL in the SM SQL editor.
+### C. StudioMunich integration (`studiomunich-main`) — Riaan (founder), two hats
+- Riaan ("Crooma hat") authors Galleries in the `studiomunich-crooma` **worktree** → hands off as **PR #45**.
+- Riaan ("SM-review hat") reviews + merges PR #45, enables the `galleries` feature flag, and sets
+  `CONTINUUM_URL` to light up the shared brain (`workspace_id := studio_id`). The two-hat split is not
+  ceremony — it enforces the "PR-reviewed, never a direct push to live SM `main`" rule of engagement.
+- Riaan (founder) applies the additive sibling-table DDL in the SM SQL editor.
 
 ### D. The human gate — Founder
 - Clear the **66 deduped drafts** through `review.mjs` approve/reject (each seals a `type='decision'`).
@@ -93,18 +93,26 @@ makes the **P9 leaps** (approvals/decisions), owns the strategic calls. The seal
 |---|---|---|---|
 | 1 | Prove Wave 1 end-to-end on one demo asset (seal → campaignHandoff → unbroken chain) | Engine (here) | ✅ campaignHandoff (done) |
 | 2 | Publish the Source/Sink adapter contract | Engine (here) | — |
-| 3 | Stand up the Crooma shell + module nav | Crooma team ⟨assign⟩ | tenant model (agreed) |
-| 4 | SM team review/merge PR #45 + set `CONTINUUM_URL` | SM team ⟨assign⟩ | founder DDL |
-| 5 | Founder clears the 66 drafts (P9 leaps) | Founder | review.mjs (✅) |
+| 3 | Stand up the Crooma shell + module nav | Riaan ("Crooma hat", `continuum-visual-ops`) | tenant model (agreed) |
+| 4 | Review/merge PR #45 + set `CONTINUUM_URL` | Riaan ("SM-review hat", `studiomunich-main`) | founder DDL |
+| 5 | Clear the 66 drafts (P9 leaps) | Riaan (founder) | review.mjs (✅) |
 
 ---
 
-## Open assignments (flagged, not invented — P4)
-The docs name **teams** ("Crooma team", "SM team", "founder") and **repos**, but not **people**. Fill in
-the ⟨assign⟩ owners:
-- Who is the Crooma team (continuum-visual-ops + pod-geni fold)?
-- Who is the SM team (reviews PR #45 into studiomunich-main)?
-- Who holds the Engine (CONTINUUM) beyond you + the agent?
+## Execution Ledger — who does what (P4: named, not invented)
 
-Once assigned, this table becomes the single source of "who does what." Until then, it's the accurate
-map of the *roles* — the names are the one thing I won't guess.
+Every "team" above resolves to **one human — Riaan (founder)** — wearing a different hat in a different
+worktree/repo. This is stated plainly rather than dressed up as a staffed org: a roadmap with unnamed
+owners is a *Role Map*; named, it becomes an *Execution Ledger*.
+
+| Hat | Acts in | Scope |
+|---|---|---|
+| **Engine** | `CONTINUUM` (this repo) | the spine + agent-paired build |
+| **Crooma hat** | `continuum-visual-ops` (+ `pod-geni` during the fold) | the product shell + 5 modules |
+| **SM-review hat** | `studiomunich-main` (+ the `studiomunich-crooma` worktree for authoring) | reviews/merges the Galleries PR into LIVE SM; never a direct push to SM `main` |
+| **Founder** | wherever the P9 leap or DDL happens | the human signature + additive DDL |
+
+The two-hat split on StudioMunich (author in a worktree → PR → review-merge into live) is deliberate: it
+is the mechanism that enforces "changes to the LIVE product go through review, never a direct push."
+
+When a second person joins any hat, name them in the row above — that is the only edit this ledger needs.
