@@ -179,11 +179,16 @@ async function smoke() {
 }
 
 const argv = process.argv.slice(2);
-if (argv.includes('--smoke')) {
-  await smoke();
-} else if (import.meta.url === `file://${process.argv[1]}`) {
-  const bucketIdx = argv.indexOf('--bucket');
-  const bucket = bucketIdx >= 0 ? argv[bucketIdx + 1] : 'pending';
-  if (argv.includes('--suppress')) suppress(bucket);
-  else report(bucket);
+// Only act when dedup.mjs is the ENTRY point — never on import. (Previously `--smoke` was checked
+// first, so importing this module from any process that happened to carry --smoke in argv — e.g. a
+// sibling module's own --smoke run — hijacked the process and exited. Entry-point is the outer gate.)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  if (argv.includes('--smoke')) {
+    await smoke();
+  } else {
+    const bucketIdx = argv.indexOf('--bucket');
+    const bucket = bucketIdx >= 0 ? argv[bucketIdx + 1] : 'pending';
+    if (argv.includes('--suppress')) suppress(bucket);
+    else report(bucket);
+  }
 }

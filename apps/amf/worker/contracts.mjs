@@ -43,6 +43,32 @@ export const HITL_REWARD = Object.freeze({ approve: 1.0, modify: 0.7, reject: 0.
 /** reward for a decision string (case-insensitive), or null if unknown. */
 export const rewardFor = (decision) => HITL_REWARD[String(decision || '').toLowerCase()] ?? null;
 
+// ── PodGeni Creative Genome engagement telemetry (Seam ② — Wave 2 return path) ─
+// The XENOS half above learns from a HUMAN DECISION ("approve/reject"). This half learns from a
+// MEASURED OUTCOME ("this asset/style actually drove engagement") — a different source, same corpus
+// slot. Both land as type='ground_truth' so content-matcher.feedbackWeight() consumes them identically.
+/** The sourceId engagement telemetry is written under (distinct from 'xenos_hitl'). */
+export const TELEMETRY_SOURCE_ID = 'podgeni';
+/** engagements/impressions rate that maps to a full 1.0 reward. Transparent heuristic, tunable. */
+export const TELEMETRY_TARGET_RATE = 0.08;
+/**
+ * Map measured engagement → a reward in the SAME 0.2..1.0 band as HITL_REWARD, so "what performed"
+ * nudges the ranker like "what a human approved". This is a TRANSPARENT HEURISTIC, not a tuned model
+ * (P4 — no false precision): a normalized `score` in [0,1] wins if present; else derive from
+ * engagements/impressions against TELEMETRY_TARGET_RATE; any conversion pins to the top of the band.
+ * Returns null when there is no measurable signal → nothing to learn, nothing written.
+ * @param {GenomeTelemetry} t
+ * @returns {number|null}
+ */
+export function engagementReward(t = {}) {
+  const band = (x) => Math.max(0.2, Math.min(1.0, 0.2 + 0.8 * Math.max(0, Math.min(1, x))));
+  if (Number.isFinite(Number(t.score))) return band(Number(t.score));
+  if (Number.isFinite(Number(t.conversions)) && Number(t.conversions) > 0) return 1.0; // a conversion IS ground truth
+  const imp = Number(t.impressions), eng = Number(t.engagements);
+  if (Number.isFinite(imp) && imp > 0 && Number.isFinite(eng)) return band((eng / imp) / TELEMETRY_TARGET_RATE);
+  return null; // no measurable engagement
+}
+
 // ── Avatar / rights scheme (Stage H — the rights wall keys off these) ─────────
 /** avatarId scheme: rented human likeness vs synthetic. */
 export const AVATAR = Object.freeze({
@@ -93,6 +119,22 @@ export const PROVIDER_IDS = Object.freeze([
  * @property {string}  [created_at]
  */
 /**
+ * @typedef {Object} GenomeTelemetry        A Crooma/PodGeni Creative Genome engagement event → mapTelemetry().
+ * @property {string}  id                    Stable per-event id (the idempotency key).
+ * @property {string}  [decisionId]          The CONTINUUM decision the asset was sealed under → refs (closes the loop).
+ * @property {string}  [signalId]            The origin signal the asset came from → refs (back to the news article).
+ * @property {number}  [score]               Normalized performance in [0,1] — wins over raw metrics if present.
+ * @property {number}  [impressions]
+ * @property {number}  [engagements]         clicks + likes + shares + saves.
+ * @property {number}  [conversions]         a conversion pins the reward to the top of the band.
+ * @property {string}  [summary]             what the asset was about — carries the TERMS feedbackWeight matches on.
+ * @property {string}  [style]               the Creative Genome variant that ran (what we're learning about).
+ * @property {string}  [product]             AMF product slug (matches feedbackWeight's product filter).
+ * @property {string}  [tenant_id]
+ * @property {string}  [asset_id]
+ * @property {string}  [measured_at]         ISO 8601.
+ */
+/**
  * @typedef {Object} LeadPayload            AMF → XENOS `POST /api/crm/leads/capture` (Seam ①, header `x-intake-key`).
  * @property {string}  tenant_id            The OWNER tenant (whose CRM the lead lands in) — NOT the prospect.
  * @property {string}  source              'amf'.
@@ -136,4 +178,4 @@ export const PROVIDER_IDS = Object.freeze([
  * @property {string[]}   not               Exclusion: the signal must contain NONE of these.
  */
 
-export default { OBS_TYPES, SIGNAL_TYPES, isSignalType, HITL_REWARD, rewardFor, AVATAR, PROVIDER_IDS };
+export default { OBS_TYPES, SIGNAL_TYPES, isSignalType, HITL_REWARD, rewardFor, TELEMETRY_SOURCE_ID, TELEMETRY_TARGET_RATE, engagementReward, AVATAR, PROVIDER_IDS };

@@ -85,11 +85,34 @@ When you measure engagement on a post, you can walk straight back to the exact s
 
 ---
 
-## 5. The learning-loop return (Wave 2, but design for it now)
-When you detect which asset/style drove engagement, write it back to Continuum as a **`ground_truth`
-Observation** (tenant-scoped, `refs: [decisionId, signalId]`). Continuum's `content-matcher.mjs`
-`feedbackWeight()` already reads co-located `ground_truth` and re-weights the 6-D ranker — so
-tomorrow's drafts lean toward what worked. Don't build a parallel analytics store; feed the brain.
+## 5. The learning-loop return (Wave 2 — the Continuum half is BUILT + gate-green)
+When you detect which asset/style drove engagement, send it to Continuum as an **engagement-telemetry
+event** and Continuum turns it into a `ground_truth` Observation (tenant-scoped, `refs: [decisionId,
+signalId]`) that `content-matcher.mjs` `feedbackWeight()` re-weights the 6-D ranker with — so tomorrow's
+drafts lean toward what worked. Don't build a parallel analytics store; feed the brain.
+
+The Continuum-side ingest is real and proven, not a promise: **`apps/amf/worker/telemetry-sync.mjs`**
+(shape in `contracts.mjs` → `GenomeTelemetry` + `engagementReward`). Its `--smoke` gate proves the FULL
+loop against a fixture — telemetry → `ground_truth` → the same signal's rank measurably rises (fb 1→1.3)
+— and it stays gated on `PODGENI_TELEMETRY_URL` + `PODGENI_TELEMETRY_KEY` until your half lands (P4/P6:
+wired, proven our-side, writes nothing live without the key).
+
+**Event shape** (POST the moment you have measured engagement; one event per asset):
+```jsonc
+{
+  "id": "<stable per-event id>",        // idempotency key
+  "decisionId": "<from sourceChain>",   // → refs (the seal this asset ran under)
+  "signalId":   "<from sourceChain>",   // → refs (the origin news article)
+  "score": 0.0,                          // OPTIONAL normalized [0,1]; wins over raw metrics
+  "impressions": 5000, "engagements": 600, "conversions": 4,   // else reward derives from these
+  "summary": "what the asset was about", // carries the terms the ranker matches on
+  "style": "testimonial",                // the Creative Genome variant that ran (what we learn about)
+  "product": "voicecosmos", "tenant_id": "<workspace_id>", "asset_id": "<yours>"
+}
+```
+Reward maps into the SAME `0.2..1.0` band as a human HITL decision (a `score` wins; else
+`engagements/impressions` vs an 0.08 target rate; any conversion pins to 1.0) — a transparent heuristic,
+not a claimed model. No measurable signal → reward `null` → nothing written (no noise in the brain).
 
 ---
 
