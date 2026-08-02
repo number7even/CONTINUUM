@@ -1,13 +1,4 @@
-<!--
-  PodGeni / Cadence — Campaign Intake Contract. What the PodGeni team must build to consume a sealed
-  AMF asset and schedule it without breaking the tamper-proof guarantee. This is the OTHER half of the
-  campaignHandoff seam (the CONTINUUM half is ✅ verified — verify-campaign-handoff, 8/8).
-
-  Source of truth for the bundle shape: apps/amf/worker/campaign-handoff.mjs (campaignHandoff()).
-  IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans.
--->
-
-# PodGeni / Cadence — Campaign Intake Contract
+PodGeni / Cadence — Campaign Intake Contract
 
 _What to communicate to the PodGeni team so their intake schedules a sealed asset without tripping (or
 weakening) the tamper-proof wall. Wave 1, PodGeni side._

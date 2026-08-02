@@ -27,7 +27,7 @@ Read the architecture in `CROOMA_PRODUCT_SPEC.md`. This doc is the **execution +
 
 | Repo | What it holds | Deploy / data | Owner |
 |---|---|---|---|
-| **`CONTINUUM`** (this repo) | the **spine**: AMF content factory, ledgers, the P9 seal, multi-tenant isolation, MCP/HTTP surface, the adapter + `campaignHandoff` contracts | continuum.rest · SQLite/RuVector · 42 gates ✅ | **Riaan** (founder) + agent — here |
+| **`CONTINUUM`** (this repo) | the **spine**: AMF content factory, ledgers, the P9 seal, multi-tenant isolation, MCP/HTTP surface, the adapter + `campaignHandoff` contracts | continuum.rest · SQLite/RuVector · 44 gates ✅ | **Riaan** (founder) + agent — here |
 | **`continuum-visual-ops`** (Crooma) | the **product**: shell + 5 modules, UX, tenancy/auth/billing | crooma.cloud · Vercel · Supabase `mpjlyfrzwrlwgzqquwjx` | **Riaan** (founder), "Crooma hat" |
 | **`studiomunich-main`** (StudioMunich) | the separate peer product (its own stack) | studiomunich.digital (**LIVE**) · Supabase `jjdjifkadyqykaamsirr` | **Riaan** (founder), "SM-review hat" |
 | **`pod-geni`** (PodGeni) | podcast/audio + Cadence campaign features — **folding into Crooma** | Firebase (until folded) | **Riaan** (founder), "Crooma hat" (fold) |
@@ -84,6 +84,36 @@ makes the **P9 leaps** (approvals/decisions), owns the strategic calls. The seal
 - **One terminal = one repo + one branch + one worktree.** No two agents/teams edit the same tree; handoffs are PRs.
 - **The seal stays in Continuum** — the tamper-proof guarantee is a cryptographic `contentHash`, referenced
   by the products, never re-implemented as a platform rule.
+
+---
+
+## How to check what's done — per repo (the verification ledger)
+
+The rule across every repo: **a feature is not "done" because it renders — it's done when a re-runnable
+gate exits 0.** Until then it is 🟡 REPORTED (built, unproven) or 🔴 VISION (not built). This table is the
+single answer to "who has to do what, and how do we check it per repo."
+
+| Repo | The check you run | What green proves | Status today |
+|---|---|---|---|
+| **`CONTINUUM`** (spine) | `make smoke` (44 gates) | the whole spine: seal, ledgers, tenant isolation, JWT, `campaignHandoff` (8/8), telemetry loop (10/10), the by-id verify endpoint (8/8) | ✅ **44/44 green** |
+| **`continuum-visual-ops`** (Crooma) | _their own_ `make smoke` / test suite (**to build**) | the shell on `workspace_id`; the intake wall schedules a sealed bundle + refuses unsealed/tampered | 🟡 REPORTED — no gate yet |
+| **`pod-geni`** (PodGeni module) | _their own_ Wave-1 gate mirroring `verify-campaign-handoff` (**to build**) | `createCampaign` gates on `contentHash`+`decisionId`, refuses unsealed/tampered, `sourceId` walks to origin | 🟡 REPORTED — schema committed (`6c51b4e`), gate pending |
+| **`studiomunich-main`** (peer) | PR #45 CI + the `galleries` feature-flag smoke | Galleries integration behind the flag; `workspace_id := studio_id` | 🔴 not started |
+
+**How to see the CONTINUUM-side truth right now:** `make smoke` from this repo. Everything this session
+produced (this doc, both terminal briefs, the intake contract, the verify endpoint) lives on branch
+**`feature/jarvis-graph-surface` (PR #24, unmerged)** — it is **not on `main` yet**, so browsing `main`
+or the Crooma repo will not show it. Merge PR #24 (or `git checkout feature/jarvis-graph-surface`) to see it.
+
+---
+
+## Continuum-side pending deliverables (what other repos are blocked on)
+
+| Deliverable | Who's waiting | Status | Note |
+|---|---|---|---|
+| **`GET /api/observation/:id`** (by-id seal verification) | Crooma + PodGeni schedulers (fail-closed publish) | ✅ **BUILT + gate-proven** (`verify-observation-endpoint.mjs`, 8/8) | tenant-scoped, read-only, seal projection only |
+| **Source/Sink adapter contract** (modules ↔ brain) | Crooma (Galleries/Assets — Wave 3) | 🟡 REPORTED — contract not published | on HOLD until Wave 1 closes |
+| **AMF-usage sync contract** (cognitive usage → the ledger) | **PodGeni** (unified credits meter) | 🟡 **strawman on disk, UNCOMMITTED** | PodGeni is correctly holding metering code until this is committed + gate-proven. Shape: `llm_tokens`/`tts_characters`/`search_requests`, keyed by `workspace_id`, `ref: operationId + observationId` |
 
 ---
 

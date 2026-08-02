@@ -57,9 +57,13 @@ the full architecture; this brief is authoritative for **what to do next and wha
    phantom REST path):** the engine exposes **no** `/api/observation/{id}` route. Verification is an MCP
    call over the authenticated `/sse` transport — `continuum_get_observations([decisionId])` — then
    re-derive the `contentHash` over the on-disk asset and compare. Auth is the scoped JWT / Bearer (§II.6);
-   `/healthz` + `/readyz` are the only no-auth probes. _(Spine-side gap, flagged not faked: a lightweight
-   REST `GET /api/observation/:id` for schedulers that don't want an MCP client does not exist yet — if
-   Wave-1 needs it, it's a small Continuum-side task, gate-proven, not a Crooma invention.)_
+   `/healthz` + `/readyz` are the only no-auth probes. **Two verification surfaces, both real:**
+   (a) the MCP tool `continuum_get_observations([decisionId])` over `/sse` (full-client path); or
+   (b) **`GET /api/observation/:id`** — a lightweight REST projection for schedulers that don't embed an
+   MCP client. It is **tenant-scoped + read-only**, returns ONLY the seal fields (`type`, `subject.contentHash`,
+   `verdict`, `operator`, `refs` — never the raw content), and **fails closed**: `401` unauth, `404` for an
+   unknown id OR a different tenant's id (cross-tenant reads are structurally impossible). Built + gate-proven
+   spine-side (`scripts/verify-observation-endpoint.mjs`, 8/8). Compare `subject.contentHash` to your bundle's.
 6. **Transport = a scoped tenant JWT.** Obtain a per-workspace token via `continuum provision-tenant` (or
    the shared bearer) and pass it on every call. Tenant-scoped either way; a token never crosses workspaces.
 7. **Don't mint identity.** The Creative Genome `sourceId` tags **ARE** the Continuum Observation ids from
