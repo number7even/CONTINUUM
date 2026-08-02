@@ -50,9 +50,16 @@ the full architecture; this brief is authoritative for **what to do next and wha
 4. **The Odometer — honesty as architecture (P4).** **Every claim in the `continuum-visual-ops` repo is
    tagged 🟡 REPORTED or 🔴 VISION until a deterministic gate proves it ✅ VERIFIED.** No feature is "done"
    because it renders; it is done when a re-runnable check exits 0. Build your own `make smoke` — see §V.
-5. **Verify through the endpoint, not a copy.** Read the bundle + verify the decision via Continuum's
-   MCP/HTTP endpoint (one authoritative source of truth). **Never gate on a cached/copied artifact** — a
-   stale or forged local copy silently defeats the wall. Re-verify against the brain at publish time.
+5. **Verify through the brain, not a copy — just-in-time, fail-closed.** **Never gate on a cached/copied
+   artifact** — a stale or forged local copy silently defeats the wall. Immediately before hitting a
+   publishing API, re-verify against the live engine and **fail closed** (abort the publish) if the check
+   fails OR the engine is unreachable. **The actual surface (verified on disk — do not build against a
+   phantom REST path):** the engine exposes **no** `/api/observation/{id}` route. Verification is an MCP
+   call over the authenticated `/sse` transport — `continuum_get_observations([decisionId])` — then
+   re-derive the `contentHash` over the on-disk asset and compare. Auth is the scoped JWT / Bearer (§II.6);
+   `/healthz` + `/readyz` are the only no-auth probes. _(Spine-side gap, flagged not faked: a lightweight
+   REST `GET /api/observation/:id` for schedulers that don't want an MCP client does not exist yet — if
+   Wave-1 needs it, it's a small Continuum-side task, gate-proven, not a Crooma invention.)_
 6. **Transport = a scoped tenant JWT.** Obtain a per-workspace token via `continuum provision-tenant` (or
    the shared bearer) and pass it on every call. Tenant-scoped either way; a token never crosses workspaces.
 7. **Don't mint identity.** The Creative Genome `sourceId` tags **ARE** the Continuum Observation ids from
