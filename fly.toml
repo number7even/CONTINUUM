@@ -21,6 +21,9 @@ primary_region = "iad"  # US East. Change with `fly regions set <region>`.
   CONTINUUM_HTTP_PORT  = "7878"
   CONTINUUM_DATA_DIR   = "/data"
   CONTINUUM_PROJECT_ID = "continuum"
+  # factory.ts now defaults to the V0.5 hybrid backend (ruvector + MiniLM),
+  # which needs >512MB + native modules. This VM is sized for SQLite-only.
+  CONTINUUM_STORAGE_BACKEND = "sqlite"
   NODE_ENV             = "production"
 
 # Secrets (NOT in env above — set via `fly secrets set ...` so they're encrypted):

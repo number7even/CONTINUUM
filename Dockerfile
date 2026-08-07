@@ -43,7 +43,7 @@ COPY apps/console/package.json                        apps/console/
 RUN npm ci --workspaces --include-workspace-root --ignore-scripts || npm install
 
 # Compile better-sqlite3 against the Node runtime in this image.
-RUN npm rebuild better-sqlite3 --workspace=@continuum/core
+RUN npm rebuild better-sqlite3 --workspace=@number7even/continuum-core
 
 # Sharp is a transitive dep of @xenova/transformers. Its prebuilt
 # platform-specific binary normally lands via a postinstall script,
@@ -63,11 +63,11 @@ COPY packages packages/
 # `continuum reindex`, `continuum verify`, `continuum adapter docs --watch`
 # etc inside the container via `fly ssh console`. Added 2026-06-01 to
 # support the V0.5 hybrid promotion remote-backfill workflow.
-RUN npm run build --workspace=@continuum/core \
- && npm run build --workspace=@continuum/mcp-server \
- && npm run build --workspace=@continuum/cli \
- && npm run build --workspace=@continuum/adapter-docs \
- && npm run build --workspace=@continuum/adapter-git
+RUN npm run build --workspace=@number7even/continuum-core \
+ && npm run build --workspace=@number7even/continuum-mcp-server \
+ && npm run build --workspace=@number7even/continuum-cli \
+ && npm run build --workspace=@number7even/continuum-adapter-docs \
+ && npm run build --workspace=@number7even/continuum-adapter-git
 
 # ─── Stage 2 ── runtime ────────────────────────────────────────────────────
 FROM node:20-bookworm-slim AS runtime
@@ -93,7 +93,7 @@ RUN groupadd --system --gid 10001 continuum \
  && chown -R continuum:continuum /data
 
 # Copy node_modules + dist from builder. Skip source + tests + .next.
-# The npm workspaces symlinks under node_modules/@continuum/* point at
+# The npm workspaces symlinks under node_modules/@number7even/* point at
 # packages/*/, so each workspace's package.json + dist must be present
 # in the runtime tree or those symlinks dangle.
 COPY --from=builder /build/node_modules                          ./node_modules
