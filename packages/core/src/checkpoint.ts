@@ -47,6 +47,27 @@ function canonicalStringify(value: unknown): string {
 }
 
 /**
+ * The V0 seal: SHA-256 over the canonically-serialized {active, dormant, broken}
+ * contents (sorted keys at every depth). Exported so the same algorithm that
+ * SEALS a checkpoint can independently RE-DERIVE it — the basis of tamper
+ * detection and the Authorship Ledger's chain verification: recompute the hash
+ * of the current entries and compare to the stored hash; a mismatch is tamper.
+ *
+ * Because canonicalStringify recurses every field, a StateEntry.acceptedBy seal
+ * (the human's decision reference) is committed into this hash automatically —
+ * altering the referenced decision changes the hash.
+ */
+export function computeCheckpointHash(
+  active: StateEntry[],
+  dormant: StateEntry[] = [],
+  broken: StateEntry[] = [],
+): string {
+  return createHash('sha256')
+    .update(canonicalStringify({ active, dormant, broken }))
+    .digest('hex');
+}
+
+/**
  * Write an immutable state snapshot. Returns the persisted row.
  *
  * Hash chain (V0): SHA-256 of canonically-serialized contents (sorted keys
@@ -60,8 +81,7 @@ export function recordCheckpoint(db: Database.Database, input: CheckpointInput):
   const dormant = input.dormant ?? [];
   const broken = input.broken ?? [];
 
-  const canonical = canonicalStringify({ active, dormant, broken });
-  const hash = createHash('sha256').update(canonical).digest('hex');
+  const hash = computeCheckpointHash(active, dormant, broken);
 
   db.prepare(`
     INSERT INTO state_snapshots (id, timestamp, active, dormant, broken, hash, reason)

@@ -1,15 +1,20 @@
 {
   "name": "@number7even/continuum-adapter-export",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Continuum export adapter — tails Claude session JSONL transcripts and writes turn observations into the Continuum DB.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "continuum-adapter-export": "./dist/index.js"
+    "continuum-adapter-export": "dist/index.js"
   },
-  "files": ["dist", "!dist/*.test.*"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "dist",
+    "!dist/*.test.*"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "prepublishOnly": "npm run build",
   "scripts": {
     "build": "tsc -b",
@@ -18,7 +23,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@number7even/continuum-core": "0.0.1",
+    "@number7even/continuum-core": "0.0.2",
     "chokidar": "^4.0.0",
     "ruv-swarm": "^1.0.20"
   },

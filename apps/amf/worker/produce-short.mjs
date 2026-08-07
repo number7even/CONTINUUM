@@ -32,8 +32,13 @@ import { decideRender, describeDecision } from './vault-guard.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(HERE, 'out');
 const OUT = join(OUT_DIR, 'one-short.mp4');
-const sh = (c) => execSync(c, { stdio: 'ignore', shell: '/bin/bash' });
-const cap = (c) => execSync(c, { encoding: 'utf8', shell: '/bin/bash' }).trim();
+// Watchdog: no single step may wedge the worker forever. execSync's `timeout`
+// SIGTERMs a stuck child (ffmpeg on bad input, whisperx wedged) and throws, so the
+// job fails cleanly and the concurrency-1 worker is freed. Generous default + env
+// override so a legitimately slow WhisperX CPU align isn't killed prematurely (P4).
+const STEP_TIMEOUT_MS = Number(process.env.AMF_STEP_TIMEOUT_MS || 300_000); // 5 min/step
+const sh = (c) => execSync(c, { stdio: 'ignore', shell: '/bin/bash', timeout: STEP_TIMEOUT_MS });
+const cap = (c) => execSync(c, { encoding: 'utf8', shell: '/bin/bash', timeout: STEP_TIMEOUT_MS }).trim();
 const probeDur = (f) => parseFloat(cap(`ffprobe -v error -show_entries format=duration -of csv=p=0 "${f}"`)) || 0;
 
 const work = mkdtempSync(join(tmpdir(), 'amf-short-'));
@@ -94,7 +99,7 @@ function whisperxWords() {
   // align-only the real recording → real per-word timestamps (the actual karaoke sync).
   // stderr → file (keeps a whisperx traceback off the console); failure → caught below.
   const alignOut = join(work, 'align');
-  const out = execSync(`python3 "${join(HERE, 'voice_pipeline.py')}" --align-audio "${voiceWav}" --out "${alignOut}" --device cpu 2>"${join(work, 'whisperx.err')}"`, { encoding: 'utf8', shell: '/bin/bash' });
+  const out = execSync(`python3 "${join(HERE, 'voice_pipeline.py')}" --align-audio "${voiceWav}" --out "${alignOut}" --device cpu 2>"${join(work, 'whisperx.err')}"`, { encoding: 'utf8', shell: '/bin/bash', timeout: STEP_TIMEOUT_MS });
   const p = JSON.parse(readFileSync(out.trim().split('\n').pop().trim(), 'utf8'));
   if (p.wordLevelSource !== 'whisperx' || !p.words?.length) throw new Error('no whisperx words');
   return p.words;
@@ -117,7 +122,7 @@ const payload = {
 const payloadPath = join(work, 'payload.json');
 writeFileSync(payloadPath, JSON.stringify(payload));
 const renderDir = join(work, 'render');
-execSync(`node "${join(HERE, 'render.mjs')}" "${payloadPath}" "${renderDir}"`, { stdio: 'inherit' });
+execSync(`node "${join(HERE, 'render.mjs')}" "${payloadPath}" "${renderDir}"`, { stdio: 'inherit', timeout: STEP_TIMEOUT_MS });
 const captionsMp4 = cap(`ls -t "${join(renderDir, 'proj', 'renders')}"/*.mp4 2>/dev/null | head -1`);
 if (!captionsMp4 || !existsSync(captionsMp4)) { console.error('HyperFrames produced no captions mp4'); process.exit(1); }
 real.push('captions (real glyphs)');
@@ -142,7 +147,7 @@ writeFileSync(scenesPath, JSON.stringify({ scenes }, null, 2));
 
 // ── L5 composite — the REAL compositor ───────────────────────────────────────
 step('L5 composite — REAL compose-broll.mjs (b-roll → colorkey glyphs → voice mux → 9:16)');
-execSync(`node "${join(HERE, 'compose-broll.mjs')}" "${scenesPath}" "${captionsMp4}" "${voiceWav}" "${OUT}"`, { stdio: 'inherit' });
+execSync(`node "${join(HERE, 'compose-broll.mjs')}" "${scenesPath}" "${captionsMp4}" "${voiceWav}" "${OUT}"`, { stdio: 'inherit', timeout: STEP_TIMEOUT_MS });
 
 // ── prove it ─────────────────────────────────────────────────────────────────
 const probe = cap(`ffprobe -v error -select_streams v:0 -show_entries stream=width,height,codec_name -show_entries format=duration -of default=noprint_wrappers=1 "${OUT}"`);

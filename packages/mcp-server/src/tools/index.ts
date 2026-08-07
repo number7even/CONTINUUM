@@ -25,6 +25,22 @@ import { createTodoTool, handleCreateTodo } from './create-todo.js';
 import { updateTodoTool, handleUpdateTodo } from './update-todo.js';
 import { recordBrandDnaTool, handleRecordBrandDna } from './record-brand-dna.js';
 import { checkBrandTool, handleCheckBrand } from './check-brand.js';
+import { graphTool, handleGraph } from './graph.js';
+import { kaizenRecordTool, handleKaizenRecord } from './kaizen-record.js';
+import { nextTasksTool, handleNextTasks } from './next-tasks.js';
+import { snapshotsTool, handleSnapshots } from './snapshots.js';
+import { recordDecisionTool, handleRecordDecision } from './record-decision.js';
+import { sessionReviewTool, handleSessionReview } from './session-review.js';
+import { askContextTool, handleAskContext } from './ask-context.js';
+import { openClaimTool, handleOpenClaim } from './open-claim.js';
+import { validateTool, handleValidate } from './validate.js';
+import { attestTool, handleAttest } from './attest.js';
+import {
+  listTemplatesTool, handleListTemplates, createDocumentTool, handleCreateDocument,
+  getDocumentTool, handleGetDocument, updateDocumentTool, handleUpdateDocument,
+  listDocumentsTool, handleListDocuments, searchDocumentsTool, handleSearchDocuments,
+} from './documents.js';
+import { codebaseContextTool, handleCodebaseContext } from './codebase-context.js';
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   recordCheckpointTool,
@@ -39,6 +55,18 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   updateTodoTool,
   recordBrandDnaTool,
   checkBrandTool,
+  graphTool,
+  kaizenRecordTool,
+  nextTasksTool,
+  snapshotsTool,
+  recordDecisionTool,
+  sessionReviewTool,
+  askContextTool,
+  openClaimTool,
+  validateTool,
+  attestTool,
+  listTemplatesTool, createDocumentTool, getDocumentTool, updateDocumentTool, listDocumentsTool, searchDocumentsTool,
+  codebaseContextTool,
 ] as const;
 
 const DISPATCH_TABLE: Record<string, ToolHandler> = {
@@ -54,6 +82,23 @@ const DISPATCH_TABLE: Record<string, ToolHandler> = {
   continuum_update_todo: handleUpdateTodo,
   continuum_record_brand_dna: handleRecordBrandDna,
   continuum_check_brand: handleCheckBrand,
+  continuum_graph: handleGraph,
+  continuum_next_tasks: handleNextTasks,
+  continuum_snapshots: handleSnapshots,
+  continuum_kaizen_record: handleKaizenRecord,
+  continuum_record_decision: handleRecordDecision,
+  continuum_session_review: handleSessionReview,
+  continuum_ask_context: handleAskContext,
+  continuum_open_claim: handleOpenClaim,
+  continuum_validate: handleValidate,
+  continuum_attest: handleAttest,
+  continuum_list_templates: handleListTemplates,
+  continuum_create_document: handleCreateDocument,
+  continuum_get_document: handleGetDocument,
+  continuum_update_document: handleUpdateDocument,
+  continuum_list_documents: handleListDocuments,
+  continuum_search_documents: handleSearchDocuments,
+  continuum_codebase_context: handleCodebaseContext,
 };
 
 /**

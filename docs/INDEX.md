@@ -50,6 +50,10 @@ the root in [`ARCHITECTURE.md`](../ARCHITECTURE.md); discipline lives in
   (AI Developer, Business Operator, Solo Developer) with tier labels
   per component. ~100% real for Journey 3, ~50% for Journey 1,
   ~10% for Journey 2 — the canonical UX framing.
+- [`KAIZEN.md`](./KAIZEN.md "wired into") — the Kaizen (改善) discipline: forge a
+  plan until a named mid-tier model runs it blind, self-grade against the 8-point
+  standard, refine. Verify-then-dissolve at the planning altitude; wired onto
+  Todo + Observation via `continuum_kaizen_record`.
 - [`INTEGRATIONS/VIBELY-HANDOFF.md`](./INTEGRATIONS/VIBELY-HANDOFF.md) —
   what CONTINUUM needs from the external Vibely team to integrate
   Layer 2 (orchestration / SIR / Mercury dLLM). Contract proposal,

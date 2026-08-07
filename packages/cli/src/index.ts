@@ -27,9 +27,18 @@ import { basename, dirname, join as joinPath, resolve as resolvePath } from 'nod
 import { copyFileSync, existsSync, mkdirSync, readFileSync, watch as fsWatch, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import Database from 'better-sqlite3';
 import {
+  buildAuthorshipExport,
+  buildOkfTree,
+  buildDiscussionScript,
+  computeNextTasks,
+  continuumDataRoot,
   openStorage,
   parseStateMdToCheckpoint,
+  renderAuthorshipMarkdown,
+  type RankedTask,
   type StorageBackend,
 } from '@number7even/continuum-core';
 
@@ -91,19 +100,59 @@ COMMANDS
   init           Create the project DB and print MCP registration snippet.
                  Auto-imports ./STATE.md as the first checkpoint if found
                  and no checkpoints exist yet.
+                 --guided : the 5-minute cold start — also writes .mcp.json
+                 for you (merges, never clobbers) and records a seed checkpoint
+                 so get_state is warm on the very first session.
   start          Run the MCP stdio server for this project.
   serve          Run the MCP HTTP/SSE server (V1 — remote / hosted clients).
                  Requires $CONTINUUM_HTTP_TOKEN (Bearer shared secret).
+  provision-tenant <id>   Concierge onboarding: register a tenant in the control
+                 plane and mint its scoped RS256 Bearer token (JWT mode). Flags:
+                 --plan --issuer --audience --ttl-days --sub.
   status         Print current state, todo counts, and data location.
                  Also nudges if a newer CLI is published (never auto-installs).
   upgrade        Re-sync the ICM "folders over agents" scaffold into this project
                  (idempotent; --force refreshes templates) + report engine updates.
   import-state   Parse a STATE.md and record it as a new checkpoint. Always
                  creates a checkpoint (use this to re-snapshot after edits).
+  next           The PM brain — "what should I work on next?" Reads the todo
+                 dependency DAG and prints the ACTIONABLE set (unblocked, not
+                 done), ordered by downstream leverage, each with its state,
+                 verify_command, and dossier refs. --json for the raw payload.
+  observe        Capture terminal output as a live 'command' Observation — the
+                 capture seam of the qualifying loop. TEEs stdin→stdout (the pipe
+                 stays transparent) and flags significant events (non-zero exit,
+                 build/test/git). Options: --label, --cmd, --exit, --max-bytes.
+                 Example:
+                   npm test 2>&1 | continuum observe --label test --exit $?
+  recap          The ambient two-host discussion audio (ARIAN). Builds the grounded,
+                 semantic-fed, tier-cited recap script and synthesises it via LOCAL
+                 supertonic (0-egress; Host A/B on two voices). Writes the script .md
+                 always; the .wav when supertonic is up. Triggerable by a SessionEnd hook.
+                 Env: SUPERTONIC_TTS_URL · SUPERTONIC_VOICE_A · SUPERTONIC_VOICE_B
+  authorship export
+                 The IP-provenance export (the legal shield). Walks the checkpoint chain,
+                 resolves every acceptedBy seal to its decision, re-derives every hash to
+                 prove the chain is unbroken, and writes a JSON + Markdown artifact listing
+                 each human-accepted state, its git commit, verifyCommand, operator, and
+                 sealed checkpoint hash. Exit 0 = INTACT, 2 = tamper detected.
   verify         Re-run every verify_command in the latest snapshot. Exit code
                  = number of failures (0 = all green). Use this to confirm
                  state-snapshot claims are still true on the current machine.
-  adapter        Run a source adapter (docs|git) once, or with --watch as a
+                 --json : emit {name, section, verifyCommand, exitCode, state}
+                 per entry (state = DONE|FAILED|SKIPPED) — feeds the 6-state UI.
+  ingest         Repo-drop — turn any repo into the knowledge graph in one shot.
+                 Local path: git commits + markdown docs + exported code symbols &
+                 call graph (inline codegraph bridge if a .codegraph index exists).
+                 Remote URL: the remote-git adapter (gitingest digest).
+                 Code engine: CONTINUUM_CODE_ENGINE=cbm (+ CONTINUUM_CBM_BIN) uses
+                 codebase-memory-mcp (Hybrid LSP); default = inline codegraph bridge.
+                 Project defaults to the repo's basename.
+                 Examples:
+                   continuum ingest --repo=/path/to/repo
+                   continuum ingest --repo=https://github.com/owner/name
+                   continuum ingest --repo=. --project=my-repo
+  adapter        Run a single source adapter (docs|git) once, or with --watch as a
                  long-running daemon that re-syncs on file change.
                  Examples:
                    continuum adapter docs
@@ -233,9 +282,12 @@ function icmFiles(projectId: string): Record<string, string> {
       `- **Never over-consume context:** fetch skills/reference only when a task needs them (see \`skills/\`).\n\n` +
       `## How to work here\n` +
       `1. Read [\`router.md\`](./router.md) — the Map. It routes you to the right floor by intent.\n` +
-      `2. Each floor has its own \`agents.md\` (local context) + the rebound rule.\n` +
-      `3. "Pick up" = read the current state (\`continuum_get_state\` if the MCP server is registered) + the relevant floor.\n` +
-      `4. "Hand off" = write progress to an artifact + (optionally) stamp a checkpoint.\n`,
+      `2. Each floor has its own \`agents.md\` (local context) + the rebound rule (return to the Map if lost).\n\n` +
+      `## Memory — "Pick up" / "Hand off" (verifiable, not remembered)\n` +
+      `This workspace's memory is **CONTINUUM** (registered as an MCP server via \`.mcp.json\`). It refuses to lie: a state reaches DONE only when its \`verifyCommand\` exits 0. Do NOT keep memory in a plain text file you have to trust.\n` +
+      `- **When I say "Pick up"** → read \`continuum://session/briefing\` (the warm brief) + \`continuum_get_state\`, then \`continuum_next_tasks\` for what is actionable right now. Brief me on where we left off. Never start cold.\n` +
+      `- **When I say "Hand off"** → call \`continuum_record_checkpoint\` with the current \`active\` / \`dormant\` / \`broken\` state, **each entry carrying a \`verifyCommand\`** (the shell proof). It is hash-sealed + append-only — the audit ledger, not a memory you assert. Also append a one-line human note to [\`artifacts/\`](./artifacts/agents.md).\n` +
+      `- If CONTINUUM's MCP server is not registered yet, run \`continuum init --guided\` in this repo first, then restart your AI client.\n`,
     'router.md':
       `# router.md — The Map (Interpretable Context Methodology)\n\n` +
       `> Read \`agents.md\` first (the Prime Mission). This is the Map — it routes you to the right *floor* by intent.\n` +
@@ -366,7 +418,33 @@ async function commandUpgrade(projectId: string): Promise<void> {
   }
 }
 
+/** Write or merge the `continuum` MCP server into a project-local `.mcp.json`,
+ *  never clobbering other servers. Returns what happened for the operator note. */
+function writeOrMergeMcpJson(
+  mcpPath: string,
+  server: Record<string, unknown>,
+): 'created' | 'merged' | 'error' {
+  try {
+    if (existsSync(mcpPath)) {
+      const cfg = JSON.parse(readFileSync(mcpPath, 'utf-8')) as {
+        mcpServers?: Record<string, unknown>;
+      };
+      cfg.mcpServers = cfg.mcpServers ?? {};
+      cfg.mcpServers.continuum = server;
+      writeFileSync(mcpPath, JSON.stringify(cfg, null, 2) + '\n');
+      return 'merged';
+    }
+    writeFileSync(mcpPath, JSON.stringify({ mcpServers: { continuum: server } }, null, 2) + '\n');
+    return 'created';
+  } catch {
+    return 'error';
+  }
+}
+
 function commandInit(projectId: string, stateMdOverride: string | undefined): void {
+  // --guided: the 5-minute cold start. Detect the project, auto-write .mcp.json,
+  // and seed a checkpoint so the user's very first `get_state` is never empty.
+  const guided = process.argv.includes('--guided');
   const storage = openStorage(projectId);
   const dataPath = storage.dataLocation();
 
@@ -374,17 +452,69 @@ function commandInit(projectId: string, stateMdOverride: string | undefined): vo
   // AND no checkpoints exist yet (avoid noise on re-running init).
   const stateMdPath = resolveStateMdPath(stateMdOverride);
   const existingSnapshots = storage.listSnapshots(1);
+  let hasCheckpoint = existingSnapshots.length > 0;
   let stateMdNote = '';
   if (existsSync(stateMdPath) && existingSnapshots.length === 0) {
     const summary = importStateMdInto(storage, stateMdPath, 'continuum init');
     printStateMdSummary(summary, stateMdPath);
     if (summary.imported) {
+      hasCheckpoint = true;
       stateMdNote =
         `\n  Auto-imported STATE.md as first checkpoint (${summary.snapshotId!.slice(0, 8)}).`;
     }
   } else if (existsSync(stateMdPath) && existingSnapshots.length > 0) {
     stateMdNote =
       `\n  STATE.md detected but checkpoints already exist — skipping auto-import.\n  Use 'continuum import-state' to force a fresh checkpoint from STATE.md.`;
+  }
+
+  // Find the MCP server binary so the registration snippet is copy-paste ready.
+  // Resolve through node's module resolution rather than guessing paths — this
+  // makes the printed snippet correct whether @number7even/continuum-mcp-server was
+  // installed via npx, npm install -g, or as a workspace dep.
+  let mcpServerBinPath: string;
+  try {
+    const main = import.meta.resolve('@number7even/continuum-mcp-server');
+    mcpServerBinPath = new URL(main).pathname;
+  } catch {
+    mcpServerBinPath = '<install-@number7even/continuum-mcp-server-first>';
+  }
+  const continuumServer = {
+    command: 'node',
+    args: [mcpServerBinPath],
+    env: { CONTINUUM_PROJECT_ID: projectId },
+  };
+  const mcpSnippet = { mcpServers: { continuum: continuumServer } };
+
+  // GUIDED extras — write .mcp.json for the operator + seed a checkpoint.
+  let guidedNote = '';
+  if (guided) {
+    const mcpPath = joinPath(process.cwd(), '.mcp.json');
+    const wrote = writeOrMergeMcpJson(mcpPath, continuumServer);
+    guidedNote +=
+      wrote === 'created' ? `\n  ✓ Wrote .mcp.json (continuum registered — no hand-editing).`
+      : wrote === 'merged' ? `\n  ✓ Merged 'continuum' into your existing .mcp.json (other servers untouched).`
+      : `\n  ⚠ Could not write .mcp.json — add the snippet below manually.`;
+
+    // Seed a checkpoint so `get_state` returns something on the first try. Only
+    // when there's no checkpoint yet and the .mcp.json registration is in place
+    // (its verifyCommand proves that registration — verify-then-dissolve from day one).
+    if (!hasCheckpoint && wrote !== 'error') {
+      const seeded = storage.recordCheckpoint({
+        reason: 'continuum init --guided — seed checkpoint (project initialised, MCP registered)',
+        active: [
+          {
+            name: 'continuum-registered',
+            where: mcpPath,
+            verifyCommand: `grep -q '"continuum"' .mcp.json`,
+            verifiedAt: new Date().toISOString(),
+            description:
+              'Continuum registered as an MCP server for this project via `continuum init --guided`. This seed checkpoint means get_state is never empty on the first session.',
+          },
+        ],
+      });
+      hasCheckpoint = true;
+      guidedNote += `\n  ✓ Seed checkpoint recorded (${seeded.id.slice(0, 8)}) — get_state is warm from day one.`;
+    }
   }
 
   storage.close();
@@ -399,50 +529,35 @@ function commandInit(projectId: string, stateMdOverride: string | undefined): vo
       : `\n  ICM structure already present (${skipped.length} files) — left untouched.`;
   }
 
-  // Find the MCP server binary so the registration snippet is copy-paste ready.
-  // Resolve through node's module resolution rather than guessing paths — this
-  // makes the printed snippet correct whether @number7even/continuum-mcp-server was
-  // installed via npx, npm install -g, or as a workspace dep.
-  let mcpServerBinPath: string;
-  try {
-    // Resolve the package's main entry; the bin file in dist/index.js sits
-    // next to it (the package.json `bin` field points there).
-    const main = import.meta.resolve('@number7even/continuum-mcp-server');
-    mcpServerBinPath = new URL(main).pathname;
-  } catch {
-    mcpServerBinPath = '<install-@number7even/continuum-mcp-server-first>';
-  }
-
-  const mcpSnippet = {
-    mcpServers: {
-      continuum: {
-        command: 'node',
-        args: [mcpServerBinPath],
-        env: { CONTINUUM_PROJECT_ID: projectId },
-      },
-    },
-  };
+  const nextSteps = guided
+    ? [
+        `Next steps (guided):`,
+        `  1. Restart your AI client so it picks up the new .mcp.json.`,
+        `  2. Run \`continuum status\` — you'll already see the seed checkpoint.`,
+        `  3. Say "let's pick up where we left off" — your AI opens warm.`,
+        ``,
+      ]
+    : [
+        `MCP registration — add to ~/.claude.json or .mcp.json`,
+        `(or re-run \`continuum init --guided\` to write it for you):`,
+        ``,
+        JSON.stringify(mcpSnippet, null, 2),
+        ``,
+        `Next steps:`,
+        `  1. Add the snippet above to your AI client's MCP config.`,
+        `  2. Restart the client so it picks up the new server.`,
+        `  3. Run \`continuum status\` here to confirm the DB is reachable.`,
+        ``,
+      ];
 
   process.stdout.write(
     [
-      `✓ Continuum initialised`,
+      `✓ Continuum initialised${guided ? ' (guided)' : ''}`,
       ``,
       `  Project ID:  ${projectId}`,
-      `  Data path:   ${dataPath}${stateMdNote}${icmNote}`,
+      `  Data path:   ${dataPath}${stateMdNote}${guidedNote}${icmNote}`,
       ``,
-      `MCP registration — add to ~/.claude.json or .mcp.json:`,
-      ``,
-      JSON.stringify(mcpSnippet, null, 2),
-      ``,
-      `Next steps:`,
-      `  1. Add the snippet above to your AI client's MCP config.`,
-      `  2. Restart the client so it picks up the new server.`,
-      `  3. Run \`continuum status\` here to confirm the DB is reachable.`,
-      `  4. (Optional) If STATE.md was not auto-imported, run`,
-      `     'continuum import-state --state-md=./STATE.md' to capture`,
-      `     a fresh checkpoint, or use continuum_record_checkpoint from`,
-      `     inside your AI client.`,
-      ``,
+      ...nextSteps,
     ].join('\n'),
   );
 }
@@ -849,39 +964,69 @@ async function commandMigrate(projectId: string): Promise<void> {
 //     rest of the snapshot's health.
 //   - Empty snapshot / no verify_commands → exit 0 with a clear note.
 
-interface VerifyEntry {
-  section: 'active' | 'dormant' | 'broken';
+/** One verify result row in the 6-state observability model. `verify` produces
+ *  DONE / FAILED / SKIPPED; RUNNING / REVIEW / BLOCKED come from the live pipeline. */
+type VerifyState = 'DONE' | 'FAILED' | 'SKIPPED';
+interface VerifyResult {
   name: string;
+  section: 'active' | 'dormant' | 'broken';
   where: string;
-  verifyCommand: string;
+  verifyCommand: string | null;
+  exitCode: number | string | null;
+  state: VerifyState;
+  stderr?: string;
 }
 
 function commandVerify(projectId: string): void {
+  const json = process.argv.includes('--json');
   const storage = openStorage(projectId);
   try {
     const snapshot = storage.getStateAt();
     if (!snapshot) {
-      process.stdout.write(
-        `continuum verify — no snapshot found for project '${projectId}'.\n` +
-          `  Capture one via continuum_record_checkpoint inside an AI client,\n` +
-          `  or run 'continuum import-state' to import from STATE.md.\n`,
-      );
+      if (json) {
+        process.stdout.write(
+          JSON.stringify(
+            { project: projectId, snapshot: null, summary: { pass: 0, fail: 0, skipped: 0, total: 0 }, entries: [] },
+            null,
+            2,
+          ) + '\n',
+        );
+      } else {
+        process.stdout.write(
+          `continuum verify — no snapshot found for project '${projectId}'.\n` +
+            `  Capture one via continuum_record_checkpoint inside an AI client,\n` +
+            `  or run 'continuum import-state' to import from STATE.md.\n`,
+        );
+      }
       process.exit(0);
     }
 
-    const entries: VerifyEntry[] = [
-      ...snapshot.active
-        .filter(e => e.verifyCommand?.trim())
-        .map(e => ({ section: 'active' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand! })),
-      ...snapshot.dormant
-        .filter(e => e.verifyCommand?.trim())
-        .map(e => ({ section: 'dormant' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand! })),
-      ...snapshot.broken
-        .filter(e => e.verifyCommand?.trim())
-        .map(e => ({ section: 'broken' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand! })),
+    // Every entry, flagged by section; those without a verify_command are SKIPPED.
+    const rows = [
+      ...snapshot.active.map(e => ({ section: 'active' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand })),
+      ...snapshot.dormant.map(e => ({ section: 'dormant' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand })),
+      ...snapshot.broken.map(e => ({ section: 'broken' as const, name: e.name, where: e.where, verifyCommand: e.verifyCommand })),
     ];
+    const runnable = rows.filter(r => r.verifyCommand?.trim());
 
-    if (entries.length === 0) {
+    if (runnable.length === 0) {
+      if (json) {
+        process.stdout.write(
+          JSON.stringify(
+            {
+              project: projectId,
+              snapshot: snapshot.id,
+              timestamp: snapshot.timestamp,
+              reason: snapshot.reason,
+              summary: { pass: 0, fail: 0, skipped: rows.length, total: rows.length },
+              entries: rows.map(r => ({ name: r.name, section: r.section, where: r.where, verifyCommand: r.verifyCommand ?? null, exitCode: null, state: 'SKIPPED' as const })),
+            },
+            null,
+            2,
+          ) + '\n',
+        );
+        process.exit(0);
+      }
       process.stdout.write(
         `continuum verify — snapshot ${snapshot.id.slice(0, 8)} has no entries with verify_command.\n` +
           `  Reason: ${snapshot.reason}\n` +
@@ -890,23 +1035,33 @@ function commandVerify(projectId: string): void {
       process.exit(0);
     }
 
-    process.stdout.write(
-      `continuum verify — project '${projectId}' · snapshot ${snapshot.id.slice(0, 8)}\n` +
-        `  captured ${snapshot.timestamp}\n` +
-        `  reason:  ${snapshot.reason}\n` +
-        `  running ${entries.length} verify_command${entries.length === 1 ? '' : 's'}…\n\n`,
-    );
+    if (!json) {
+      process.stdout.write(
+        `continuum verify — project '${projectId}' · snapshot ${snapshot.id.slice(0, 8)}\n` +
+          `  captured ${snapshot.timestamp}\n` +
+          `  reason:  ${snapshot.reason}\n` +
+          `  running ${runnable.length} verify_command${runnable.length === 1 ? '' : 's'}…\n\n`,
+      );
+    }
 
+    const results: VerifyResult[] = [];
     let failures = 0;
-    for (const entry of entries) {
+    for (const r of rows) {
+      if (!r.verifyCommand?.trim()) {
+        // 6-state model: no proof attached → SKIPPED (a soft state, not a failure).
+        results.push({ name: r.name, section: r.section, where: r.where, verifyCommand: null, exitCode: null, state: 'SKIPPED' });
+        if (!json) process.stdout.write(`  ⊘ [${r.section}] ${r.name} — skipped (no verify_command)\n`);
+        continue;
+      }
       try {
-        execSync(entry.verifyCommand, {
+        execSync(r.verifyCommand, {
           stdio: 'pipe',
           timeout: 30_000,
           // Run from cwd of the CLI invocation. Verify commands are
           // intentionally repo-relative (grep, curl, fly status, etc.).
         });
-        process.stdout.write(`  ✓ [${entry.section}] ${entry.name}\n`);
+        results.push({ name: r.name, section: r.section, where: r.where, verifyCommand: r.verifyCommand, exitCode: 0, state: 'DONE' });
+        if (!json) process.stdout.write(`  ✓ [${r.section}] ${r.name}\n`);
       } catch (err) {
         failures++;
         const e = err as NodeJS.ErrnoException & {
@@ -918,29 +1073,402 @@ function commandVerify(projectId: string): void {
         const exitCode = e.status ?? (e.signal ? `signal=${e.signal}` : 'unknown');
         const stderr = e.stderr?.toString().trim() ?? '';
         const stdoutTail = e.stdout?.toString().trim() ?? '';
-        process.stdout.write(
-          `  ✗ [${entry.section}] ${entry.name} — exit ${exitCode}\n` +
-            `      where:   ${entry.where}\n` +
-            `      command: ${entry.verifyCommand}\n`,
-        );
-        if (stderr) {
+        results.push({ name: r.name, section: r.section, where: r.where, verifyCommand: r.verifyCommand, exitCode, state: 'FAILED', stderr: stderr || stdoutTail || undefined });
+        if (!json) {
           process.stdout.write(
-            `      stderr:  ${stderr.slice(-200).replace(/\n/g, '\n               ')}\n`,
+            `  ✗ [${r.section}] ${r.name} — exit ${exitCode}\n` +
+              `      where:   ${r.where}\n` +
+              `      command: ${r.verifyCommand}\n`,
           );
-        } else if (stdoutTail) {
-          // No stderr but stdout might explain — show tail.
-          process.stdout.write(
-            `      stdout:  ${stdoutTail.slice(-200).replace(/\n/g, '\n               ')}\n`,
-          );
+          if (stderr) {
+            process.stdout.write(`      stderr:  ${stderr.slice(-200).replace(/\n/g, '\n               ')}\n`);
+          } else if (stdoutTail) {
+            process.stdout.write(`      stdout:  ${stdoutTail.slice(-200).replace(/\n/g, '\n               ')}\n`);
+          }
         }
       }
     }
 
-    const passes = entries.length - failures;
-    process.stdout.write(
-      `\nSummary: ${passes} pass · ${failures} fail (exit ${failures})\n`,
-    );
+    const passes = results.filter(r => r.state === 'DONE').length;
+    const skipped = results.filter(r => r.state === 'SKIPPED').length;
+
+    if (json) {
+      process.stdout.write(
+        JSON.stringify(
+          {
+            project: projectId,
+            snapshot: snapshot.id,
+            timestamp: snapshot.timestamp,
+            reason: snapshot.reason,
+            summary: { pass: passes, fail: failures, skipped, total: results.length },
+            entries: results.map(r => ({ name: r.name, section: r.section, where: r.where, verifyCommand: r.verifyCommand, exitCode: r.exitCode, state: r.state })),
+          },
+          null,
+          2,
+        ) + '\n',
+      );
+    } else {
+      process.stdout.write(
+        `\nSummary: ${passes} pass · ${failures} fail${skipped ? ` · ${skipped} skipped` : ''} (exit ${failures})\n`,
+      );
+    }
     process.exit(failures);
+  } finally {
+    storage.close();
+  }
+}
+
+// ── continuum ingest --repo=<path> (the repo-drop) ───────────────────────────
+//
+// One command turns a dropped repo into the knowledge graph: git commits +
+// markdown docs (via the published adapters) + exported code symbols + call
+// graph (inline codegraph bridge, if a .codegraph index is present). The result
+// is the "map + dossier" surface the brain renders.
+
+function parseIngestArgs(argv: string[]): { repo?: string; project?: string; docsDir?: string } {
+  const args = argv.slice(2);
+  const out: { repo?: string; project?: string; docsDir?: string } = {};
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === undefined) continue;
+    if (a.startsWith('--repo=')) out.repo = a.split('=').slice(1).join('=');
+    else if (a === '--repo') out.repo = args[++i];
+    else if (a.startsWith('--project=')) out.project = a.split('=').slice(1).join('=');
+    else if (a.startsWith('--docs-dir=')) out.docsDir = a.split('=').slice(1).join('=');
+  }
+  return out;
+}
+
+/** Run a published source adapter (docs|git) once against a target dir. */
+function runAdapterOnce(name: AdapterName, projectId: string, opts: { docsDir?: string; repoDir?: string }): boolean {
+  let bin: string;
+  try {
+    bin = resolveAdapterBin(name);
+  } catch (err) {
+    process.stderr.write(`[ingest] ${(err as Error).message}\n`);
+    return false;
+  }
+  const args =
+    name === 'docs'
+      ? [`--project=${projectId}`, `--docs-dir=${opts.docsDir ?? process.cwd()}`, '--once']
+      : [`--project=${projectId}`, `--repo-dir=${opts.repoDir ?? process.cwd()}`, '--once'];
+  try {
+    execFileSync(process.execPath, [bin, ...args], { stdio: 'inherit' });
+    return true;
+  } catch (err) {
+    process.stderr.write(`[ingest:${name}] failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    return false;
+  }
+}
+
+interface CgNode { id: number; kind: string; name: string; qualified_name: string; file_path: string; signature: string | null; docstring: string | null }
+interface CgEdge { source: number; target: number }
+
+/** Inline codegraph bridge — ingest exported symbols + call/import edges from a
+ *  repo's .codegraph/codegraph.db as observations (id=`sym:<qn>`), directional
+ *  refs = the symbols each one calls/imports. Mirrors scripts/ingest-codegraph.mjs. */
+function ingestCodegraph(projectId: string, dbPath: string): { symbols: number; edges: number } {
+  const KINDS = ['function', 'class', 'method', 'interface', 'component'];
+  const db = new Database(dbPath, { readonly: true });
+  const rows = db
+    .prepare(
+      `SELECT id, kind, name, qualified_name, file_path, signature, docstring
+       FROM nodes WHERE is_exported = 1 AND kind IN (${KINDS.map(() => '?').join(',')})`,
+    )
+    .all(...KINDS) as CgNode[];
+  const idToQn = new Map(rows.map(r => [r.id, r.qualified_name]));
+  const symId = (qn: string): string => `sym:${qn}`;
+  const refs = new Map<string, Set<string>>();
+  const edgeRows = db.prepare(`SELECT source, target FROM edges WHERE kind IN ('calls','imports')`).all() as CgEdge[];
+  for (const e of edgeRows) {
+    if (idToQn.has(e.source) && idToQn.has(e.target) && e.source !== e.target) {
+      const s = symId(idToQn.get(e.source)!), t = symId(idToQn.get(e.target)!);
+      if (!refs.has(s)) refs.set(s, new Set());
+      refs.get(s)!.add(t);
+    }
+  }
+  db.close();
+
+  const now = new Date().toISOString();
+  const storage = openStorage(projectId);
+  let symbols = 0, edges = 0;
+  try {
+    storage.upsertSource(`codegraph:${projectId}`, 'export', { adapter: 'codegraph-bridge', db: dbPath });
+    for (const r of rows) {
+      const id = symId(r.qualified_name);
+      const content = [
+        `${r.name}${r.signature ? ' ' + r.signature : ''}`,
+        r.file_path,
+        (r.docstring ?? '').trim(),
+      ].filter(Boolean).join('\n');
+      const rr = [...(refs.get(id) ?? [])];
+      if (storage.upsertObservation({ id, sourceId: `codegraph:${projectId}`, type: r.kind, content, timestamp: now, refs: rr, metadata: { adapter: 'codegraph-bridge', file: r.file_path, kind: r.kind } })) {
+        symbols++;
+      }
+      edges += rr.length;
+    }
+  } finally {
+    storage.close();
+  }
+  return { symbols, edges };
+}
+
+// ── codebase-memory-mcp bridge (opt-in via CONTINUUM_CODE_ENGINE=cbm) ─────────
+// The approved Hybrid-LSP engine. Indexes the repo, then pulls the raw structural
+// truth via query_graph (Cypher) — bypassing trace_path's constructor blind spot
+// — and maps it into canonical CONTINUUM observations with sym: edges. The inline
+// codegraph bridge remains the reversible fallback.
+
+function resolveCbmBin(): string | null {
+  const envBin = process.env.CONTINUUM_CBM_BIN;
+  if (envBin && existsSync(envBin)) return envBin;
+  try {
+    const p = execFileSync('which', ['codebase-memory-mcp'], { encoding: 'utf-8' }).trim();
+    if (p && existsSync(p)) return p;
+  } catch { /* not on PATH */ }
+  return null;
+}
+
+function runCbmTool(bin: string, tool: string, args: Record<string, unknown>): { rows?: unknown[][]; project?: string } {
+  const out = execFileSync(bin, ['cli', tool, JSON.stringify(args)], {
+    encoding: 'utf-8',
+    stdio: ['ignore', 'pipe', 'ignore'], // logs → stderr (ignored), result JSON → stdout
+    maxBuffer: 256 * 1024 * 1024,
+    timeout: 300_000,
+  });
+  return JSON.parse(out) as { rows?: unknown[][]; project?: string };
+}
+
+function ingestViaCbm(projectId: string, repoPath: string, bin: string): { symbols: number; edges: number } {
+  const idx = runCbmTool(bin, 'index_repository', { repo_path: repoPath });
+  const cbmProject = String(idx.project ?? '');
+  if (!cbmProject) throw new Error('codebase-memory-mcp index_repository returned no project id');
+  const strip = (qn: string): string => (qn.startsWith(cbmProject + '.') ? qn.slice(cbmProject.length + 1) : qn);
+  const symId = (qn: string): string => `sym:${strip(qn)}`;
+
+  // Symbols — ONE query for all node kinds (perf: each cbm cli call cold-starts the
+  // binary). Keep only code symbols + exported, filtered client-side (Cypher
+  // WHERE-on-boolean is unreliable here).
+  type Sym = { id: string; name: string; file: string; signature: string; docstring: string; kind: string };
+  const CODE_KINDS = ['function', 'method', 'class', 'interface', 'component'];
+  const symbols: Sym[] = [];
+  const exported = new Set<string>();
+  try {
+    const res = runCbmTool(bin, 'query_graph', {
+      project: cbmProject,
+      query: `MATCH (n) RETURN n.qualified_name, n.name, n.file_path, n.signature, n.docstring, n.is_exported, labels(n) LIMIT 50000`,
+    });
+    for (const row of res.rows ?? []) {
+      const [qn, name, file, sig, doc, exp, labels] = row as [string, string, string, string, string, unknown, unknown];
+      if (!qn) continue;
+      const isExp = exp === true || exp === 1 || exp === 'true' || exp === '1';
+      if (!isExp) continue;
+      const labelStr = (Array.isArray(labels) ? labels.join(',') : String(labels)).toLowerCase();
+      const kind = CODE_KINDS.find(k => labelStr.includes(k));
+      if (!kind) continue; // skip Section / Decorator / non-code nodes
+      const id = symId(qn);
+      symbols.push({ id, name: name ?? '', file: file ?? '', signature: sig ?? '', docstring: doc ?? '', kind });
+      exported.add(id);
+    }
+  } catch { /* leave symbols empty → caller falls back */ }
+
+  // Edges — ONE query, CALLS|IMPORTS union. Kept only among the exported set (no
+  // dangling refs), directional a → b as sym: ids.
+  const refs = new Map<string, Set<string>>();
+  try {
+    const res = runCbmTool(bin, 'query_graph', {
+      project: cbmProject,
+      query: `MATCH (a)-[:CALLS|IMPORTS]->(b) RETURN a.qualified_name, b.qualified_name LIMIT 200000`,
+    });
+    for (const row of res.rows ?? []) {
+      const a = symId(String(row[0] ?? '')), b = symId(String(row[1] ?? ''));
+      if (a === 'sym:' || b === 'sym:' || a === b) continue;
+      if (!exported.has(a) || !exported.has(b)) continue;
+      if (!refs.has(a)) refs.set(a, new Set());
+      refs.get(a)!.add(b);
+    }
+  } catch { /* no edges → symbols still ingest */ }
+
+  const now = new Date().toISOString();
+  const storage = openStorage(projectId);
+  let count = 0, edgeCount = 0;
+  try {
+    storage.upsertSource(`codegraph:${projectId}`, 'export', { adapter: 'codebase-memory-mcp', engine: 'cbm', project: cbmProject });
+    for (const s of symbols) {
+      const content = [`${s.name}${s.signature ? ' ' + s.signature : ''}`, s.file, (s.docstring || '').trim()].filter(Boolean).join('\n');
+      const rr = [...(refs.get(s.id) ?? [])];
+      if (storage.upsertObservation({ id: s.id, sourceId: `codegraph:${projectId}`, type: s.kind, content, timestamp: now, refs: rr, metadata: { adapter: 'codebase-memory-mcp', engine: 'cbm', file: s.file, kind: s.kind } })) {
+        count++;
+      }
+      edgeCount += rr.length;
+    }
+  } finally {
+    storage.close();
+  }
+  return { symbols: count, edges: edgeCount };
+}
+
+function commandIngest(): void {
+  const { repo, project, docsDir } = parseIngestArgs(process.argv);
+  if (!repo || !repo.trim()) {
+    process.stderr.write(
+      `continuum ingest: --repo=<path-or-url> required.\n` +
+        `  Drop any repo into the graph:\n` +
+        `    continuum ingest --repo=/path/to/repo\n` +
+        `    continuum ingest --repo=https://github.com/owner/name\n` +
+        `    continuum ingest --repo=. --project=my-repo\n`,
+    );
+    process.exit(2);
+  }
+  const raw = repo.trim();
+
+  // A remote URL → the remote-git adapter (gitingest digest → one observation).
+  // A local path → the git + docs + codegraph flow below.
+  if (/^(https?:\/\/|git@)/i.test(raw)) {
+    const projectId = project?.trim() ? project.trim() : basename(raw.replace(/\.git$/, '')).toLowerCase();
+    process.stdout.write(`continuum ingest — remote repo '${raw}' → project '${projectId}'\n\n▸ remote-git — gitingest digest\n`);
+    let bin: string;
+    try {
+      bin = fileURLToPath(import.meta.resolve('@number7even/continuum-adapter-remote-git'));
+    } catch (err) {
+      process.stderr.write(
+        `[ingest:remote-git] cannot resolve @number7even/continuum-adapter-remote-git — install it in this workspace. (${err instanceof Error ? err.message : String(err)})\n`,
+      );
+      process.exit(2);
+    }
+    try {
+      execFileSync(process.execPath, [bin, `--repo=${raw}`, `--project=${projectId}`], { stdio: 'inherit' });
+    } catch (err) {
+      process.stderr.write(`[ingest:remote-git] failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+    process.stdout.write(
+      `\n✓ Remote repo ingested into project '${projectId}'.\n` +
+        `  Inspect:  continuum status --project-id ${projectId}\n` +
+        `  Map + dossier: open the 3D brain against project '${projectId}'.\n`,
+    );
+    return;
+  }
+
+  const repoPath = resolvePath(raw);
+  if (!existsSync(repoPath)) {
+    process.stderr.write(`continuum ingest: repo not found: ${repoPath}\n`);
+    process.exit(2);
+  }
+  const projectId = project?.trim() ? project.trim() : basename(repoPath).toLowerCase();
+
+  process.stdout.write(`continuum ingest — repo '${repoPath}' → project '${projectId}'\n\n`);
+
+  // 1) git commit history (the temporal spine)
+  if (existsSync(joinPath(repoPath, '.git'))) {
+    process.stdout.write(`▸ git — commit history\n`);
+    runAdapterOnce('git', projectId, { repoDir: repoPath });
+  } else {
+    process.stdout.write(`▸ git — skipped (no .git at ${repoPath})\n`);
+  }
+
+  // 2) markdown docs (RAG surface)
+  const docsTarget = docsDir
+    ? resolvePath(docsDir)
+    : existsSync(joinPath(repoPath, 'docs'))
+      ? joinPath(repoPath, 'docs')
+      : repoPath;
+  process.stdout.write(`\n▸ docs — markdown in ${docsTarget}\n`);
+  runAdapterOnce('docs', projectId, { docsDir: docsTarget });
+
+  // 3) code symbols + call graph (the architecture map).
+  //    Engine select: CONTINUUM_CODE_ENGINE=cbm → codebase-memory-mcp (Hybrid LSP);
+  //    default → inline codegraph bridge (the safe, reversible baseline).
+  process.stdout.write(`\n▸ code — exported symbols + call graph\n`);
+  const engine = (process.env.CONTINUUM_CODE_ENGINE ?? 'codegraph').toLowerCase();
+  let codeDone = false;
+  if (engine === 'cbm' || engine === 'codebase-memory') {
+    const cbmBin = resolveCbmBin();
+    if (cbmBin) {
+      try {
+        const { symbols, edges } = ingestViaCbm(projectId, repoPath, cbmBin);
+        process.stdout.write(`  ✓ [codebase-memory-mcp · Hybrid LSP] ${symbols} symbol(s) · ${edges} cross-file edge(s)\n`);
+        codeDone = true;
+      } catch (err) {
+        process.stderr.write(`  ✗ codebase-memory-mcp ingest failed: ${err instanceof Error ? err.message : String(err)} — falling back to inline codegraph\n`);
+      }
+    } else {
+      process.stdout.write(`  ⚠ CONTINUUM_CODE_ENGINE=cbm but binary not found — set CONTINUUM_CBM_BIN=/path/to/codebase-memory-mcp (or install it on PATH). Falling back to inline codegraph.\n`);
+    }
+  }
+  if (!codeDone) {
+    const cgDb = joinPath(repoPath, '.codegraph', 'codegraph.db');
+    if (existsSync(cgDb)) {
+      try {
+        const { symbols, edges } = ingestCodegraph(projectId, cgDb);
+        process.stdout.write(`  ✓ [inline codegraph] ${symbols} symbol(s) · ${edges} call/import edge(s) — directional code flow\n`);
+      } catch (err) {
+        process.stderr.write(`  ✗ codegraph ingest failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      }
+    } else {
+      process.stdout.write(
+        `  no code index — for Hybrid LSP set CONTINUUM_CODE_ENGINE=cbm (+ CONTINUUM_CBM_BIN);\n` +
+          `  or for the inline bridge run 'codegraph init -i' in the repo, then re-run ingest.\n`,
+      );
+    }
+  }
+
+  process.stdout.write(
+    `\n✓ Repo ingested into project '${projectId}'.\n` +
+      `  Inspect:  continuum status --project-id ${projectId}\n` +
+      `  Map + dossier: open the 3D brain (apps/console → /brain) against project '${projectId}'.\n`,
+  );
+}
+
+// ── continuum next (the PM brain — "what's next?") ───────────────────────────
+
+const truncate = (s: string, n: number): string => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + '…' : s);
+
+function stateGlyph(s: RankedTask['state']): string {
+  return s === 'READY' ? '○' : s === 'RUNNING' ? '◐' : s === 'BLOCKED' ? '⊘' : '✓';
+}
+
+function commandNext(projectId: string): void {
+  const json = process.argv.includes('--json');
+  const storage = openStorage(projectId);
+  try {
+    const result = computeNextTasks(storage.listTodos());
+    if (json) {
+      process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      return;
+    }
+    if (result.total === 0) {
+      process.stdout.write(
+        `continuum next — no todos in project '${projectId}'.\n` +
+          `  Create tasks via continuum_create_todo inside your AI client.\n`,
+      );
+      return;
+    }
+    process.stdout.write(
+      `continuum next — project '${projectId}' · ${result.actionable.length} actionable · ` +
+        `${result.blocked.length} blocked · ${result.done}/${result.total} done\n\n`,
+    );
+    if (result.actionable.length === 0) {
+      process.stdout.write(`  Nothing actionable — every open task is blocked. See the critical path below.\n\n`);
+    } else {
+      process.stdout.write(`DO NEXT (unblocked, highest leverage first):\n`);
+      for (const t of result.actionable) {
+        const lev = t.leverage > 0 ? ` · unblocks ${t.leverage}` : '';
+        const dossier = t.refs.length ? ` · dossier ${t.refs.length}` : '';
+        process.stdout.write(`  ${stateGlyph(t.state)} [${t.state}] ${truncate(t.title, 60)}${lev}${dossier}\n`);
+        const vc = t.hasVerify ? `verify: ${truncate(t.verifyCommand!, 50)}` : '⚠ no verify_command';
+        process.stdout.write(`      ${t.id.slice(0, 8)} · ${vc}\n`);
+      }
+    }
+    if (result.blocked.length) {
+      process.stdout.write(`\nBLOCKED (waiting on upstream):\n`);
+      for (const t of result.blocked.slice(0, 10)) {
+        process.stdout.write(
+          `  ⊘ ${truncate(t.title, 58)} — needs ${t.blockedByOpen.map(id => id.slice(0, 8)).join(', ')}\n`,
+        );
+      }
+    }
+    process.stdout.write(`\n`);
   } finally {
     storage.close();
   }
@@ -961,10 +1489,16 @@ async function commandStart(projectId: string): Promise<void> {
 // ── continuum serve (V1 HTTP/SSE) ────────────────────────────────────────────
 
 async function commandServe(projectId: string): Promise<void> {
-  if (!process.env.CONTINUUM_HTTP_TOKEN || !process.env.CONTINUUM_HTTP_TOKEN.trim()) {
+  // Two auth modes (auth.ts): shared-secret (CONTINUUM_HTTP_TOKEN) OR JWT
+  // (CONTINUUM_JWT_ISSUER + CONTINUUM_JWT_AUDIENCE). A multi-tenant JWT deploy must
+  // NOT be forced to also carry a bogus shared secret — accept either.
+  const hasToken = !!process.env.CONTINUUM_HTTP_TOKEN?.trim();
+  const hasJwt = !!process.env.CONTINUUM_JWT_ISSUER?.trim() && !!process.env.CONTINUUM_JWT_AUDIENCE?.trim();
+  if (!hasToken && !hasJwt) {
     process.stderr.write(
-      'continuum serve: $CONTINUUM_HTTP_TOKEN required. Generate one with `openssl rand -hex 32` ' +
-        'and re-launch, e.g.\n  CONTINUUM_HTTP_TOKEN=$(openssl rand -hex 32) continuum serve\n',
+      'continuum serve: configure ONE auth mode.\n' +
+        '  shared-secret:  CONTINUUM_HTTP_TOKEN=$(openssl rand -hex 32) continuum serve\n' +
+        '  JWT (per-tenant): CONTINUUM_JWT_ISSUER=<url> CONTINUUM_JWT_AUDIENCE=<aud> continuum serve\n',
     );
     process.exit(1);
   }
@@ -972,6 +1506,273 @@ async function commandServe(projectId: string): Promise<void> {
   // The http.ts module is the bin entry — importing it boots Express +
   // SSEServerTransport and listens on $CONTINUUM_HTTP_PORT (default 7878).
   await import('@number7even/continuum-mcp-server/dist/http.js');
+}
+
+// ── continuum provision-tenant — concierge onboarding in one command ──────────
+//
+// Signs the "last mile" of the enterprise sale into a single executable action:
+// register the tenant in the control plane AND mint the scoped RS256 Bearer token
+// its ARIA client presents. CONTINUUM is its own issuer (see mcp-server/issuer.ts),
+// so no external IdP is needed — the engine serves the matching JWKS and validates
+// the very token this command prints.
+//
+//   continuum provision-tenant grand-harbour --plan enterprise \
+//       --issuer https://api.continuum.rest --audience continuum-api
+//
+async function commandProvisionTenant(): Promise<void> {
+  const argv = process.argv.slice(3);
+  let tenantId = '';
+  let plan = 'enterprise';
+  let ttlDays = 90;
+  let issuer = process.env.CONTINUUM_JWT_ISSUER?.trim() || 'http://localhost:7878';
+  let audience = process.env.CONTINUUM_JWT_AUDIENCE?.trim() || 'continuum-api';
+  let sub = '';
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] ?? '';
+    const val = (): string => (a.includes('=') ? a.slice(a.indexOf('=') + 1) : (argv[++i] ?? ''));
+    if (a.startsWith('-')) {
+      if (a === '--plan' || a.startsWith('--plan=')) plan = val();
+      else if (a === '--issuer' || a.startsWith('--issuer=')) issuer = val();
+      else if (a === '--audience' || a.startsWith('--audience=')) audience = val();
+      else if (a === '--sub' || a.startsWith('--sub=')) sub = val();
+      else if (a === '--ttl-days' || a.startsWith('--ttl-days=')) { const n = Number(val()); if (Number.isFinite(n) && n > 0) ttlDays = n; }
+    } else if (!tenantId) {
+      tenantId = a;
+    }
+  }
+  if (!tenantId) {
+    process.stderr.write('continuum provision-tenant: <tenantId> required.\n  e.g. continuum provision-tenant grand-harbour --plan enterprise\n');
+    process.exit(1);
+  }
+
+  const { openTenancyDirectory } = await import('@number7even/continuum-core');
+  const { mintTenantToken } = await import('@number7even/continuum-mcp-server/dist/issuer.js');
+
+  const minted = await mintTenantToken({ tenantId, issuer, audience, sub: sub || undefined, ttlSeconds: ttlDays * 24 * 3600 });
+  // Register (or refresh) the tenant in the control plane, pinning the signing key id.
+  const dir = openTenancyDirectory();
+  const record = dir.registerTenant({ tenantId, plan, status: 'active', keyId: minted.kid });
+  dir.close();
+
+  const out = process.stdout;
+  out.write(`\n✓ Tenant provisioned — ${record.tenantId}\n`);
+  out.write(`  plan        ${record.plan}\n`);
+  out.write(`  status      ${record.status}\n`);
+  out.write(`  issuer      ${issuer}\n`);
+  out.write(`  audience    ${audience}\n`);
+  out.write(`  subject     ${minted.sub}\n`);
+  out.write(`  key id      ${minted.kid}\n`);
+  out.write(`  expires     ${minted.expiresAt}\n`);
+  out.write(`\n  X-Continuum-Project: ${record.tenantId}\n`);
+  out.write(`  Authorization: Bearer ${minted.token}\n`);
+  out.write(`\n  Hand the client the endpoint + this token. The engine must run in JWT mode\n`);
+  out.write(`  (CONTINUUM_JWT_ISSUER=${issuer} CONTINUUM_JWT_AUDIENCE=${audience}) so it serves the\n`);
+  out.write(`  matching JWKS and validates this token. Never commit the token (P1).\n\n`);
+}
+
+// ── continuum observe — capture terminal output as a live Observation ─────────
+//
+// The CAPTURE seam of the qualifying loop. Pipe any command's output in and it
+// becomes a `type='command'` Observation the (separate) qualifying agent can
+// later cross-examine against the codebase, spec, and knowledge base.
+//
+//   npm test 2>&1 | continuum observe --label test --exit $?
+//   ./build.sh 2>&1 | continuum observe --label build --cmd "./build.sh" --exit $?
+//
+// It TEEs stdin → stdout, so the output still shows in your terminal (the pipe
+// stays transparent). Content flows through storage.upsertObservation()'s
+// privacy-scrub choke-point before it's stored.
+//
+// Source registration: under the 'export' genre (captured tool/session activity)
+// but distinguished by the `terminal:<project>` sourceId prefix — which is what
+// the Brain/Timeline color by — plus obs type 'command'. Migration-free until a
+// first-class 'terminal' SourceType lands (P4: honest about the reuse).
+async function commandObserve(projectId: string): Promise<void> {
+  const argv = process.argv.slice(3);
+  let label = '', cmd = '', exitCode: number | null = null, maxBytes = 64 * 1024;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] ?? '';
+    const val = (): string => (a.includes('=') ? a.slice(a.indexOf('=') + 1) : (argv[++i] ?? ''));
+    if (a === '--label' || a.startsWith('--label=')) label = val();
+    else if (a === '--cmd' || a.startsWith('--cmd=')) cmd = val();
+    else if (a === '--exit' || a.startsWith('--exit=')) { const n = Number(val()); exitCode = Number.isFinite(n) ? n : null; }
+    else if (a === '--max-bytes' || a.startsWith('--max-bytes=')) { const n = Number(val()); if (Number.isFinite(n) && n > 0) maxBytes = n; }
+  }
+
+  // Read piped stdin while TEE-ing to stdout so the pipe stays transparent. Guard
+  // the interactive-TTY case (no pipe) so `observe` never hangs waiting on input.
+  let output = '';
+  let total = 0;
+  let truncated = false;
+  if (!process.stdin.isTTY) {
+    const chunks: Buffer[] = [];
+    await new Promise<void>((resolve) => {
+      process.stdin.on('data', (d: Buffer) => {
+        process.stdout.write(d);                    // tee — user still sees it
+        total += d.length;
+        if (!truncated) {
+          chunks.push(d);
+          if (Buffer.concat(chunks).length >= maxBytes) truncated = true;
+        }
+      });
+      process.stdin.on('end', () => resolve());
+      process.stdin.on('error', () => resolve());
+    });
+    output = Buffer.concat(chunks).toString('utf8');
+    if (output.length > maxBytes) output = output.slice(0, maxBytes);
+  }
+
+  // Nothing worth recording (no output AND no command/exit context) → clean no-op.
+  if (!output.trim() && !cmd && exitCode === null) process.exit(0);
+
+  const status = exitCode === null ? 'unknown' : exitCode === 0 ? 'ok' : 'fail';
+  const storage = openStorage(projectId);
+  const sourceId = `terminal:${projectId}`;
+  storage.upsertSource(sourceId, 'export', {
+    adapter: '@number7even/continuum-cli observe',
+    version: '0.0.2',
+    note: "terminal capture — genre 'export' pending a first-class 'terminal' SourceType",
+  });
+
+  const header = [
+    cmd ? `$ ${cmd}` : (label ? `[${label}]` : '$ (command)'),
+    exitCode === null ? '' : `→ exit ${exitCode} (${status})`,
+  ].filter(Boolean).join(' ');
+  const content = `${header}\n${output.trimEnd()}${truncated ? '\n…[truncated]' : ''}`.trimEnd();
+
+  // Significance flag the qualifier keys on (P9: it decides, observe only hints):
+  // a non-zero exit, or a build/test/git/deploy-class label/command.
+  const significant =
+    (exitCode !== null && exitCode !== 0) ||
+    /\b(test|build|deploy|release|git|ci|lint|typecheck|migrate|publish)\b/i.test(`${label} ${cmd}`);
+
+  const id = randomUUID();
+  storage.upsertObservation({
+    id,
+    sourceId,
+    type: 'command',
+    content,
+    timestamp: new Date().toISOString(),
+    refs: [],
+    metadata: {
+      label: label || undefined,
+      cmd: cmd || undefined,
+      exitCode,
+      status,
+      cwd: process.cwd(),
+      bytes: total,
+      truncated,
+      significant: significant || undefined,
+    },
+  });
+
+  // Confirmation on stderr (never stdout — keep the pipe clean for downstream),
+  // then exit explicitly: attaching stdin 'data' listeners refs the event loop,
+  // so a leaf capture command must not rely on a natural exit (it would hang).
+  process.stderr.write(
+    `\x1b[2m[continuum] observed ${status}${label ? ' · ' + label : ''}${significant ? ' · significant' : ''} → ${sourceId} ${id.slice(0, 8)}\x1b[0m\n`,
+    () => process.exit(0),
+  );
+}
+
+// ── continuum recap — the ambient two-host discussion audio (ARIAN) ────────────
+//
+// Builds the grounded, semantic-fed, tier-cited two-host script (buildDiscussionScript)
+// and synthesises it through the LOCAL supertonic TTS (0-egress) — Host A and Host B on
+// two distinct voices. Always writes the script .md (deterministic); writes the .wav when
+// supertonic is reachable, else says so plainly (never fakes audio). Meant to be triggered
+// ambiently by a SessionEnd hook — this is the command that hook calls.
+async function commandRecap(projectId: string): Promise<void> {
+  const storage = openStorage(projectId);
+  const script = await buildDiscussionScript(storage);
+
+  const dir = joinPath(continuumDataRoot(), projectId, 'recaps');
+  mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const base = joinPath(dir, `recap-${stamp}`);
+
+  // 1 — the script (deterministic, grounded). Always written.
+  const md =
+    `# ${script.title}\n\n_${script.turns.length} turns · ${script.grounded} grounded_\n\n` +
+    script.turns.map((t) => `**Host ${t.host}${t.tier ? ` · ${t.tier}` : ''}:** ${t.text}`).join('\n\n') + '\n';
+  writeFileSync(`${base}.script.md`, md);
+  console.log(`[recap] script → ${base}.script.md (${script.turns.length} turns, ${script.grounded} grounded)`);
+
+  // 2 — synthesise via LOCAL supertonic (0 bytes egress). Two hosts → two voices.
+  const ttsUrl = process.env.SUPERTONIC_TTS_URL || 'http://127.0.0.1:7788/v1/audio/speech';
+  const voiceA = process.env.SUPERTONIC_VOICE_A || process.env.SUPERTONIC_VOICE || 'M1';
+  const voiceB = process.env.SUPERTONIC_VOICE_B || 'F1';
+  try {
+    const chunks: Buffer[] = [];
+    for (const t of script.turns) {
+      const r = await fetch(ttsUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'supertonic', input: t.text, voice: t.host === 'A' ? voiceA : voiceB, response_format: 'wav' }),
+      });
+      if (!r.ok) throw new Error(`TTS ${r.status}`);
+      chunks.push(Buffer.from(await r.arrayBuffer()));
+    }
+    const wav = Buffer.concat(chunks);
+    writeFileSync(`${base}.wav`, wav);
+    console.log(`[recap] audio → ${base}.wav (${wav.length} bytes · ${script.turns.length} turns · voices ${voiceA}/${voiceB}) · 0 bytes egress`);
+  } catch (e) {
+    console.log(`[recap] audio skipped — supertonic not reachable at ${ttsUrl} (${e instanceof Error ? e.message : String(e)}).`);
+    console.log(`         start it:  supertonic serve --host 127.0.0.1 --port 7788`);
+  }
+  process.exit(0);
+}
+
+// ── continuum authorship export — the IP-provenance export (legal shield) ──────
+//
+// Walks the local checkpoint chain, resolves every acceptedBy seal to its decision, and
+// re-derives each hash to prove the chain is unbroken. Writes a JSON artifact (machine
+// verification) + a Markdown rendering (filing / counsel). Prints INTACT/BROKEN + the path.
+function commandAuthorship(projectId: string): void {
+  const sub = process.argv[3];
+  if (sub !== 'export') {
+    process.stderr.write(`usage: continuum authorship export [-p <project>]\n`);
+    process.exit(sub ? 1 : 0);
+  }
+  const storage = openStorage(projectId);
+  const generatedAt = new Date().toISOString();
+  const exp = buildAuthorshipExport(storage, { project: projectId, generatedAt });
+
+  const dir = joinPath(continuumDataRoot(), projectId, 'authorship');
+  mkdirSync(dir, { recursive: true });
+  const base = joinPath(dir, `authorship-${generatedAt.replace(/[:.]/g, '-')}`);
+  writeFileSync(`${base}.json`, JSON.stringify(exp, null, 2) + '\n');
+  writeFileSync(`${base}.md`, renderAuthorshipMarkdown(exp));
+
+  console.log(`[authorship] ${exp.authorship.length} human-accepted state(s) across ${exp.chain.length} checkpoint(s)`);
+  console.log(`[authorship] chain integrity: ${exp.intact ? 'INTACT ✓ (every hash re-derived, every seal verified)' : 'BROKEN ✗ — a checkpoint or decision has been tampered with'}`);
+  console.log(`[authorship] artifact → ${base}.json  +  ${base}.md`);
+  process.exit(exp.intact ? 0 : 2);
+}
+
+// ── continuum export-okf ──────────────────────────────────────────────────────
+//
+// Export the project's knowledge as an OKF (Open Knowledge Format) tree: topic
+// folders, an index.md map in every folder, YAML front matter (name/description/
+// type) on every document, one concept per file. Any OKF-speaking agent can then
+// navigate this brain surgically — read the maps, load only what it needs —
+// without MCP access. Portable, platform-independent, machine-readable.
+function commandExportOkf(projectId: string): void {
+  const outFlagIdx = process.argv.indexOf('--out');
+  const outDir = outFlagIdx > 0
+    ? process.argv[outFlagIdx + 1]!
+    : joinPath(continuumDataRoot(), projectId, 'okf');
+  const storage = openStorage(projectId);
+  const tree = buildOkfTree(storage, { project: projectId });
+  for (const f of tree.files) {
+    const p = joinPath(outDir, f.path);
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, f.content);
+  }
+  const topics = Object.entries(tree.counts).map(([t, n]) => `${t}:${n}`).join(' · ');
+  console.log(`[okf] ${tree.files.length} file(s) exported → ${outDir}`);
+  console.log(`[okf] topics: ${topics}`);
+  console.log(`[okf] entry point: ${joinPath(outDir, 'index.md')} — maps first, surgical loads after.`);
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -1007,12 +1808,39 @@ async function main(): Promise<void> {
       await commandServe(projectId);
       return;
 
+    case 'provision-tenant':
+      await commandProvisionTenant();
+      return;
+
     case 'import-state':
       commandImportState(projectId, stateMd);
       return;
 
     case 'verify':
       commandVerify(projectId);
+      return;
+
+    case 'ingest':
+      commandIngest();
+      return;
+
+    case 'next':
+      commandNext(projectId);
+      return;
+
+    case 'observe':
+      await commandObserve(projectId);
+      return;
+
+    case 'recap':
+      await commandRecap(projectId);
+      return;
+
+    case 'export-okf':
+      commandExportOkf(projectId);
+      break;
+    case 'authorship':
+      commandAuthorship(projectId);
       return;
 
     case 'adapter':

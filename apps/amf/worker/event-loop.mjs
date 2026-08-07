@@ -60,8 +60,16 @@ export function startContentWorker() {
       }
       // default 'produce' — the proven faceless voice-over-b-roll short from fuel/
       const state = job.data ?? {};
+      // Fire-time fuel guard (Sprint 1): when AMF_REQUIRE_FUEL=1, refuse to render a
+      // stub short from empty inputs — record a skip on the state doc instead. Stops
+      // the 09:00 pulse from shipping placeholder assets nobody asked for (V5).
+      const inputs = state.inputs ?? {};
+      if (process.env.AMF_REQUIRE_FUEL === '1' && Object.keys(inputs).length === 0) {
+        console.error(`[L4/L5] job ${job.id} — SKIPPED: AMF_REQUIRE_FUEL set and no fuel/ inputs (no stub render)`);
+        return { ...state, results: [...(state.results ?? []), { stage: 'L4/L5', skipped: 'no-fuel', at: 'render-skipped' }] };
+      }
       console.error(`[L4/L5] job ${job.id} — synthesizing short…`);
-      const { assetPath } = await produceShort(state.inputs ?? {});
+      const { assetPath } = await produceShort(inputs);
       const next = { ...state, results: [...(state.results ?? []), { stage: 'L4/L5', assetPath, at: 'render-complete' }] };
       console.error(`[L4/L5] job ${job.id} ✅ asset → ${assetPath}`);
       return next;

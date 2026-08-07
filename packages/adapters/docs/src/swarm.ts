@@ -48,6 +48,12 @@ export interface DocFile {
   content: string;
   /** mtime as ISO string. */
   timestamp: string;
+  /** Observation IDs of the docs this file links to (real provenance edges). */
+  refs?: string[];
+  /** Authored typed relationships: target observation ID → verb (from link titles). */
+  relations?: Array<{ to: string; as: string }>;
+  /** OKF YAML front matter (name/description/type…), parsed at read time (OKF Slice 2). */
+  frontMatter?: Record<string, string>;
 }
 
 export interface DocsSwarmResult {
@@ -247,12 +253,16 @@ export async function ingestViaMeshSwarm(
             type: 'doc',
             content: file.content,
             timestamp: file.timestamp,
-            refs: [],
+            refs: file.refs ?? [],
             metadata: {
               adapter: '@number7even/continuum-adapter-docs',
               path: file.relativePath,
               bytes: file.content.length,
               title,
+              // OKF front matter (name/description/type) — surgical pre-load context (Slice 2).
+              ...(file.frontMatter ? { okf: file.frontMatter } : {}),
+              // Authored typed edges (link-title verbs) — the graph's "meaning".
+              ...(file.relations?.length ? { relations: file.relations } : {}),
               // Audit: how was this title chosen?
               titleAgreement:
                 vote.winners.find(w => w.inputId === file.id)?.quorum ?? 0,

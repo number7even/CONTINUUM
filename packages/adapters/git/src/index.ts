@@ -101,7 +101,7 @@ function readCommits(repoDir: string, maxCount: number): ParsedCommit[] {
       'log',
       '-z',
       `--max-count=${maxCount}`,
-      '--pretty=format:%H%x1f%aI%x1f%an%x1f%ae%x1f%s%x1f%b',
+      '--pretty=format:%H%x1f%P%x1f%aI%x1f%an%x1f%ae%x1f%s%x1f%b',
     ],
     { encoding: 'buffer', maxBuffer: 1024 * 1024 * 64 },
   );
@@ -113,8 +113,9 @@ function readCommits(repoDir: string, maxCount: number): ParsedCommit[] {
   const commits: ParsedCommit[] = [];
   for (const r of records) {
     const fields = r.split('\x1f');
-    if (fields.length < 5) continue;
-    const [sha, isoDate, authorName, authorEmail, subject, body] = fields as [
+    if (fields.length < 6) continue;
+    const [sha, parentStr, isoDate, authorName, authorEmail, subject, body] = fields as [
+      string,
       string,
       string,
       string,
@@ -123,8 +124,13 @@ function readCommits(repoDir: string, maxCount: number): ParsedCommit[] {
       string | undefined,
     ];
     if (!/^[0-9a-f]{40}$/.test(sha)) continue;
+    // Parents: the commit DAG. refs → parent SHAs give the directional history flow.
+    const parents = (parentStr ?? '').trim()
+      ? parentStr.trim().split(/\s+/).filter((p) => /^[0-9a-f]{40}$/.test(p))
+      : [];
     commits.push({
       sha,
+      parents,
       isoDate,
       authorName,
       authorEmail,

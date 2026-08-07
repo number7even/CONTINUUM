@@ -1,13 +1,13 @@
 {
   "name": "@number7even/continuum-mcp-server",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Continuum MCP server — exposes 10 tools + 4 Resources + 2 Prompts to AI clients over stdio (local) or HTTP/SSE (remote / hosted).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "continuum-mcp": "./dist/index.js",
-    "continuum-mcp-http": "./dist/http.js"
+    "continuum-mcp": "dist/index.js",
+    "continuum-mcp-http": "dist/http.js"
   },
   "scripts": {
     "build": "tsc -b",
@@ -17,9 +17,10 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@number7even/continuum-core": "0.0.1",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "express": "^4.21.0",
+    "@number7even/continuum-core": "0.0.2",
+    "array-flatten": "^3.0.0",
+    "express": "^4.22.2",
     "jose": "^5.9.6"
   },
   "devDependencies": {
@@ -37,5 +38,8 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "optionalDependencies": {
+    "codebase-memory-mcp": "^0.9.0"
   }
 }

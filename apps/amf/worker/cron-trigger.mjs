@@ -72,8 +72,14 @@ async function remove() {
 }
 
 async function once() {
-  const queue = new Queue(QUEUE, { connection });
   const { state, fueled } = newState();
+  // Schedule-time fuel guard (Sprint 1): mirror the worker's fire-time guard so a
+  // manual pulse also refuses to enqueue a stub. The worker re-checks at fire time.
+  if ((process.env.AMF_REQUIRE_FUEL === '1' || process.argv.includes('--require-fuel')) && !fueled) {
+    console.error('[pulse] SKIPPED: --require-fuel set and fuel/ is empty — no stub job enqueued. Drop assets in fuel/ and re-run.');
+    return;
+  }
+  const queue = new Queue(QUEUE, { connection });
   const job = await queue.add('produce', state, { removeOnComplete: true, removeOnFail: 50 });
   console.error(`[pulse] enqueued one job ${job.id} · fuel ${fueled ? 'PRESENT' : 'absent (stub)'}. Worker (event-loop.mjs) will process it.`);
   await queue.close();

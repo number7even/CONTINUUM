@@ -32,8 +32,8 @@ export async function processDecisions(decisions, { render = true } = {}) {
     const bucket = draftBucket(id);
     if (bucket !== 'pending') { out.skipped.push({ id, reason: bucket ? `already ${bucket}` : 'no local draft' }); continue; }
     const decision = String(d.decision || d.decision_type || '').toLowerCase();
-    if (decision === 'approve') { const r = approveDraft(id, { render }); out.rendered.push({ id, slug: r.slug, rendered: r.render?.rendered ?? render }); }
-    else if (decision === 'reject') { rejectDraft(id, (d.context && d.context.title) || 'rejected in Pulse'); out.rejected.push({ id }); }
+    if (decision === 'approve') { const r = await approveDraft(id, { render }); if (!r.ok) { out.skipped.push({ id, reason: r.reason }); continue; } out.rendered.push({ id, slug: r.slug, rendered: r.render?.rendered ?? render }); }
+    else if (decision === 'reject') { await rejectDraft(id, (d.context && d.context.title) || 'rejected in Pulse'); out.rejected.push({ id }); }
     else out.skipped.push({ id, reason: `decision=${decision || '?'}` });
   }
   return out;

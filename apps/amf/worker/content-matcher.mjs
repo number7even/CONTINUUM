@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { SIGNAL_TYPES } from './contracts.mjs'; // rankable obs-types — single source of truth
+import { signalStoryKey, loadSeenFingerprints } from './dedup.mjs'; // story-freshness gate (adopt: eligible-before-collect)
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
@@ -213,10 +214,37 @@ async function run() {
   if (!pillars.length) { console.error('no pillars — add the product to portfolio-universe.json, or pass --pillars "a,b,c"'); process.exit(2); }
   const { openStorage } = await import(resolve(REPO_ROOT, 'packages/core/dist/index.js'));
   const storage = openStorage(project);
-  const ranked = rankSignals(storage, pillars, product, Date.now(), format === 'report' ? 4 : 1);
+  // Widen the candidate pool for posts so the freshness gate has room to PROMOTE the next
+  // signal when the top story was already drafted (reports stay multi-signal as before).
+  const ranked = rankSignals(storage, pillars, product, Date.now(), format === 'report' ? 4 : 6);
   if (!ranked.length) { console.error('[matcher] no matching signals — run adapter-news first'); storage.close(); process.exit(1); }
-  const brief = format === 'report' ? await buildReportBrief(ranked, brand, product) : await buildBrief(ranked[0], brand, product);
+
+  let brief; let skipped = 0;
+  if (format === 'report') {
+    brief = await buildReportBrief(ranked, brand, product);
+  } else {
+    // Story-freshness gate (adopt of "discover eligible before you collect"): skip a signal whose
+    // story we've ALREADY drafted (any queue bucket) and promote the next-freshest — so the top
+    // story that keeps re-reporting no longer regenerates a duplicate. Keyed on the SOURCE SIGNAL
+    // (stable), checked BEFORE drafting (cheap), then stamped on the draft so future runs see it —
+    // draft-mode-independent (the LLM rewording the headline can't defeat it).
+    const seen = loadSeenFingerprints();
+    for (const sig of ranked) {
+      const storyKey = signalStoryKey(slug, sig);
+      if (seen.has(storyKey)) { skipped++; continue; }
+      brief = await buildBrief(sig, brand, product);
+      brief.storyKey = storyKey;
+      break;
+    }
+    if (!brief) {
+      console.error(`[matcher] stats kept=${ranked.length} skipped=${skipped} drafted=none`); // odometer-parseable
+      console.error(`[matcher] all ${ranked.length} top signals already drafted — no fresh story this tick (P4: honest skip, no duplicate)`);
+      storage.close(); process.exit(3);
+    }
+  }
   storage.close();
+  brief.contentProject = project; // self-containment: the project the fromSignal lives in, so campaignHandoff walks the chain with no manual override
+  console.error(`[matcher] stats kept=${ranked.length} skipped=${skipped} drafted=${brief.drafted}`); // machine-parseable for the dogfood odometer
   console.log(JSON.stringify(brief, null, 2));
 }
 

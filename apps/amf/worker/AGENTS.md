@@ -43,7 +43,11 @@ Render the MP4 / PDF / post. **Every presenter routes through `safety/` first.**
 
 ### `seams/` — Stages I–J + the XENOS loop
 The human gate and the CRM amalgamation.
-- `review.mjs` — Stage I human gate (`approveDraft`/`rejectDraft`, idempotent; approve ≠ publish)
+- `review.mjs` — Stage I human gate (`approveDraft`/`rejectDraft`, async + idempotent; approve ≠ publish).
+  Each P9 decision is **sealed** into the Authorship Ledger via `sealDecision` (core) — an immutable
+  `type='decision'` Observation binding the exact-draft `contentHash` (scrub → hash → store; PII
+  redacted before the hash; post-hoc draft tampering is detectable). Seal-before-move is atomic:
+  no approved draft exists without ledger provenance. Gate: `verify-decision-seal.mjs`.
 - `stage-j.mjs` — Seam ① lead handoff → XENOS `/capture` (`buildLeadPayload` → `LeadPayload`)
 - `pulse.mjs` — Seam ⑤ push draft → Operational Pulse
 - `pulse-return.mjs` · `feedback-sync.mjs` — Seam ② return + `ground_truth` (`mapDecision`, `HITL_REWARD`)

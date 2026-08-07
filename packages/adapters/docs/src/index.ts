@@ -33,7 +33,7 @@
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { join, relative, resolve, sep, posix } from 'node:path';
 import { createHash } from 'node:crypto';
 import { openStorage } from '@number7even/continuum-core';
 import { ingestViaMeshSwarm, type DocFile } from './swarm.js';
@@ -75,6 +75,45 @@ function pathToObservationId(relativePath: string): string {
   const normalized = relativePath.split(sep).join('/');
   const hex = createHash('sha256').update(normalized).digest('hex');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+// ── Provenance edges — resolve internal markdown links to observation IDs ────
+
+/**
+ * Turn a doc's internal markdown links into refs to the observation IDs of the
+ * docs they point at — the REAL provenance edges that light up the 3D brain
+ * graph. Only links to files present in the ingested set become refs; external
+ * URLs, anchors, and links that escape the docs root are dropped (same
+ * dangling-drop discipline the graph builder enforces). No fabricated edges (P4).
+ */
+function linkRefs(file: DocFile, knownPaths: Set<string>): { refs: string[]; relations: Array<{ to: string; as: string }> } {
+  const refs = new Set<string>();
+  const relations = new Map<string, string>(); // target id → verb (last wins)
+  // [text](target "optional title") — the TITLE, when a short verb phrase, becomes
+  // the edge's meaning: `[VAULT](./x.md "enforces")` → this —enforces→ x. Authored,
+  // deterministic — never inferred (P4).
+  const linkRe = /\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = linkRe.exec(file.content)) !== null) {
+    let target = m[1]!.trim();
+    const title = (m[2] ?? '').trim();
+    if (/^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) continue; // protocol / protocol-relative / pure-anchor
+    target = target.split('#')[0]!.split('?')[0]!; // strip anchor + query
+    if (!target || !/\.mdx?$/i.test(target)) continue; // markdown targets only
+    const base = target.startsWith('/')
+      ? target.slice(1)
+      : posix.join(posix.dirname(file.relativePath), target);
+    const resolved = posix.normalize(base);
+    if (resolved.startsWith('..') || resolved === file.relativePath) continue; // escaped root / self
+    if (!knownPaths.has(resolved)) continue;
+    const id = pathToObservationId(resolved);
+    refs.add(id);
+    // A title of 1–3 words with a letter is treated as a verb phrase (the meaning).
+    if (title && /^[a-z][\w -]{1,28}$/i.test(title) && title.split(/\s+/).length <= 3) {
+      relations.set(id, title.toLowerCase());
+    }
+  }
+  return { refs: [...refs], relations: [...relations].map(([to, as]) => ({ to, as })) };
 }
 
 // ── Recursive markdown walker ────────────────────────────────────────────────
@@ -126,7 +165,31 @@ function readDocFile(filePath: string, docsDir: string): DocFile | null {
     id: pathToObservationId(relativePath),
     content,
     timestamp: mtime,
+    frontMatter: parseFrontMatter(content),
   };
+}
+
+/**
+ * OKF Slice 2 — parse a leading YAML front-matter block (`---` … `---` at byte 0) into
+ * flat key:value pairs (name / description / type …). Deliberately minimal (no nested
+ * YAML, no deps): OKF's contract is flat scalar fields. A file without a block, or with
+ * a malformed one, returns undefined — never a guess (P4). The body is left intact.
+ */
+export function parseFrontMatter(content: string): Record<string, string> | undefined {
+  if (!content.startsWith('---\n')) return undefined;
+  const end = content.indexOf('\n---', 4);
+  if (end < 0 || end > 4000) return undefined;
+  const out: Record<string, string> = {};
+  for (const line of content.slice(4, end).split('\n')) {
+    const m = line.match(/^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.+)$/);
+    if (!m) continue;
+    let v = m[2]!.trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\');   // unescape (renderDoc round-trip)
+    }
+    out[m[1]!] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -164,6 +227,17 @@ async function main() {
   }
   console.log(`[docs] scanned ${docFiles.length} markdown file${docFiles.length === 1 ? '' : 's'}`);
 
+  // Resolve internal doc-to-doc markdown links into refs — the graph edges.
+  const knownPaths = new Set(docFiles.map(f => f.relativePath));
+  for (const f of docFiles) {
+    const { refs, relations } = linkRefs(f, knownPaths);
+    f.refs = refs;
+    f.relations = relations;
+  }
+  const edgeCount = docFiles.reduce((n, f) => n + (f.refs?.length ?? 0), 0);
+  const verbCount = docFiles.reduce((n, f) => n + (f.relations?.length ?? 0), 0);
+  console.log(`[docs] resolved ${edgeCount} internal doc-link edge(s) (${verbCount} typed with a verb) across ${docFiles.length} file(s)`);
+
   const result = await ingestViaMeshSwarm(docFiles, {
     storage,
     sourceId,
@@ -181,7 +255,10 @@ async function main() {
   storage.close();
 }
 
-main().catch(err => {
-  console.error('[docs] fatal:', err);
-  process.exit(1);
-});
+// Run the CLI only when invoked directly — safe to `import { parseFrontMatter }` (OKF gate).
+if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+  main().catch(err => {
+    console.error('[docs] fatal:', err);
+    process.exit(1);
+  });
+}

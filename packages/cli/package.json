@@ -1,12 +1,12 @@
 {
   "name": "@number7even/continuum-cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Continuum CLI — continuum init / start / serve / status / import-state for new operators.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "continuum": "./dist/index.js"
+    "continuum": "dist/index.js"
   },
   "scripts": {
     "build": "tsc -b",
@@ -15,8 +15,9 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@number7even/continuum-core": "0.0.1",
-    "@number7even/continuum-mcp-server": "0.0.1"
+    "@number7even/continuum-core": "0.0.2",
+    "@number7even/continuum-mcp-server": "0.0.2",
+    "better-sqlite3": "^11.3.0"
   },
   "license": "Apache-2.0",
   "author": "Riaan Kleynhans <riaan@number7even.com>",

@@ -25,6 +25,8 @@ import type {
   TimelineHit,
   Todo,
 } from './types.js';
+import type { GraphOptions, ObservationGraph } from './graph.js';
+import type { Identity, LedgerEntry, TruthBlock, Verdict } from './truth-ledger.js';
 
 // ── Input types for write operations ────────────────────────────────────────
 
@@ -94,6 +96,18 @@ export interface StorageBackend {
   getTodo(id: string): Todo | null;
   updateTodo(input: UpdateTodoInput): Todo;
 
+  // — Truth Ledger — multi-signature attestation (A·V·T·H). Identities are the
+  // public-key registry (set up out-of-band by the human — NOT over MCP, so no LLM
+  // can register a human key). submitLedgerEntry verifies the signature before
+  // accepting; submitTest is the mechanical referee (server-held tester key).
+  registerIdentity(id: Identity): void;
+  listIdentities(): Identity[];
+  submitLedgerEntry(taskRef: string, entry: LedgerEntry): TruthBlock;
+  submitTest(taskRef: string, result: { verifyCommand: string; exitCode: number; outputHash: string }): TruthBlock;
+  verdictForTask(taskRef: string): Verdict | null;
+  getTruthThread(taskRef: string): TruthBlock[];
+  allTruthBlocks(): TruthBlock[];
+
   // — Observations — privacy-filtered event log
   upsertSource(id: string, type: SourceType, config?: Record<string, unknown>): void;
   insertObservation(obs: Omit<Observation, 'id'> & { id?: string }): Observation | null;
@@ -132,6 +146,15 @@ export interface StorageBackend {
   searchObservations(query: string, limit?: number): SearchHit[];
 
   /**
+   * Optional SEMANTIC search (hybrid backend only): HNSW over MiniLM-384 embeddings,
+   * returning SearchHit[] ranked by cosine similarity. Feature-detect before calling —
+   * the sqlite backend omits it, and retrieval degrades to FTS5-only (same shape).
+   */
+  vectorSearch?(query: string, k?: number): Promise<SearchHit[]>;
+  /** Optional (hybrid backend only): await in-flight embeddings so a search sees them. */
+  flushVectorWrites?(): Promise<void>;
+
+  /**
    * Layer-2 Progressive Disclosure — observations in chronological order
    * around a reference point (observation ID OR ISO timestamp). Returns
    * compact TimelineHit[] with `offsetSec` so the agent reads "what
@@ -146,6 +169,15 @@ export interface StorageBackend {
    * dropped — caller should batch.
    */
   getObservations(ids: string[]): Observation[];
+
+  /**
+   * The observation provenance graph — nodes (observations) + edges (refs[]
+   * links) — for the 3D "brain" visualization and voice-driven traversal.
+   * Most-recent-first, capped by `opts.limit` (default 2000, max 10000). This
+   * is a whole-graph read, distinct from Progressive-Disclosure retrieval; use
+   * search/timeline/getObservations for token-efficient reading.
+   */
+  getObservationGraph(opts?: GraphOptions): ObservationGraph;
 
   // — Lifecycle —
   close(): void;

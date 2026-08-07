@@ -1,0 +1,36 @@
+{
+  "name": "@number7even/continuum",
+  "version": "0.0.2",
+  "description": "CONTINUUM — the verifiable memory & trust layer for AI-assisted development. Marketed entry point; forwards to the CONTINUUM CLI.",
+  "type": "module",
+  "bin": {
+    "continuum": "bin.mjs"
+  },
+  "dependencies": {
+    "@number7even/continuum-cli": "0.0.2"
+  },
+  "files": [
+    "bin.mjs",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "ai-memory",
+    "claude-code",
+    "cursor",
+    "continuum",
+    "verify-then-dissolve",
+    "the-nine"
+  ],
+  "license": "Apache-2.0",
+  "author": "Riaan Kleynhans <riaan@number7even.com>",
+  "homepage": "https://thenine.foundation",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/number7even/CONTINUUM.git",
+    "directory": "packages/continuum"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

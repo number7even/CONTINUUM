@@ -3,228 +3,1352 @@
   "personal": {
     "name": "Riaan Kleynhans",
     "positioning": "Founder / systems-thinker. Voice is the substrate through which intent becomes operational reality; trust must be verifiable, not asserted.",
-    "themes": ["voice as substrate", "verify-then-dissolve / verifiable trust", "AI that does not hallucinate", "the geopolitics of AI infrastructure", "sovereign / EU AI", "systems thinking across a venture studio"],
-    "keywords": ["voice ai", "agentic ai", "ai trust", "hallucination", "ai governance", "ai sovereignty", "founder", "venture studio", "systems thinking"],
+    "themes": [
+      "voice as substrate",
+      "verify-then-dissolve / verifiable trust",
+      "AI that does not hallucinate",
+      "the geopolitics of AI infrastructure",
+      "sovereign / EU AI",
+      "systems thinking across a venture studio"
+    ],
+    "keywords": [
+      "voice ai",
+      "agentic ai",
+      "ai trust",
+      "hallucination",
+      "ai governance",
+      "ai sovereignty",
+      "founder",
+      "venture studio",
+      "systems thinking"
+    ],
     "cross_cutting": true,
-    "note": "Riaan's personal brand is the FOUNDER LENS on every product's content — the through-line that ties the portfolio into one point of view."
+    "note": "Riaan's personal brand is the FOUNDER LENS on every product's content — the through-line that ties the portfolio into one point of view.",
+    "brand_identity": null
   },
   "products": [
     {
-      "slug": "voicecosmos", "priority": 1, "geo": false, "confidence": "high",
+      "slug": "voicecosmos",
+      "priority": 1,
+      "geo": false,
+      "confidence": "high",
       "sector": "hospitality voice AI",
       "angle": "AI concierge (ARIAN) recovers the revenue hotels/spas quietly lose — no-shows, the 8pm after-hours call, missed upsell. NOT generic AI.",
-      "topics": ["booking recovery", "no-show reduction", "after-hours booking", "guest experience", "upsell automation", "direct booking vs OTA", "front-desk labour"],
-      "keywords": ["hotel", "spa", "salon", "hospitality", "booking", "concierge", "no-show", "occupancy", "guest", "reservation", "revenue", "OTA", "front desk"],
-      "sales_signals": ["revenue leak", "labour shortage", "OTA commission", "direct booking", "guest satisfaction", "staffing cost", "occupancy drop"],
-      "signal_query": ["hotel", "spa", "booking recovery", "no-show", "direct booking", "guest experience"],
+      "topics": [
+        "booking recovery",
+        "no-show reduction",
+        "after-hours booking",
+        "guest experience",
+        "upsell automation",
+        "direct booking vs OTA",
+        "front-desk labour"
+      ],
+      "keywords": [
+        "hotel",
+        "spa",
+        "salon",
+        "hospitality",
+        "booking",
+        "concierge",
+        "no-show",
+        "occupancy",
+        "guest",
+        "reservation",
+        "revenue",
+        "OTA",
+        "front desk"
+      ],
+      "sales_signals": [
+        "revenue leak",
+        "labour shortage",
+        "OTA commission",
+        "direct booking",
+        "guest satisfaction",
+        "staffing cost",
+        "occupancy drop"
+      ],
+      "signal_query": [
+        "hotel",
+        "spa",
+        "booking recovery",
+        "no-show",
+        "direct booking",
+        "guest experience"
+      ],
       "filters": {
         "_model": "Feedly: (Lodging Industry) AND (Use Cases) AND (AI) NOT (sports). Each must-group is one entity's alias set.",
         "must": [
-          ["hotel", "hotels", "hotelier", "spa", "salon", "resort", "hospitality", "lodging", "motel", "inn", "guest", "accommodation"],
-          ["booking", "reservation", "no-show", "check-in", "front desk", "occupancy", "concierge", "revenue", "upsell", "guest experience", "reception"]
+          [
+            "hotel",
+            "hotels",
+            "hotelier",
+            "spa",
+            "salon",
+            "resort",
+            "hospitality",
+            "lodging",
+            "motel",
+            "inn",
+            "guest",
+            "accommodation"
+          ],
+          [
+            "booking",
+            "reservation",
+            "no-show",
+            "check-in",
+            "front desk",
+            "occupancy",
+            "concierge",
+            "revenue",
+            "upsell",
+            "guest experience",
+            "reception"
+          ]
         ],
-        "not": ["world cup", "fifa", "football", "soccer", "olympic", "olympics", "grand prix", "tournament", "match result", "playoff", "super bowl"]
+        "not": [
+          "world cup",
+          "fifa",
+          "football",
+          "soccer",
+          "olympic",
+          "olympics",
+          "grand prix",
+          "tournament",
+          "match result",
+          "playoff",
+          "super bowl"
+        ]
       },
       "feeds": [
-        {"url": "https://skift.com/feed/", "tier": 1, "name": "Skift"},
-        {"url": "https://www.phocuswire.com/RSS", "tier": 1, "name": "PhocusWire", "status": "cloudflare-403 to non-browser clients (2026-07-01) — T1 authority stands; needs a browser-UA/proxy fetch to ingest"},
-        {"url": "https://www.hospitalitynet.org/rss", "tier": 2, "name": "HospitalityNet"},
-        {"url": "https://www.hotelmanagement.net/rss/xml", "tier": 2, "name": "Hotel Management"}
+        {
+          "url": "https://skift.com/feed/",
+          "tier": 1,
+          "name": "Skift"
+        },
+        {
+          "url": "https://www.phocuswire.com/RSS",
+          "tier": 1,
+          "name": "PhocusWire",
+          "status": "cloudflare-403 to non-browser clients (2026-07-01) — T1 authority stands; needs a browser-UA/proxy fetch to ingest"
+        },
+        {
+          "url": "https://www.hospitalitynet.org/rss",
+          "tier": 2,
+          "name": "HospitalityNet"
+        },
+        {
+          "url": "https://www.hotelmanagement.net/rss/xml",
+          "tier": 2,
+          "name": "Hotel Management"
+        }
       ],
       "own_feeds": [],
-      "own_feeds_note": "First-party content to PULL / REWORK / SYNDICATE (not intelligence to draft from). Add your platform's site RSS + YouTube channel RSS (https://www.youtube.com/feeds/videos.xml?channel_id=UC…). Operator fills real URLs; ingest via `adapter-news --provider own --brand voicecosmos`, then `syndicate`."
+      "own_feeds_note": "First-party content to PULL / REWORK / SYNDICATE (not intelligence to draft from). Add your platform's site RSS + YouTube channel RSS (https://www.youtube.com/feeds/videos.xml?channel_id=UC…). Operator fills real URLs; ingest via `adapter-news --provider own --brand voicecosmos`, then `syndicate`.",
+      "brand_identity": {
+        "ratified": "2026-07-15 — ratified by use: the first cinematic render (dark/cinematic session)",
+        "colors": {
+          "canvas": "#05070a",
+          "ink": "#e5e7eb",
+          "muted": "#94a3b8",
+          "accent": "#5eead4"
+        },
+        "fonts": {
+          "display": "Barlow",
+          "body": "Inter",
+          "mono": "IBM Plex Mono"
+        },
+        "display_case": "lowercase",
+        "style_preset": "broadside",
+        "style": "dark-cinematic",
+        "logo": "assets/brands/voicecosmos/logo-primary-dark.svg",
+        "logo_note": "path ratified 2026-07-15; operator deposits the SVG (P9)",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      }
     },
     {
-      "slug": "voiceidvault", "priority": 1, "geo": true, "confidence": "high",
+      "slug": "voiceidvault",
+      "priority": 1,
+      "geo": true,
+      "confidence": "high",
       "sector": "voice biometric security",
       "angle": "Voice authentication + deepfake defence for enterprise — riding the AI-fraud / synthetic-voice wave. The security-posture flagship.",
-      "topics": ["voice deepfake", "voice fraud / vishing", "biometric authentication", "synthetic voice scam", "identity verification", "AI-enabled fraud", "call-centre fraud"],
-      "keywords": ["deepfake", "biometric", "voice fraud", "vishing", "authentication", "identity", "synthetic voice", "kyc", "breach", "voice clone", "impersonation"],
-      "sales_signals": ["deepfake fraud incident", "voice scam loss", "biometric / AI-act regulation", "enterprise breach", "call-centre attack", "wire-fraud"],
-      "signal_query": ["voice deepfake", "deepfake detection", "voice biometric", "identity verification", "voice fraud", "vishing"],
+      "topics": [
+        "voice deepfake",
+        "voice fraud / vishing",
+        "biometric authentication",
+        "synthetic voice scam",
+        "identity verification",
+        "AI-enabled fraud",
+        "call-centre fraud"
+      ],
+      "keywords": [
+        "deepfake",
+        "biometric",
+        "voice fraud",
+        "vishing",
+        "authentication",
+        "identity",
+        "synthetic voice",
+        "kyc",
+        "breach",
+        "voice clone",
+        "impersonation"
+      ],
+      "sales_signals": [
+        "deepfake fraud incident",
+        "voice scam loss",
+        "biometric / AI-act regulation",
+        "enterprise breach",
+        "call-centre attack",
+        "wire-fraud"
+      ],
+      "signal_query": [
+        "voice deepfake",
+        "deepfake detection",
+        "voice biometric",
+        "identity verification",
+        "voice fraud",
+        "vishing"
+      ],
       "feeds": [
-        {"url": "https://krebsonsecurity.com/feed/", "tier": 1, "name": "KrebsOnSecurity"},
-        {"url": "https://www.bleepingcomputer.com/feed/", "tier": 1, "name": "BleepingComputer"},
-        {"url": "https://thehackernews.com/feeds/posts/default", "tier": 1, "name": "TheHackerNews"}
-      ]
+        {
+          "url": "https://krebsonsecurity.com/feed/",
+          "tier": 1,
+          "name": "KrebsOnSecurity"
+        },
+        {
+          "url": "https://www.bleepingcomputer.com/feed/",
+          "tier": 1,
+          "name": "BleepingComputer"
+        },
+        {
+          "url": "https://thehackernews.com/feeds/posts/default",
+          "tier": 1,
+          "name": "TheHackerNews"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "OPERATOR-RATIFIED 2026-07-17 (P9) — supersedes the agent draft, specs verbatim from the ratification directive",
+        "colors": {
+          "canvas": "#0f172a",
+          "ink": "#e0e7ff",
+          "muted": "#cbd5e1",
+          "accent": "#3b82f6"
+        },
+        "fonts": {
+          "display": "Space Grotesk",
+          "body": "Roboto",
+          "mono": "Inconsolata"
+        },
+        "display_case": null,
+        "style_preset": "blue-professional",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Secure, authoritative, cryptographic."
     },
     {
-      "slug": "continuum", "priority": 1, "geo": false, "confidence": "high",
+      "slug": "continuum",
+      "priority": 1,
+      "geo": false,
+      "confidence": "high",
       "sector": "AI agent memory + verifiable trust (the GAP)",
       "angle": "The memory + verify-then-dissolve engine that stops AI agents hallucinating their own state. Fills the gap between 'AI can do it' and 'AI can prove it'.",
-      "topics": ["ai agent memory", "hallucination / reliability", "agent context", "verifiable ai", "ai coding assistants", "agent evaluation"],
-      "keywords": ["ai agent", "agentic", "memory", "hallucination", "context window", "reliability", "verifiable", "mcp", "coding assistant", "eval"],
-      "sales_signals": ["agent reliability failure", "hallucination incident", "enterprise ai trust", "agent memory", "ai evaluation"],
-      "signal_query": ["ai agent memory", "agent context", "agentic", "ai agent memory mcp", "memory layer", "hallucination"],
+      "topics": [
+        "ai agent memory",
+        "hallucination / reliability",
+        "agent context",
+        "verifiable ai",
+        "ai coding assistants",
+        "agent evaluation"
+      ],
+      "keywords": [
+        "ai agent",
+        "agentic",
+        "memory",
+        "hallucination",
+        "context window",
+        "reliability",
+        "verifiable",
+        "mcp",
+        "coding assistant",
+        "eval"
+      ],
+      "sales_signals": [
+        "agent reliability failure",
+        "hallucination incident",
+        "enterprise ai trust",
+        "agent memory",
+        "ai evaluation"
+      ],
+      "signal_query": [
+        "ai agent memory",
+        "agent context",
+        "agentic",
+        "ai agent memory mcp",
+        "memory layer",
+        "hallucination"
+      ],
       "feeds": [
-        {"url": "https://simonwillison.net/atom/everything/", "tier": 1, "name": "Simon Willison", "status": "operator-ratified 2026-07-01 as the Braintrust substitute — verifiable AI engineering / prompt-injection / SQLite, aligned to CONTINUUM's verifiable-memory ethos"},
-        {"url": "https://github.blog/changelog/feed/", "tier": 1, "name": "GitHub Changelog"},
-        {"url": "https://hnrss.org/newest?q=AI+dev+tools", "tier": 3, "name": "HN (AI/Dev Tools)"}
-      ]
+        {
+          "url": "https://simonwillison.net/atom/everything/",
+          "tier": 1,
+          "name": "Simon Willison",
+          "status": "operator-ratified 2026-07-01 as the Braintrust substitute — verifiable AI engineering / prompt-injection / SQLite, aligned to CONTINUUM's verifiable-memory ethos"
+        },
+        {
+          "url": "https://github.blog/changelog/feed/",
+          "tier": 1,
+          "name": "GitHub Changelog"
+        },
+        {
+          "url": "https://hnrss.org/newest?q=AI+dev+tools",
+          "tier": 3,
+          "name": "HN (AI/Dev Tools)"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "OPERATOR-RATIFIED 2026-07-17 (P9) — supersedes the agent draft, specs verbatim from the ratification directive",
+        "colors": {
+          "canvas": "#000000",
+          "ink": "#22c55e",
+          "muted": "#334155",
+          "accent": "#10b981"
+        },
+        "fonts": {
+          "display": "JetBrains Mono",
+          "body": "Inter",
+          "mono": "Fira Code"
+        },
+        "display_case": null,
+        "style_preset": "bold-poster",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Cold, precise, strictly factual. Refuses to lie."
     },
     {
-      "slug": "thenine", "priority": 2, "geo": true, "confidence": "high",
+      "slug": "thenine",
+      "priority": 2,
+      "geo": true,
+      "confidence": "high",
       "sector": "verifiable trust / AI governance",
       "angle": "A discipline of verifiable trust — the principled backbone under the portfolio's AI. Governance + safety as a differentiator, not a compliance chore.",
-      "topics": ["ai governance", "ai safety", "ai regulation", "trust frameworks", "ai ethics", "eu ai act"],
-      "keywords": ["ai governance", "ai safety", "ai act", "regulation", "trust", "ethics", "accountability", "alignment"],
-      "sales_signals": ["ai regulation", "ai incident", "governance mandate", "eu ai act enforcement"],
-      "signal_query": ["ai governance", "ai safety", "ai act", "ai regulation", "ai ethics", "eu ai act"],
+      "topics": [
+        "ai governance",
+        "ai safety",
+        "ai regulation",
+        "trust frameworks",
+        "ai ethics",
+        "eu ai act"
+      ],
+      "keywords": [
+        "ai governance",
+        "ai safety",
+        "ai act",
+        "regulation",
+        "trust",
+        "ethics",
+        "accountability",
+        "alignment"
+      ],
+      "sales_signals": [
+        "ai regulation",
+        "ai incident",
+        "governance mandate",
+        "eu ai act enforcement"
+      ],
+      "signal_query": [
+        "ai governance",
+        "ai safety",
+        "ai act",
+        "ai regulation",
+        "ai ethics",
+        "eu ai act"
+      ],
       "feeds": [
-        {"url": "https://newsletter.safe.ai/feed", "tier": 2, "name": "AI Safety Newsletter (safe.ai)"}
-      ]
+        {
+          "url": "https://newsletter.safe.ai/feed",
+          "tier": 2,
+          "name": "AI Safety Newsletter (safe.ai)"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "OPERATOR-RATIFIED 2026-07-17 (P9) — supersedes the agent draft, specs verbatim from the ratification directive",
+        "colors": {
+          "canvas": "#ffffff",
+          "ink": "#000000",
+          "muted": "#1a1a1a",
+          "accent": "#dc2626"
+        },
+        "fonts": {
+          "display": "Helvetica",
+          "body": "Inter",
+          "mono": "Courier"
+        },
+        "display_case": null,
+        "style_preset": "cartesian",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Philosophical, absolute, uncompromising. The protocol speaks."
     },
     {
-      "slug": "studiomunich", "priority": 2, "geo": false, "confidence": "high",
+      "slug": "studiomunich",
+      "priority": 2,
+      "geo": false,
+      "confidence": "high",
       "sector": "consented digital talent marketplace",
       "angle": "Rent a consented digital face + voice, rights + royalties by construction — the ethical answer to the deepfake / avatar economy.",
-      "topics": ["ai avatars", "digital talent", "likeness rights", "creator economy", "synthetic media consent", "ai actors"],
-      "keywords": ["avatar", "digital human", "likeness", "deepfake consent", "creator", "synthetic media", "voice clone rights", "talent", "sag"],
-      "sales_signals": ["likeness lawsuit", "ai actor dispute", "deepfake regulation", "creator monetisation", "brand avatar"],
-      "signal_query": ["ai avatars", "digital human", "likeness rights", "digital talent", "creator economy", "deepfake consent"],
+      "topics": [
+        "ai avatars",
+        "digital talent",
+        "likeness rights",
+        "creator economy",
+        "synthetic media consent",
+        "ai actors"
+      ],
+      "keywords": [
+        "avatar",
+        "digital human",
+        "likeness",
+        "deepfake consent",
+        "creator",
+        "synthetic media",
+        "voice clone rights",
+        "talent",
+        "sag"
+      ],
+      "sales_signals": [
+        "likeness lawsuit",
+        "ai actor dispute",
+        "deepfake regulation",
+        "creator monetisation",
+        "brand avatar"
+      ],
+      "signal_query": [
+        "ai avatars",
+        "digital human",
+        "likeness rights",
+        "digital talent",
+        "creator economy",
+        "deepfake consent"
+      ],
       "filters": {
         "_model": "Feedly: (Avatar/synthetic-media entity) AND (rights/consent/creator/talent context) NOT (sports/collectibles). must-B separates studiomunich (consented likeness/talent) from voiceidvault (fraud/detection).",
         "must": [
-          ["avatar", "digital human", "digital humans", "likeness", "deepfake", "synthetic media", "synthetic voice", "voice clone", "voice cloning", "ai actor", "ai actors", "digital twin", "digital double", "ai-generated", "generative", "virtual influencer", "digital talent"],
-          ["consent", "rights", "royalt", "licensing", "license", "sag-aftra", "sag aftra", "union", "creator", "talent", "actor", "performer", "likeness", "monetiz", "monetis", "contract", "ownership", "opt-in", "ethics", "regulation"]
+          [
+            "avatar",
+            "digital human",
+            "digital humans",
+            "likeness",
+            "deepfake",
+            "synthetic media",
+            "synthetic voice",
+            "voice clone",
+            "voice cloning",
+            "ai actor",
+            "ai actors",
+            "digital twin",
+            "digital double",
+            "ai-generated",
+            "generative",
+            "virtual influencer",
+            "digital talent"
+          ],
+          [
+            "consent",
+            "rights",
+            "royalt",
+            "licensing",
+            "license",
+            "sag-aftra",
+            "sag aftra",
+            "union",
+            "creator",
+            "talent",
+            "actor",
+            "performer",
+            "likeness",
+            "monetiz",
+            "monetis",
+            "contract",
+            "ownership",
+            "opt-in",
+            "ethics",
+            "regulation"
+          ]
         ],
-        "not": ["trading card", "pokemon", "world cup", "fifa", "football", "soccer", "olympic"]
+        "not": [
+          "trading card",
+          "pokemon",
+          "world cup",
+          "fifa",
+          "football",
+          "soccer",
+          "olympic"
+        ]
       },
       "feeds": [
-        {"url": "https://www.404media.co/rss/", "tier": 1, "name": "404 Media", "status": "operator authority for likeness / synthetic-media / consent — validated live 2026-07-02 (15 items). Broad source: gated by the must/not filter above."},
-        {"url": "https://www.theverge.com/rss/index.xml", "tier": 2, "name": "The Verge", "status": "secondary — strong deepfake / creator-economy coverage; validated live 2026-07-02 (10 items). Broad: gated by filter."}
-      ]
+        {
+          "url": "https://www.404media.co/rss/",
+          "tier": 1,
+          "name": "404 Media",
+          "status": "operator authority for likeness / synthetic-media / consent — validated live 2026-07-02 (15 items). Broad source: gated by the must/not filter above."
+        },
+        {
+          "url": "https://www.theverge.com/rss/index.xml",
+          "tier": 2,
+          "name": "The Verge",
+          "status": "secondary — strong deepfake / creator-economy coverage; validated live 2026-07-02 (10 items). Broad: gated by filter."
+        }
+      ],
+      "brand_identity": {
+        "ratified": "OPERATOR-RATIFIED 2026-07-17 (P9) — supersedes the agent draft, specs verbatim from the ratification directive",
+        "colors": {
+          "canvas": "#1f2937",
+          "ink": "#f3f4f6",
+          "muted": "#9ca3af",
+          "accent": "#d97706"
+        },
+        "fonts": {
+          "display": "Playfair Display",
+          "body": "Lato",
+          "mono": "JetBrains Mono"
+        },
+        "display_case": null,
+        "style_preset": "broadside",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Cinematic, premium, architectural."
     },
     {
-      "slug": "podgeni", "priority": 2, "geo": false, "confidence": "high",
+      "slug": "podgeni",
+      "priority": 2,
+      "geo": false,
+      "confidence": "high",
       "sector": "AI podcasting / creator",
       "angle": "A studio that listens while you record — AI co-host + research grounding → RAWPITCH advisory. Content-to-advisory monetisation.",
-      "topics": ["ai podcasting", "creator tools", "audio ai", "content monetisation", "advisory / expertise economy"],
-      "keywords": ["podcast", "creator", "audio", "content", "advisory", "expertise", "monetise", "co-host"],
-      "sales_signals": ["creator monetisation", "podcast growth", "advisory market", "audio ai launch"],
-      "signal_query": ["ai podcasting", "audio ai", "creator tools", "content monetisation", "podcast software", "podcast editing"],
+      "topics": [
+        "ai podcasting",
+        "creator tools",
+        "audio ai",
+        "content monetisation",
+        "advisory / expertise economy"
+      ],
+      "keywords": [
+        "podcast",
+        "creator",
+        "audio",
+        "content",
+        "advisory",
+        "expertise",
+        "monetise",
+        "co-host"
+      ],
+      "sales_signals": [
+        "creator monetisation",
+        "podcast growth",
+        "advisory market",
+        "audio ai launch"
+      ],
+      "signal_query": [
+        "ai podcasting",
+        "audio ai",
+        "creator tools",
+        "content monetisation",
+        "podcast software",
+        "podcast editing"
+      ],
       "feeds": [
-        {"url": "https://twimlai.com/feed/", "tier": 2, "name": "TWIML AI Podcast"}
-      ]
+        {
+          "url": "https://twimlai.com/feed/",
+          "tier": 2,
+          "name": "TWIML AI Podcast"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#0a0a0a",
+          "ink": "#ffffff",
+          "muted": "#666666",
+          "accent": "#ff4500"
+        },
+        "fonts": {
+          "display": "Helvetica",
+          "body": "Inter",
+          "mono": "Roboto Mono"
+        },
+        "display_case": null,
+        "style_preset": "broadside",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Authoritative, premium, uncompromisingly creator-focused."
     },
     {
-      "slug": "sezine", "priority": 2, "geo": false, "confidence": "high",
+      "slug": "sezine",
+      "priority": 2,
+      "geo": false,
+      "confidence": "high",
       "sector": "workforce / talent intelligence",
       "angle": "Humans rate the skills; the system enforces the identity — verified workforce intelligence for hiring + skills.",
-      "topics": ["talent intelligence", "skills verification", "hiring", "workforce analytics", "credential fraud"],
-      "keywords": ["hiring", "recruitment", "skills", "workforce", "talent", "credential", "hr", "people analytics", "resume fraud"],
-      "sales_signals": ["hiring fraud", "skills gap", "credential fraud", "workforce shortage", "hr tech"],
-      "signal_query": ["talent intelligence", "skills verification", "workforce analytics", "hiring", "recruitment", "talent intelligence hub"],
+      "topics": [
+        "talent intelligence",
+        "skills verification",
+        "hiring",
+        "workforce analytics",
+        "credential fraud"
+      ],
+      "keywords": [
+        "hiring",
+        "recruitment",
+        "skills",
+        "workforce",
+        "talent",
+        "credential",
+        "hr",
+        "people analytics",
+        "resume fraud"
+      ],
+      "sales_signals": [
+        "hiring fraud",
+        "skills gap",
+        "credential fraud",
+        "workforce shortage",
+        "hr tech"
+      ],
+      "signal_query": [
+        "talent intelligence",
+        "skills verification",
+        "workforce analytics",
+        "hiring",
+        "recruitment",
+        "talent intelligence hub"
+      ],
       "feeds": [
-        {"url": "https://resources.workable.com/feed/", "tier": 1, "name": "Workable Resources"},
-        {"url": "http://www.hiringlab.org/feed/", "tier": 2, "name": "Indeed Hiring Lab"}
-      ]
+        {
+          "url": "https://resources.workable.com/feed/",
+          "tier": 1,
+          "name": "Workable Resources"
+        },
+        {
+          "url": "http://www.hiringlab.org/feed/",
+          "tier": 2,
+          "name": "Indeed Hiring Lab"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#f4f4f5",
+          "ink": "#18181b",
+          "muted": "#a1a1aa",
+          "accent": "#3b82f6"
+        },
+        "fonts": {
+          "display": "Playfair Display",
+          "body": "Lato",
+          "mono": "JetBrains Mono"
+        },
+        "display_case": null,
+        "style_preset": "cartesian",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Curious, generous, audio-native. Never gatekeep."
     },
     {
-      "slug": "viwago", "priority": 2, "geo": true, "confidence": "high",
+      "slug": "viwago",
+      "priority": 2,
+      "geo": true,
+      "confidence": "high",
       "sector": "compliance / audit automation",
       "angle": "Turn the scan you already run into sealed, auditor-ready evidence — compliance as verifiable output.",
-      "topics": ["compliance automation", "audit", "regulatory reporting", "risk", "security posture attestation"],
-      "keywords": ["compliance", "audit", "regulatory", "attestation", "risk", "governance", "soc2", "iso", "evidence"],
-      "sales_signals": ["new regulation", "audit failure", "compliance mandate", "fine / enforcement"],
-      "signal_query": ["audit", "compliance", "regulatory", "compliance automation", "risk management"],
+      "topics": [
+        "compliance automation",
+        "audit",
+        "regulatory reporting",
+        "risk",
+        "security posture attestation"
+      ],
+      "keywords": [
+        "compliance",
+        "audit",
+        "regulatory",
+        "attestation",
+        "risk",
+        "governance",
+        "soc2",
+        "iso",
+        "evidence"
+      ],
+      "sales_signals": [
+        "new regulation",
+        "audit failure",
+        "compliance mandate",
+        "fine / enforcement"
+      ],
+      "signal_query": [
+        "audit",
+        "compliance",
+        "regulatory",
+        "compliance automation",
+        "risk management"
+      ],
       "filters": {
         "_model": "Feedly: (Compliance/Audit) AND (Security/IT/Regulatory context) NOT (energy/tax/election/SEO audits + sports). must-B separates security-compliance 'audit' from financial/energy/movie 'audit'.",
         "must": [
-          ["compliance", "audit", "auditor", "audit-ready", "audit trail", "regulatory", "regulation", "governance", "attestation", "grc", "soc2", "soc 2", "iso 27001", "iso27001", "controls", "certification", "risk management", "security posture"],
-          ["security", "cyber", "cybersecurity", "infosec", "data", "privacy", "software", "cloud", "saas", "information", "risk", "posture", "vendor", "policy", "enterprise", "regulation", "regulatory", "governance", "framework", "certification", "ai"]
+          [
+            "compliance",
+            "audit",
+            "auditor",
+            "audit-ready",
+            "audit trail",
+            "regulatory",
+            "regulation",
+            "governance",
+            "attestation",
+            "grc",
+            "soc2",
+            "soc 2",
+            "iso 27001",
+            "iso27001",
+            "controls",
+            "certification",
+            "risk management",
+            "security posture"
+          ],
+          [
+            "security",
+            "cyber",
+            "cybersecurity",
+            "infosec",
+            "data",
+            "privacy",
+            "software",
+            "cloud",
+            "saas",
+            "information",
+            "risk",
+            "posture",
+            "vendor",
+            "policy",
+            "enterprise",
+            "regulation",
+            "regulatory",
+            "governance",
+            "framework",
+            "certification",
+            "ai"
+          ]
         ],
-        "not": ["energy audit", "tax audit", "irs audit", "election audit", "seo audit", "content audit", "audit the fed", "world cup", "fifa", "football", "soccer", "olympic", "olympics", "box office", "tournament", "playoff"]
+        "not": [
+          "energy audit",
+          "tax audit",
+          "irs audit",
+          "election audit",
+          "seo audit",
+          "content audit",
+          "audit the fed",
+          "world cup",
+          "fifa",
+          "football",
+          "soccer",
+          "olympic",
+          "olympics",
+          "box office",
+          "tournament",
+          "playoff"
+        ]
       },
       "feeds": [
-        {"url": "https://risky.biz/feeds/risky-business", "tier": 1, "name": "Risky Business"},
-        {"url": "https://www.risk.net/feeds/rss", "tier": 2, "name": "Risk.net"}
-      ]
+        {
+          "url": "https://risky.biz/feeds/risky-business",
+          "tier": 1,
+          "name": "Risky Business"
+        },
+        {
+          "url": "https://www.risk.net/feeds/rss",
+          "tier": 2,
+          "name": "Risk.net"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#111827",
+          "ink": "#f9fafb",
+          "muted": "#9ca3af",
+          "accent": "#10b981"
+        },
+        "fonts": {
+          "display": "Montserrat",
+          "body": "Open Sans",
+          "mono": "Fira Code"
+        },
+        "display_case": null,
+        "style_preset": "blue-professional",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Data-driven, precise, calm. The silent operator."
     },
     {
-      "slug": "phantaqsm", "priority": 3, "geo": true, "confidence": "tagline",
+      "slug": "phantaqsm",
+      "priority": 3,
+      "geo": true,
+      "confidence": "tagline",
       "sector": "security deception (SSH honeypot, EU gov)",
       "angle": "Managed SSH honeypot / deception layer for EU government — threat intel from the attacker's own moves.",
-      "topics": ["honeypot", "deception technology", "threat intelligence", "ssh attacks", "eu government security"],
-      "keywords": ["honeypot", "deception", "threat intel", "ssh", "intrusion", "attacker", "eu gov", "critical infrastructure"],
-      "sales_signals": ["government breach", "critical infrastructure attack", "eu cyber regulation (NIS2)", "ransomware"],
-      "signal_query": ["threat intelligence", "honeypot", "deception technology", "ssh attacks", "intrusion detection", "threat intelligence feeds"],
+      "topics": [
+        "honeypot",
+        "deception technology",
+        "threat intelligence",
+        "ssh attacks",
+        "eu government security"
+      ],
+      "keywords": [
+        "honeypot",
+        "deception",
+        "threat intel",
+        "ssh",
+        "intrusion",
+        "attacker",
+        "eu gov",
+        "critical infrastructure"
+      ],
+      "sales_signals": [
+        "government breach",
+        "critical infrastructure attack",
+        "eu cyber regulation (NIS2)",
+        "ransomware"
+      ],
+      "signal_query": [
+        "threat intelligence",
+        "honeypot",
+        "deception technology",
+        "ssh attacks",
+        "intrusion detection",
+        "threat intelligence feeds"
+      ],
       "feeds": [
-        {"url": "https://thehackernews.com/feeds/posts/default", "tier": 1, "name": "TheHackerNews"},
-        {"url": "https://www.servethehome.com/feed/", "tier": 1, "name": "ServeTheHome (HPC/infra)"},
-        {"url": "https://hnrss.org/newest?q=infrastructure", "tier": 3, "name": "HN (Infrastructure)"}
-      ]
+        {
+          "url": "https://thehackernews.com/feeds/posts/default",
+          "tier": 1,
+          "name": "TheHackerNews"
+        },
+        {
+          "url": "https://www.servethehome.com/feed/",
+          "tier": 1,
+          "name": "ServeTheHome (HPC/infra)"
+        },
+        {
+          "url": "https://hnrss.org/newest?q=infrastructure",
+          "tier": 3,
+          "name": "HN (Infrastructure)"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#2e0249",
+          "ink": "#a3d8f4",
+          "muted": "#570a57",
+          "accent": "#f806cc"
+        },
+        "fonts": {
+          "display": "Oswald",
+          "body": "Roboto",
+          "mono": "Source Code Pro"
+        },
+        "display_case": null,
+        "style_preset": "bold-poster",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Visionary, slightly disruptive, electric."
     },
     {
-      "slug": "qintercept", "priority": 3, "geo": true, "confidence": "tagline",
+      "slug": "qintercept",
+      "priority": 3,
+      "geo": true,
+      "confidence": "tagline",
       "sector": "quantum (enterprise-realistic)",
       "angle": "Quantum hardware will disappoint your enterprise — the honest, near-term quantum play.",
-      "topics": ["quantum computing", "quantum hardware reality", "post-quantum crypto", "enterprise quantum"],
-      "keywords": ["quantum", "qubit", "post-quantum", "quantum computing", "cryptography", "quantum supremacy"],
-      "sales_signals": ["quantum breakthrough hype", "post-quantum mandate", "nist pqc", "quantum funding"],
-      "signal_query": ["quantum computing", "post-quantum cryptography", "qubit", "quantum supremacy", "enterprise quantum", "quantum hardware"],
+      "topics": [
+        "quantum computing",
+        "quantum hardware reality",
+        "post-quantum crypto",
+        "enterprise quantum"
+      ],
+      "keywords": [
+        "quantum",
+        "qubit",
+        "post-quantum",
+        "quantum computing",
+        "cryptography",
+        "quantum supremacy"
+      ],
+      "sales_signals": [
+        "quantum breakthrough hype",
+        "post-quantum mandate",
+        "nist pqc",
+        "quantum funding"
+      ],
+      "signal_query": [
+        "quantum computing",
+        "post-quantum cryptography",
+        "qubit",
+        "quantum supremacy",
+        "enterprise quantum",
+        "quantum hardware"
+      ],
       "feeds": [
-        {"url": "https://quantumcomputingreport.com/feed/", "tier": 1, "name": "Quantum Computing Report"},
-        {"url": "http://news.mit.edu/rss/topic/quantum-computing", "tier": 2, "name": "MIT News — Quantum"}
-      ]
+        {
+          "url": "https://quantumcomputingreport.com/feed/",
+          "tier": 1,
+          "name": "Quantum Computing Report"
+        },
+        {
+          "url": "http://news.mit.edu/rss/topic/quantum-computing",
+          "tier": 2,
+          "name": "MIT News — Quantum"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#0f172a",
+          "ink": "#e2e8f0",
+          "muted": "#64748b",
+          "accent": "#ef4444"
+        },
+        "fonts": {
+          "display": "Space Grotesk",
+          "body": "Inter",
+          "mono": "JetBrains Mono"
+        },
+        "display_case": null,
+        "style_preset": "broadside",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Analytical, sharp, investigative. We find the leak."
     },
     {
-      "slug": "voinista", "priority": 3, "geo": true, "confidence": "tagline",
+      "slug": "voinista",
+      "priority": 3,
+      "geo": true,
+      "confidence": "tagline",
       "sector": "AI trading / market intelligence",
       "angle": "Watch four analysts argue your next trade — multi-agent debate for market decisions.",
-      "topics": ["ai trading", "market intelligence", "multi-agent finance", "investment research"],
-      "keywords": ["trading", "markets", "fintech", "investment", "portfolio", "hedge", "equities", "macro", "analyst"],
-      "sales_signals": ["market volatility", "ai in finance", "retail trading", "fintech funding"],
-      "signal_query": ["ai trading", "market intelligence", "ai trading tool", "ai trading bot", "investment research", "multi-agent finance"],
+      "topics": [
+        "ai trading",
+        "market intelligence",
+        "multi-agent finance",
+        "investment research"
+      ],
+      "keywords": [
+        "trading",
+        "markets",
+        "fintech",
+        "investment",
+        "portfolio",
+        "hedge",
+        "equities",
+        "macro",
+        "analyst"
+      ],
+      "sales_signals": [
+        "market volatility",
+        "ai in finance",
+        "retail trading",
+        "fintech funding"
+      ],
+      "signal_query": [
+        "ai trading",
+        "market intelligence",
+        "ai trading tool",
+        "ai trading bot",
+        "investment research",
+        "multi-agent finance"
+      ],
       "filters": {
         "_model": "Feedly: (Financial-market entity) NOT (sports trading / collectibles / housing-job-market). Bare 'market' excluded so housing/job/farmers markets don't leak; specific finance anchors required.",
         "must": [
-          ["trading", "trader", "stock market", "financial market", "capital market", "stocks", "equities", "equity", "investment", "investing", "investor", "portfolio", "hedge fund", "fintech", "forex", "securities", "wall street", "nasdaq", "s&p", "earnings", "interest rate", "federal reserve", "central bank", "macro", "bonds", "commodities", "asset management", "volatility"]
+          [
+            "trading",
+            "trader",
+            "stock market",
+            "financial market",
+            "capital market",
+            "stocks",
+            "equities",
+            "equity",
+            "investment",
+            "investing",
+            "investor",
+            "portfolio",
+            "hedge fund",
+            "fintech",
+            "forex",
+            "securities",
+            "wall street",
+            "nasdaq",
+            "s&p",
+            "earnings",
+            "interest rate",
+            "federal reserve",
+            "central bank",
+            "macro",
+            "bonds",
+            "commodities",
+            "asset management",
+            "volatility"
+          ]
         ],
-        "not": ["trading card", "trading cards", "transfer market", "trade rumor", "trade rumour", "trade deadline", "free agent", "pokemon", "pokémon", "world cup", "fifa", "football", "soccer", "olympic", "sports betting", "housing market", "job market", "farmers market", "flea market", "labor market", "labour market", "meat market"]
+        "not": [
+          "trading card",
+          "trading cards",
+          "transfer market",
+          "trade rumor",
+          "trade rumour",
+          "trade deadline",
+          "free agent",
+          "pokemon",
+          "pokémon",
+          "world cup",
+          "fifa",
+          "football",
+          "soccer",
+          "olympic",
+          "sports betting",
+          "housing market",
+          "job market",
+          "farmers market",
+          "flea market",
+          "labor market",
+          "labour market",
+          "meat market"
+        ]
       },
       "feeds": [
-        {"url": "http://feed.zacks.com/commentary/AllStories/rss", "tier": 2, "name": "Zacks Investment Research"}
-      ]
+        {
+          "url": "http://feed.zacks.com/commentary/AllStories/rss",
+          "tier": 2,
+          "name": "Zacks Investment Research"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#fffbeb",
+          "ink": "#451a03",
+          "muted": "#d97706",
+          "accent": "#fbbf24"
+        },
+        "fonts": {
+          "display": "Merriweather",
+          "body": "Nunito",
+          "mono": "Inconsolata"
+        },
+        "display_case": null,
+        "style_preset": "biennale-yellow",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Warm, artisanal, fiercely independent."
     },
     {
-      "slug": "fluxcore", "priority": 3, "geo": false, "confidence": "tagline",
+      "slug": "fluxcore",
+      "priority": 3,
+      "geo": false,
+      "confidence": "tagline",
       "sector": "photonic chip design (EDA)",
       "angle": "Design photonic chips in minutes, not months — AI-accelerated silicon photonics design.",
-      "topics": ["silicon photonics", "photonic chip design", "eda tools", "ai for chip design", "optical computing"],
-      "keywords": ["photonics", "photonic chip", "silicon photonics", "eda", "semiconductor", "optical", "chip design", "foundry"],
-      "sales_signals": ["photonics funding", "chip design ai", "optical interconnect", "semiconductor shortage"],
-      "signal_query": ["silicon photonics", "photonic chip design", "eda tools", "optical computing", "ai for chip design", "photonic integrated circuit"],
+      "topics": [
+        "silicon photonics",
+        "photonic chip design",
+        "eda tools",
+        "ai for chip design",
+        "optical computing"
+      ],
+      "keywords": [
+        "photonics",
+        "photonic chip",
+        "silicon photonics",
+        "eda",
+        "semiconductor",
+        "optical",
+        "chip design",
+        "foundry"
+      ],
+      "sales_signals": [
+        "photonics funding",
+        "chip design ai",
+        "optical interconnect",
+        "semiconductor shortage"
+      ],
+      "signal_query": [
+        "silicon photonics",
+        "photonic chip design",
+        "eda tools",
+        "optical computing",
+        "ai for chip design",
+        "photonic integrated circuit"
+      ],
       "feeds": [
-        {"url": "https://www.servethehome.com/feed/", "tier": 1, "name": "ServeTheHome (HPC/infra)"},
-        {"url": "https://hnrss.org/newest?q=infrastructure", "tier": 3, "name": "HN (Infrastructure)"}
-      ]
+        {
+          "url": "https://www.servethehome.com/feed/",
+          "tier": 1,
+          "name": "ServeTheHome (HPC/infra)"
+        },
+        {
+          "url": "https://hnrss.org/newest?q=infrastructure",
+          "tier": 3,
+          "name": "HN (Infrastructure)"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#000000",
+          "ink": "#f8fafc",
+          "muted": "#94a3b8",
+          "accent": "#38bdf8"
+        },
+        "fonts": {
+          "display": "Syncopate",
+          "body": "Manrope",
+          "mono": "IBM Plex Mono"
+        },
+        "display_case": null,
+        "style_preset": "cartesian",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Hyper-modern, fast, infrastructure-first."
     },
     {
-      "slug": "digitalcoaching", "priority": 3, "geo": false, "confidence": "tagline",
+      "slug": "digitalcoaching",
+      "priority": 3,
+      "geo": false,
+      "confidence": "tagline",
       "sector": "digital leadership coaching / consulting",
       "angle": "Empowering digital leaders — coaching + consulting for AI-era transformation.",
-      "topics": ["digital transformation", "leadership", "ai adoption", "change management", "executive coaching"],
-      "keywords": ["digital transformation", "leadership", "coaching", "consulting", "change management", "ai adoption", "executive"],
-      "sales_signals": ["ai adoption struggle", "digital transformation", "leadership gap", "reskilling"],
-      "signal_query": ["digital transformation", "ai adoption", "executive coaching", "change management", "digital leadership", "digital transformation manager"],
+      "topics": [
+        "digital transformation",
+        "leadership",
+        "ai adoption",
+        "change management",
+        "executive coaching"
+      ],
+      "keywords": [
+        "digital transformation",
+        "leadership",
+        "coaching",
+        "consulting",
+        "change management",
+        "ai adoption",
+        "executive"
+      ],
+      "sales_signals": [
+        "ai adoption struggle",
+        "digital transformation",
+        "leadership gap",
+        "reskilling"
+      ],
+      "signal_query": [
+        "digital transformation",
+        "ai adoption",
+        "executive coaching",
+        "change management",
+        "digital leadership",
+        "digital transformation manager"
+      ],
       "feeds": [
-        {"url": "http://www.leadershipnow.com/leadingblog/atom.xml", "tier": 1, "name": "Leading Blog"}
-      ]
+        {
+          "url": "http://www.leadershipnow.com/leadingblog/atom.xml",
+          "tier": 1,
+          "name": "Leading Blog"
+        }
+      ],
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#ffffff",
+          "ink": "#1e3a8a",
+          "muted": "#93c5fd",
+          "accent": "#2563eb"
+        },
+        "fonts": {
+          "display": "Poppins",
+          "body": "PT Sans",
+          "mono": "Ubuntu Mono"
+        },
+        "display_case": null,
+        "style_preset": "capsule",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Empathetic, structured, relentlessly encouraging."
     },
     {
-      "slug": "sekago", "priority": 1, "geo": false, "confidence": "ratified",
+      "slug": "sekago",
+      "priority": 1,
+      "geo": false,
+      "confidence": "ratified",
       "sector": "digital perimeter defense / deception",
       "angle": "The digital perimeter that observes, never strikes.",
-      "topics": ["digital perimeter defense", "deception layer", "quantum-risk mitigation", "insider threat", "zero-trust perimeter"],
-      "keywords": ["perimeter", "deception", "honeypot", "insider threat", "zero-trust", "quantum-risk", "intrusion", "lateral movement", "breach"],
-      "sales_signals": ["insider threat detection", "honeypot", "zero-trust perimeter"],
-      "signal_query": ["deception", "honeypot", "zero-trust", "insider threat", "threat intelligence"],
-      "feeds": [
-        {"url": "https://krebsonsecurity.com/feed/", "tier": 1, "name": "KrebsOnSecurity"},
-        {"url": "https://www.darkreading.com/rss.xml", "tier": 2, "name": "Dark Reading"}
+      "topics": [
+        "digital perimeter defense",
+        "deception layer",
+        "quantum-risk mitigation",
+        "insider threat",
+        "zero-trust perimeter"
       ],
-      "note": "Category + params fully ratified by operator 2026-07-01: observes-never-strikes perimeter/deception posture."
+      "keywords": [
+        "perimeter",
+        "deception",
+        "honeypot",
+        "insider threat",
+        "zero-trust",
+        "quantum-risk",
+        "intrusion",
+        "lateral movement",
+        "breach"
+      ],
+      "sales_signals": [
+        "insider threat detection",
+        "honeypot",
+        "zero-trust perimeter"
+      ],
+      "signal_query": [
+        "deception",
+        "honeypot",
+        "zero-trust",
+        "insider threat",
+        "threat intelligence"
+      ],
+      "feeds": [
+        {
+          "url": "https://krebsonsecurity.com/feed/",
+          "tier": 1,
+          "name": "KrebsOnSecurity"
+        },
+        {
+          "url": "https://www.darkreading.com/rss.xml",
+          "tier": 2,
+          "name": "Dark Reading"
+        }
+      ],
+      "note": "Category + params fully ratified by operator 2026-07-01: observes-never-strikes perimeter/deception posture.",
+      "brand_identity": {
+        "ratified": "identity completed 2026-07-16 (position/feeds pre-existing)",
+        "colors": {
+          "canvas": "#1c1917",
+          "ink": "#fafaf9",
+          "muted": "#a8a29e",
+          "accent": "#d946ef"
+        },
+        "fonts": {
+          "display": "Cinzel",
+          "body": "Work Sans",
+          "mono": "Fira Mono"
+        },
+        "display_case": null,
+        "style_preset": "coral",
+        "style": null,
+        "logo": null,
+        "logo_note": "not supplied — renders run without a mark until deposited",
+        "voice": {
+          "engine": "supertonic",
+          "ref": null
+        },
+        "caption_identity": null
+      },
+      "voice_kernel": "Minimalist, elite, culturally plugged-in."
     }
-  ]
+  ],
+  "$brand_identity_comment": "brand_identity: the visual half of the Brand Onboarding Packet (positioning/feeds/voice-kernel are the other halves). EACH BRAND IS UNIQUE — null means not yet onboarded; brand-tokens.mjs hard-refuses null so no brand ever renders in another brand's clothes. Define at onboarding: colors (canvas/ink/muted/accent), fonts (display/body/mono), display_case, style_preset (hyperframes frame-preset to remix), logo file, TTS voice, caption identity."
 }

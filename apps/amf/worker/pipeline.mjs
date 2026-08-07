@@ -31,7 +31,13 @@ export function enqueueForReview(item) {
   mkdirSync(join(REVIEW, 'pending'), { recursive: true });
   const day = new Date().toISOString().slice(0, 10);
   const id = `${item.slug}-${day}-${createHash('sha256').update(JSON.stringify(item) + Date.now()).digest('hex').slice(0, 6)}`;
-  writeFileSync(join(REVIEW, 'pending', `${id}.json`), JSON.stringify({ id, status: 'pending', queuedAt: new Date().toISOString(), ...item }, null, 2));
+  // Self-containment: stamp the originating content project on the draft so campaignHandoff walks the
+  // provenance chain with NO manual AMF_CONTENT_PROJECT override — friction is spent on the P9 leap, not metadata.
+  const contentProject = item.contentProject ?? item.brief?.contentProject ?? process.env.AMF_CONTENT_PROJECT ?? process.env.AMF_PROJECT ?? null;
+  writeFileSync(
+    join(REVIEW, 'pending', `${id}.json`),
+    JSON.stringify({ id, status: 'pending', queuedAt: new Date().toISOString(), ...(contentProject ? { contentProject } : {}), ...item }, null, 2),
+  );
   return id;
 }
 

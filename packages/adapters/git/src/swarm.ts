@@ -38,6 +38,8 @@ export interface SwarmIngestConfig {
 
 export interface ParsedCommit {
   sha: string;
+  /** Parent commit SHAs — the history DAG. Optional for back-compat with fixtures. */
+  parents?: string[];
   isoDate: string;
   authorName: string;
   authorEmail: string;
@@ -110,12 +112,15 @@ function normaliseShardToObservations(
     type: 'commit',
     content: commitToContent(c),
     timestamp: c.isoDate,
-    refs: [],
+    // commit → parent(s): the directional history flow. Dangling parents (older
+    // than the ingest window) are dropped by the graph builder.
+    refs: c.parents ?? [],
     metadata: {
       adapter: '@number7even/continuum-adapter-git',
       sha: c.sha,
       author: c.authorName,
       email: c.authorEmail,
+      parents: c.parents ?? [],
     },
   }));
 }

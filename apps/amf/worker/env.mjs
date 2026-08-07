@@ -20,3 +20,10 @@ try {
     if (process.env[m[1]] === undefined) process.env[m[1]] = v; // real env wins
   }
 } catch { /* no .env.local — fine, providers gate themselves (P6) */ }
+
+// The operator invariant (P9): every human leap signs a NAME, never the anonymous "operator" — an
+// unsigned leap erodes the moat of human ownership. Defaults to the founder; real env / .env.local
+// override it (e.g. a different operator on a hosted instance).
+if (!process.env.CONTINUUM_OPERATOR || !process.env.CONTINUUM_OPERATOR.trim()) {
+  process.env.CONTINUUM_OPERATOR = 'riaan';
+}

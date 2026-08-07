@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd agent — keeps the AMF supervisor alive across login/reboot.
+
+  Install (one-time):
+    cp com.number7even.amf.supervisor.plist ~/Library/LaunchAgents/
+    launchctl load  ~/Library/LaunchAgents/com.number7even.amf.supervisor.plist
+  Stop / uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.number7even.amf.supervisor.plist
+
+  KeepAlive=true → launchd restarts the supervisor if IT dies; the supervisor in
+  turn restarts the worker and Redis. Two layers, so the night runs unwatched.
+
+  Edit the two absolute paths below if this repo lives elsewhere, and set the
+  correct absolute `node` path (`which node`) — launchd has a minimal PATH.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.number7even.amf.supervisor</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>node</string>
+    <string>/Users/emporiumcollection/Development/supabase-projects/CONTINUUM/apps/amf/worker/supervisor.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/emporiumcollection/Development/supabase-projects/CONTINUUM/apps/amf/worker</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>AMF_REQUIRE_FUEL</key>
+    <string>1</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/emporiumcollection/Development/supabase-projects/CONTINUUM/apps/amf/worker/out/supervisor.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/emporiumcollection/Development/supabase-projects/CONTINUUM/apps/amf/worker/out/supervisor.log</string>
+</dict>
+</plist>

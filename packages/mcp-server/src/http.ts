@@ -23,6 +23,11 @@
  *                              must include it as a query param so we can
  *                              route the message to the right transport.
  *
+ *   GET  /api/observation/:id  Read-only, tenant-scoped by-id verification
+ *                              projection (the seal fields only) for schedulers
+ *                              that re-verify at publish time without an MCP
+ *                              client. Cross-tenant reads 404 by construction.
+ *
  *   GET  /healthz              No-auth health probe.
  *
  * Auth:
@@ -41,6 +46,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { openStorage } from '@number7even/continuum-core';
 import { buildServer, type ServerHandle } from './server.js';
 import { createAuthMiddleware, resolveAuthConfig } from './auth.js';
+import { publicJwks } from './issuer.js';
 import { TenantRegistry, defaultTenantRegistryConfig } from './tenant-registry.js';
 
 const PORT = Number(process.env.CONTINUUM_HTTP_PORT ?? 7878);
@@ -177,6 +183,57 @@ app.post('/messages', async (req: Request, res: Response): Promise<void> => {
   await session.transport.handlePostMessage(req, res, req.body);
 });
 
+// ── GET /api/observation/:id  by-id verification (read-only, tenant-scoped) ───
+//
+// A lightweight REST projection of `continuum_get_observations` for schedulers
+// that must re-verify a seal just-in-time at publish time WITHOUT embedding a
+// full MCP client (the CROOMA/PodGeni intake wall — CROOMA_TERMINAL_BRIEF §II.5,
+// PODGENI_INTAKE_CONTRACT §2). Same auth + tenant-scoping as every other route:
+// the observation is read from the CALLER'S tenant storage only, so a different
+// tenant's id 404s — cross-tenant reads are structurally impossible. Returns ONLY
+// the verification fields the wall gates on (never the raw content — P1, minimal
+// surface). Read-only; there is no write path here. Fail-closed by construction:
+// unknown id → 404, unresolved tenant → 400, bad/absent auth → 401 (middleware).
+app.get('/api/observation/:id', async (req: Request, res: Response): Promise<void> => {
+  const tenantId = resolveTenantOrReject(req, res);
+  if (tenantId === null) return; // 400 already written
+  const id = req.params.id;
+  if (typeof id !== 'string' || id.trim() === '') {
+    res.status(400).json({ error: 'observation id required' });
+    return;
+  }
+  let storage;
+  try {
+    storage = tenantRegistry.acquire(tenantId);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(/capacity exhausted/.test(msg) ? 503 : 400).json({ error: msg });
+    return;
+  }
+  try {
+    const [obs] = await storage.getObservations([id]);
+    if (!obs) {
+      res.status(404).json({ error: 'observation not found in this tenant' });
+      return;
+    }
+    const meta = (obs.metadata ?? {}) as Record<string, unknown>;
+    // Verification projection ONLY — the exact fields the intake wall re-checks.
+    res.json({
+      id: obs.id,
+      type: obs.type,
+      sourceId: obs.sourceId,
+      timestamp: obs.timestamp,
+      refs: obs.refs ?? [],
+      contentHash: meta.contentHash ?? null,
+      subject: meta.subject ?? null, // { contentHash } — binds the exact approved asset
+      verdict: meta.verdict ?? null,
+      operator: meta.operator ?? null, // scrub-exempt provenance — WHO leapt
+    });
+  } finally {
+    tenantRegistry.release(tenantId);
+  }
+});
+
 // ── Readiness probe (W24-3) ──────────────────────────────────────────────────
 //
 // /healthz answers "am I alive" (liveness — orchestrators restart on fail).
@@ -263,6 +320,22 @@ void probeReadiness();
 // Re-probe every 5 minutes to catch drift (DB file deleted, ruvector
 // corruption, etc.). Cheap — one SQLite read + one vectorCount.
 setInterval(() => void probeReadiness(), 5 * 60 * 1000).unref();
+
+// ── /.well-known/jwks.json  no-auth issuer keyset ────────────────────────────
+//
+// CONTINUUM as its own OIDC-lite issuer: the public JWKS that verifies the RS256
+// tokens `continuum provision-tenant` mints. Auth-exempt (the JWT middleware
+// fetches this to validate; a chicken-and-egg 401 would deadlock). Only ever the
+// PUBLIC key — the private half never leaves ~/.continuum/issuer/ (P1).
+
+app.get('/.well-known/jwks.json', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    res.json(await publicJwks());
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: `jwks unavailable: ${msg}` });
+  }
+});
 
 // ── /healthz  no-auth probe ──────────────────────────────────────────────────
 //

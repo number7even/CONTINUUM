@@ -43,6 +43,9 @@ interface NamedPattern {
 
 const PRIVATE_TAG_RX = /<private>[\s\S]*?<\/private>/gi;
 
+/** The Authorship Ledger source — its `operator` field is provenance, PII-exempt (see authorship.ts). */
+export const AUTHORSHIP_SOURCE_ID = 'authorship';
+
 const DEFAULT_PRIVATE_PATTERNS: NamedPattern[] = [
   // V0 baseline (shipped pre-§A3) — now also scrub, not just detect.
   { label: 'openai-key', rx: /sk-[a-zA-Z0-9_-]{20,}/g },
@@ -63,6 +66,26 @@ const DEFAULT_PRIVATE_PATTERNS: NamedPattern[] = [
   { label: 'google-api-key', rx: /\bAIza[0-9A-Za-z_-]{35}\b/g },
   { label: 'stripe-live-secret', rx: /\bsk_live_[0-9a-zA-Z]{24,}\b/g },
   { label: 'stripe-live-publishable', rx: /\bpk_live_[0-9a-zA-Z]{24,}\b/g },
+];
+
+// ── Guest / customer PII (opt-in) ────────────────────────────────────────────
+//
+// The default patterns scrub SECRETS (keys/tokens) — correct for the dev-memory
+// dogfood, where a git commit author's email is legitimate provenance we must NOT
+// destroy. But a multi-tenant KNOWLEDGE base (a hotel's FAQs, guest correspondence,
+// booking records) carries guest PII — email, phone, card, passport, IBAN — that
+// must never embed into the vector space. These are enabled per-process by
+// CONTINUUM_PRIVACY_PII=1 (the SaaS/tenant deployment sets it; dev leaves it off,
+// so nothing changes for the self-hosted single-tenant path). Applied in Pass 2
+// BEFORE the phone rule so grouped card digits are redacted first. Over-redaction
+// is the safe failure here (P1 — minimise the secret): a stray digit-block lost
+// beats a guest card number embedded.
+const PII_PATTERNS: NamedPattern[] = [
+  { label: 'pii-email', rx: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
+  { label: 'pii-credit-card', rx: /\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{1,4}\b/g },
+  { label: 'pii-iban', rx: /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/g },
+  { label: 'pii-passport', rx: /\b[A-Z]{1,2}\d{6,9}\b/g },
+  { label: 'pii-phone', rx: /\+?\d{1,3}[ .()-]{1,2}\d{2,4}[ .()-]{1,2}\d{2,4}(?:[ .()-]{1,2}\d{1,4})?/g },
 ];
 
 // Operator patterns are loaded once per process and cached. Reloading on
@@ -187,14 +210,18 @@ export interface MetadataScrubResult {
 
 export function scrubMetadataDeep(
   metadata: Record<string, unknown> | undefined,
+  opts: { piiExemptKeys?: string[] } = {},
 ): MetadataScrubResult {
   if (!metadata) return { scrubbed: metadata, matchedPatterns: [] };
   const matched: string[] = [];
+  const exempt = new Set(opts.piiExemptKeys ?? []);
 
-  function walk(v: unknown): unknown {
+  // `key` is the field name the value sits under — a value under an exempt key (e.g. a decision's
+  // `operator`) is scrubbed for SECRETS but not for guest-PII, so an authorized identity survives.
+  function walk(v: unknown, key?: string): unknown {
     if (v === null || v === undefined) return v;
     if (typeof v === 'string') {
-      const r = privacyFilter(v);
+      const r = privacyFilter(v, [], { skipPii: key !== undefined && exempt.has(key) });
       for (const label of r.matchedPatterns) matched.push(`metadata:${label}`);
       return r.scrubbed;
     }
@@ -202,12 +229,12 @@ export function scrubMetadataDeep(
       return v;
     }
     if (Array.isArray(v)) {
-      return v.map(walk);
+      return v.map((el) => walk(el, key));
     }
     if (typeof v === 'object') {
       const out: Record<string, unknown> = {};
       for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-        out[k] = walk(val);
+        out[k] = walk(val, k);
       }
       return out;
     }
@@ -231,7 +258,7 @@ export function scrubMetadataDeep(
  * @param content       Raw observation content.
  * @param extraPatterns Caller-supplied regexes; each gets auto-label `extra-<i>`.
  */
-export function privacyFilter(content: string, extraPatterns: RegExp[] = []): PrivacyResult {
+export function privacyFilter(content: string, extraPatterns: RegExp[] = [], opts: { skipPii?: boolean } = {}): PrivacyResult {
   const matched: string[] = [];
 
   // Pass 1 — <private>...</private> block redaction.
@@ -241,8 +268,12 @@ export function privacyFilter(content: string, extraPatterns: RegExp[] = []): Pr
   if (tagBytesRemoved > 0) matched.push('private-tag');
 
   // Pass 2 — named-pattern scrubbing (defaults + operator + caller extras).
+  // opts.skipPii exempts the value from the guest-PII patterns (email/phone/card/…) while KEEPING
+  // the secret patterns (keys/tokens) — for an authorized-identity field (a decision's operator) that
+  // is legitimate provenance, not leaked PII. Nobody can hide an sk_live_… there: secrets still scrub.
   const patterns: NamedPattern[] = [
     ...DEFAULT_PRIVATE_PATTERNS,
+    ...(!opts.skipPii && process.env.CONTINUUM_PRIVACY_PII === '1' ? PII_PATTERNS : []),
     ...getOperatorPatterns(),
     ...extraPatterns.map((rx, i) => ({ label: `extra-${i}`, rx })),
   ];
@@ -299,8 +330,13 @@ export function insertObservation(
     // Still write a redaction audit entry — operator can see WHAT was dropped + WHY
     return null;
   }
-  // Issue #8 — deep-scrub metadata strings through the same privacy patterns.
-  const metaScrub = scrubMetadataDeep(obs.metadata);
+  // Issue #8 — deep-scrub metadata strings through the same privacy patterns. The Authorship Ledger's
+  // `operator` field is authorized provenance (WHO leapt) — exempt from guest-PII redaction so an email
+  // identity survives, but STILL secret-scrubbed (no sk_live_… can hide there). Scoped to that source only.
+  const metaScrub = scrubMetadataDeep(
+    obs.metadata,
+    obs.sourceId === AUTHORSHIP_SOURCE_ID ? { piiExemptKeys: ['operator'] } : {},
+  );
 
   const id = obs.id ?? randomUUID();
   db.prepare(`

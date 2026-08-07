@@ -1,0 +1,35 @@
+{
+  "name": "@number7even/continuum-adapter-github-projects",
+  "version": "0.0.2",
+  "description": "Continuum GitHub Projects adapter — ingests GitHub Projects (v2) items as CONTINUUM tasks. A foreign 'Done' is downgraded to a CLAIM until A·V·T·H prove it. The proof-overlay seam.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "continuum-adapter-github-projects": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "!dist/*.test.*"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "prepublishOnly": "npm run build",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "test": "node --test",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@number7even/continuum-core": "0.0.2"
+  },
+  "license": "Apache-2.0",
+  "author": "Riaan Kleynhans <riaan@number7even.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/number7even/CONTINUUM.git",
+    "directory": "packages/adapters/github-projects"
+  }
+}
