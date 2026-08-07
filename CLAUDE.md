@@ -115,6 +115,16 @@ The machine is built and safely gated: the loops close in code, the walls enforc
 nothing is claimed live beyond what a `verifyCommand` proves. Flip the switches when
 the keys and the voice fuel land.
 
+**Wave-1 engine-side CLOSED (2026-08-07, live-fire):** engine redeployed to Fly in
+JWT mode (`api.continuum.rest`, open JWKS, `sqlite` pinned — commit `db87d4a` fixed
+the Dockerfile workspace rename + hybrid-default regression); tenant JWT minted
+on-target; authenticated public JIT probe of `GET /api/observation/:id` returned the
+seal projection only (raw body shielded), 404/401 fail-closed, local sha256 ==
+`subject.contentHash`. Witness row `jit-probe-wave1-001` in the live ledger. The
+shared-bearer console is retired (JWT mode is exclusive). Remaining 🟡s are PodGeni's:
+the intake gate (Seam 1) and the engagement **pull** endpoint (Seam 2 —
+`telemetry-sync.mjs` PULLS `GET /api/genome/engagement`; PodGeni never POSTs).
+
 ---
 
 ## What's true RIGHT NOW (verify in code before claiming)
@@ -367,7 +377,7 @@ The architecture is identical across all three. Only configuration changes.
 
 ---
 
-_Last updated: 2026-07-03 — AMF engine session · checkpoint `49bd2613` (8 verify-green)._
+_Last updated: 2026-08-07 — Wave-1 engine-side closed (live-fire JIT probe green on `api.continuum.rest`)._
 _Update this file whenever V0 polish lands, V0.5 begins, an AMF milestone lands, or any
 partner agreement clause is revised._
 
