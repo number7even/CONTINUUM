@@ -304,12 +304,12 @@ the intake gate (Seam 1) and the engagement **pull** endpoint (Seam 2 —
   (WebSocket) + V2.2 (Postgres RLS + OAuth — see architectural flag below)
   in the `vc-hospitality` pipeline (2026-05-15).
 
-**Open architectural flag (2026-05-15):** V2.2 todo title says "Postgres
-RLS" but D2 locks RuVector as the V0.5+ unified persistence engine. Two
-coherent reconciliations: (a) RuVector holds data, Postgres wraps it as the
-auth/tenancy directory (common SaaS pattern, no D2 revision needed); or
-(b) V2 reverts to Postgres which would require a D2 lock-revision conversation
-in ARCHITECTURE.md §14. Decide before V2.2 work begins.
+**Architectural flag RESOLVED (2026-08-10):** the 2026-05-15 V2.2 flag is
+closed — **D-V2.2 locked in ARCHITECTURE.md §14** as reconciliation (a):
+per-tenant SQLite+RuVector data plane (isolated under
+`$CONTINUUM_DATA_DIR/<tenantId>/`), thin Postgres **control plane only**
+(tenancy directory, OAuth, billing webhooks, quotas — never tenant content).
+No D2 revision. Founder-locked, this session.
 
 ---
 

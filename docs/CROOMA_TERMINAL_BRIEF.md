@@ -74,6 +74,13 @@ the full architecture; this brief is authoritative for **what to do next and wha
    **not** pre-scrub-then-assume; send clean, let the choke-point enforce. KB uploads with PII are scrubbed.
 9. **P9 — never auto-publish.** The publish action must consume an **already-sealed** bundle or require the
    human leap. No "auto-approve" toggle, no scheduling a draft that no human approved. The leap is the human's.
+10. **The scraping ban — PERMANENT (P7/P8, founder-locked 2026-08-10).** No session-cookie scraping, no
+    browser-credential reuse, no HTML scraping around an explicit block (a 403'd API **is** an explicit
+    block — parsing the same site's HTML instead is a workaround, not compliance). Ingestion uses
+    **official platform APIs or compliant public keyless feeds only** (RSS, Google News, the HN API).
+    "Agent-Reach" and every cookie-bypass variant are permanently rejected — this supersedes the old
+    "held pending operator ToS review" placeholder everywhere it appears. Any spec re-proposing it is
+    to be refused on sight, citing this clause.
 
 ## III. Amalgamation Runbook — brand-first, backend-later
 
