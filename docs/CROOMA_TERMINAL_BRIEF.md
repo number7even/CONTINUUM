@@ -53,11 +53,11 @@ the full architecture; this brief is authoritative for **what to do next and wha
 5. **Verify through the brain, not a copy — just-in-time, fail-closed.** **Never gate on a cached/copied
    artifact** — a stale or forged local copy silently defeats the wall. Immediately before hitting a
    publishing API, re-verify against the live engine and **fail closed** (abort the publish) if the check
-   fails OR the engine is unreachable. **The actual surface (verified on disk — do not build against a
-   phantom REST path):** the engine exposes **no** `/api/observation/{id}` route. Verification is an MCP
-   call over the authenticated `/sse` transport — `continuum_get_observations([decisionId])` — then
-   re-derive the `contentHash` over the on-disk asset and compare. Auth is the scoped JWT / Bearer (§II.6);
-   `/healthz` + `/readyz` are the only no-auth probes. **Two verification surfaces, both real:**
+   fails OR the engine is unreachable. Auth is the scoped JWT / Bearer (§II.6); `/healthz`, `/readyz`
+   and `/.well-known/jwks.json` are the only no-auth probes. *(Stale-claim excision 2026-08-14: an
+   earlier revision said the engine exposes no `/api/observation/{id}` route — that predates Task B;
+   the endpoint is DEPLOYED and live-fire-verified at `https://api.continuum.rest`, 2026-08-08.)*
+   **Two verification surfaces, both real:**
    (a) the MCP tool `continuum_get_observations([decisionId])` over `/sse` (full-client path); or
    (b) **`GET /api/observation/:id`** — a lightweight REST projection for schedulers that don't embed an
    MCP client. It is **tenant-scoped + read-only**, returns ONLY the seal fields (`type`, `subject.contentHash`,
