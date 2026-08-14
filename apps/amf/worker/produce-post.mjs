@@ -98,7 +98,9 @@ window.__timelines["main"]=tl;</script></body></html>`;
 function render(html) {
   mkdirSync(OUT_DIR, { recursive: true });
   const work = mkdtempSync(join(tmpdir(), 'amf-post-'));
-  execSync('npx --yes hyperframes@latest init proj', { cwd: work, stdio: 'ignore' });
+  // --example blank: hyperframes' non-interactive init requires an explicit starter
+  // (same fix as render.mjs:96 — init without it exits 1 under execSync).
+  execSync('npx --yes hyperframes@latest init proj --example blank', { cwd: work, stdio: 'ignore' });
   const proj = join(work, 'proj');
   writeFileSync(join(proj, 'index.html'), html);
   execSync('npm run render', { cwd: proj, stdio: 'ignore' });
