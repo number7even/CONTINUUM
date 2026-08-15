@@ -86,4 +86,25 @@ read-only projection over resources that already exist.
 
 ---
 
-_IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._
+## 6. Design inputs received (audited 2026-08-15 — recorded, NOT built)
+
+**The Gauntlet-Loop pattern** for feature ② is adopted as design intent, with credit: it is
+the public `robonuggets/gauntlet-loop` skill (builder/critic pairs looping to a quality
+bar) — the Honest-Narrator Gate slots in as the critic. An advisor-channel claim that this
+was already "implemented and live" in this repo was disproven on disk (no files exist);
+the concept survives, the claim does not.
+
+**Five defects in the advisor's implementation sketch — do not inherit them when the park lifts:**
+1. **Shell injection:** piping narrator text via `execSync(\`… --text "${output}"\`)` puts
+   untrusted spoken content into a shell string. Use `spawn` with argument arrays or stdin.
+2. **Stale package name:** `@continuum/core` — the pre-rename scope that already broke the
+   Fly Docker build once (`db87d4a`). Real name: `@number7even/continuum-core`.
+3. **Broken CI assertion:** `execSync` returns *stdout*, not an exit code — the proposed
+   `assert.equal(exitCode, 0)` gate can never work as written; a throwing call is the signal.
+4. **Wrong tool-module shape:** the sketch invents an `McpTool`/`../types` interface; real
+   tools follow the existing `packages/mcp-server/src/tools/` registration pattern.
+5. **Python-in-core mismatch:** `packages/core` is a TypeScript workspace; the voice
+   runtime belongs at the app layer (alongside `voice_pipeline.py`) or its own package.
+   "VoxCPM2 48kHz on localhost:37777" specifics are unverified.
+
+Sequencing unchanged: **all of §6 waits behind Wave-1 closure.**
