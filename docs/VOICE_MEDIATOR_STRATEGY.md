@@ -107,4 +107,15 @@ the concept survives, the claim does not.
    runtime belongs at the app layer (alongside `voice_pipeline.py`) or its own package.
    "VoxCPM2 48kHz on localhost:37777" specifics are unverified.
 
+**Run receipt (2026-08-15):** the advisor's `gauntlet_loop.py` was eventually delivered
+and re-run under its own "re-runnable receipt" doctrine. Result: (a) the critic **approves
+maximal hype for ✅ VERIFIED states** ("100% complete and working flawlessly!" passes —
+puffery about true facts sails through); (b) **round 2 crashes** (`NameError`: the
+`honest_narrator` fallback stub returns an undefined variable); (c) its rejection strings
+(`TRUTH DEVIATION…`) **do not match the published "captured" trace** (`CRITICAL GATE
+FAIL: SECURITY VIOLATION…` — a string no code path emits). The trace was authored, not
+captured. **Design lesson banked for feature ②:** the real Honest-Narrator Gate needs a
+puffery/register check that fires INDEPENDENTLY of odometer state — verified facts stated
+with hype are still register violations; P4 governs certainty, the gate must also govern tone.
+
 Sequencing unchanged: **all of §6 waits behind Wave-1 closure.**
