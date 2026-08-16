@@ -21,12 +21,27 @@ approval a cryptographic `type='decision'` record), and **(d) the verification s
 (fail-closed, re-runnable checks that make "done" a proof, not an assertion). VoiceCosmos
 makes the property talk; CONTINUUM makes it *trustworthy and unable to forget or lie*.
 
-## 2. Identity — the one rule that carries everything
+## 2. Identity — CORRECTED 2026-08-17 after VC-terminal schema audit
 
-**One property = one workspace = one Continuum tenant: `property_id === workspace_id ===
-tenantId`, 1:1, zero translation** (same law as Crooma's `workspace_id` and StudioMunich's
-`studio_id`). Every call carries the tenant JWT + `X-Continuum-Project`. A property's ARIA
-can never read another property's memory — not by policy, by 404.
+The original 1:1 "property = tenant" rule **contradicted the live VC schema** (verified
+VC-side: 3,899 tenants; 34 properties across 15 tenants, max 14 per tenant; `tenant_id`
+is the anchor across 77 tables; `workspace_id` does not exist there). Corrected rule:
+
+- **The shared anchor is `tenant_id`:** VoiceCosmos `tenant_id` ≡ CONTINUUM `tenantId`,
+  1:1, zero translation. (`workspace_id` is Crooma's name for the same slot — vocabulary,
+  not a second scheme.) Every call carries the tenant JWT + `X-Continuum-Project`.
+- **⚖️ ID-1 — PENDING FOUNDER LOCK — the isolation boundary:** is the CONTINUUM tenant
+  the VC **org** (`tenant_id`) or the **property**? **Engine recommendation: the org.**
+  Rationale: the org is the legal/billing/liability boundary (matching Crooma's workspace
+  and SM's studio); structural 404-isolation should separate *legal entities*, while
+  **`property_id` becomes first-class scoping metadata** stamped on every Observation
+  (hotel-kb ingest, ops events, seals) and filtered at retrieval — the same
+  intra-tenant-scoping layer as the deferred role-loadouts. Cross-property visibility
+  inside one org is then the org's policy choice, not a security hole. Alternative
+  (tenant-per-property) forfeits group-level agents (a 14-property GM view would require
+  14 tokens) and mints ~4k stores for ~34 active properties. **No VC-1 map is built until
+  ID-1 is locked** — the VC terminal is right that building the map first builds the
+  wrong map. Minting strategy either way: on activation, never pre-mint the long tail.
 
 ## 3. The live surface (✅ deployed, live-fire receipts)
 

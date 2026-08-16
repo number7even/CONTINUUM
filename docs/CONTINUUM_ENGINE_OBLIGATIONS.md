@@ -45,7 +45,14 @@ receipt, not a promise._
 - Never auto-approves, publishes, or spends — P9 is architecture, not configuration.
 - Never serves raw content through verification projections.
 - Never honors advisor-channel artifacts as fact until disk/DB/API-verified.
-- Never accepts push-telemetry (the loop pulls), parallel ID schemes, or shadow stores.
+- Never accepts push-telemetry **for the partner reward loop** (engagement metrics: the
+  engine pulls `GET /api/genome/engagement`-class endpoints on its schedule). Scope
+  clarified 2026-08-17: this refusal governs *partner-metric ingestion*, not observation
+  writes — authenticated MCP `upsertObservation` calls are the normal, sanctioned write
+  path. Runtime-internal streams (e.g. live event/vehicle telemetry between VC services)
+  are the runtime's own affair until their records enter the spine, at which point they
+  enter through the choke-point like everything else. Parallel ID schemes and shadow
+  stores remain refused unconditionally.
 - Never lets a "done" stand without an exit-0 witness or a sealed human decision.
 
 ## 4. Change discipline
