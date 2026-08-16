@@ -118,4 +118,17 @@ captured. **Design lesson banked for feature ②:** the real Honest-Narrator Gat
 puffery/register check that fires INDEPENDENTLY of odometer state — verified facts stated
 with hype are still register violations; P4 governs certainty, the gate must also govern tone.
 
+**Gate placement sharpened (2026-08-17, VC-terminal):** the Honest-Narrator Gate sits
+**in front of the claim, not in front of the microphone.** Read-aloud is one consumer of
+a rendered claim; the Dossier panel, the Mermaid export, and every future HyperFrames
+panel are more — gating only the spoken path ships the same unverified sentence silently
+through three other surfaces (all three already exist in `apps/console/app/brain`). The
+gate therefore lives at the claim-render layer, upstream of every consumer. Corollary
+panel laws inherited from the VC ledger: a Fact Gate before render; **absence renders as
+absence** (never as a confident empty state); counts never default to 0 on a failed fetch
+— "a 3D graph that draws an empty universe on a failed fetch is `allergies: []` with
+better lighting." Projection integrity is now gate-checked: `scripts/
+verify-brain-projection.mjs` (GREEN at commit) fails the build the moment a browser-storage
+API enters the Brain surface.
+
 Sequencing unchanged: **all of §6 waits behind Wave-1 closure.**

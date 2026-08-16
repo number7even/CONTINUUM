@@ -102,6 +102,18 @@ format, drafted**, and they are already CONTINUUM-native by construction:
 the KAIZAN template as the pack schema + build the compiler." Items 2–5 unchanged (verb
 adapters are targets, not contracts: Onfido/LenelS2/Secutix/AWS-hub all 🔴).
 
+**Fleet discovery (2026-08-17, VC-terminal):** a legacy **fork-per-vertical repo fleet**
+exists — `VC-F1`, `VC-Equestrian`, `VC-Marine`, `VC-Aviation`, `VC-FamilyOffice`,
+`VC-Automotive`, `VC-RealEstate`, `VC-ShortTermRental`, `VC-Restaurants`, `VC-Spa`,
+`VC-Healthcare`, `VC-EventsCatering`, `VC-PropertyManagement`, … This is precisely the
+anti-pattern the Industry Pack thesis (§1) exists to end: verticals as forks instead of
+configurations. Ruling: **harvest, don't extend** — each fork gets a one-command schema
+inventory (do any carry real vertical schemas/data?); anything real is harvested into its
+pack; no new code lands in any fork. Consequences already live: the VC ledger's
+"schema-blocked" classifications (PR #22 §6) were measured against the Hospitality DB
+only and need an append-only correction once the fleet inventory runs; the drafted F1
+substrate migration is HELD pending the `VC-F1` inventory (it may already exist there).
+
 **Standing risk flagged:** the KAIZAN canon lives un-versioned in iCloud. Recommendation:
 bring `KAIZAN/` under git (its own repo or `industries/` tree) before any compilation work —
 un-versioned canon is the documentation-drift pattern this project keeps paying for.
