@@ -77,4 +77,36 @@ receipts-backed claims about the engine, vision-tagged claims about the paddock.
 
 ---
 
+## 6. Source canon received (2026-08-16) — the pack format already has a draft
+
+Two authored KAIZAN documents surfaced from the founder's VoiceCosmos canon
+(`A-VoiceCosmos/KAIZAN/`): **`formula-one-blueprint-sheet-v2.md`** (the 11-layer master
+sheet) and **`formula-one-role-specifications.md`** (the 7-part role schema + six costed
+role specs). Audit verdict: **these are not vision prose — they are the Industry Pack
+format, drafted**, and they are already CONTINUUM-native by construction:
+
+| KAIZAN canon element | CONTINUUM primitive it compiles to |
+|---|---|
+| Layer 0: "Inherited: The Nine + VOICEOS_STRUCTURE" | Same constitution — zero translation needed |
+| 7-loop Loop Map · L0–L4 autonomy ladder | Identical vocabulary to `voiceos-ops` (verified live registry) |
+| `Pinnacle_Pace_Promise` lifecycle (Invoiced→…→Reconciled) | Observation state chain; each transition an event, HITL transitions **P9-sealed** |
+| Flow Catalog (`fulfill--paddock-access-…`) + ACTS/BINDS primitives | Verb registry entries + federation-verb adapters |
+| GUARDS (FIA pit-lane, track-active, biometric thresholds) | The guard compiler's input format — **already authored as data** |
+| HITL `APPROVES` slots per role | Seal writes with `operator` provenance |
+| Skeptic patches (TP-OFFLINE-STAGE-LOCK, EC-THERMO-BYPASS, …) | The ⚪ MANUAL fallback discipline (SOP-HOST-010 pattern) — each patch an authored analog shadow, P6 |
+| "Verification runs" (packet-injection test, spoof stress-test) | `verifyCommand` gates — the pack ships with its own witnesses |
+| `industries/motorsport/pack.json` (named in SCENARIO.md §8) | **The Industry Pack file, already named in canon** |
+| `[VISION]` tags inside the compliance weave | The Honest Odometer, already practiced at the source |
+
+**Revised gap list:** item 1 (pack format) drops from "design from scratch" to "formalize
+the KAIZAN template as the pack schema + build the compiler." Items 2–5 unchanged (verb
+adapters are targets, not contracts: Onfido/LenelS2/Secutix/AWS-hub all 🔴).
+
+**Standing risk flagged:** the KAIZAN canon lives un-versioned in iCloud. Recommendation:
+bring `KAIZAN/` under git (its own repo or `industries/` tree) before any compilation work —
+un-versioned canon is the documentation-drift pattern this project keeps paying for.
+Sequencing unchanged: behind Wave-1/2.
+
+---
+
 _IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans._
