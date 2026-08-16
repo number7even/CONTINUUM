@@ -239,11 +239,15 @@ decision → draft → source signal → origin URL across projects. _(verify-ca
 > **Locked primitive:** the seal is the `type='decision'` **`contentHash` + `decisionId`**, **NOT**
 > `StateEntry.acceptedBy`. Gate on the former or reject every asset.
 
-## 6.4 The live JIT verification (Wave-1 handshake)  🔴 GATED
+## 6.4 The live JIT verification (Wave-1 handshake)  ✅ VERIFIED engine-side (live-fire 2026-08-07)
 At schedule time PodGeni re-verifies the seal against the live engine (the MCP `continuum_get_observations`
 call over `/sse`, **or** `GET /api/observation/:id`) and **fails closed** if the check fails or the engine
-is unreachable. Today this runs **gated → §6.3 local fallback** (safe: re-derive + reject unsealed/tampered),
-**not** the live fail-closed check. It flips to ✅ when the three externals land (PART 8).
+is unreachable. **The engine half is proven live (2026-08-07):** new build deployed to Fly in JWT mode
+(open JWKS at `/.well-known/jwks.json`), tenant JWT minted on-target against the volume-persisted issuer
+key, and an authenticated public probe of `GET /api/observation/jit-probe-wave1-001` returned the
+verification projection only (raw body shielded, P1), 404/401 fail-closed, with the re-derived local
+sha256 matching `subject.contentHash` exactly. The witness row stays in the ledger. The **PodGeni half**
+(the intake gate calling this check at schedule time) is still theirs to deploy (PART 8 §8.2 step 2).
 
 ---
 
@@ -255,7 +259,7 @@ is unreachable. Today this runs **gated → §6.3 local fallback** (safe: re-der
 | Decision seal = tamper-proof human approval (welded into the checkpoint hash, §2.3) | ✅ VERIFIED | verify-decision-seal (14/14) |
 | Queue throughput — story-freshness dedup (301 → 66) | ✅ VERIFIED | dedup.mjs / verify-matcher-dedup |
 | Self-contained handoff — `campaignHandoff` export + wall | ✅ VERIFIED | verify-campaign-handoff (8/8), cross-project |
-| By-id seal verification endpoint (`GET /api/observation/:id`) | ✅ VERIFIED | verify-observation-endpoint (8/8) |
+| By-id seal verification endpoint (`GET /api/observation/:id`) | ✅ VERIFIED (live-fire) | verify-observation-endpoint (8/8) + authenticated public probe 2026-08-07: hash re-derivation match, raw body shielded, 404/401 fail-closed |
 | Return-loop ranker re-weight — `feedbackWeight()` (fb 1.0→1.3, bounded) | ✅ VERIFIED (built) | telemetry-sync (10/10) — **🟡 STARVED of live telemetry** |
 | StudioMunich VAULT rights wall | ✅ VERIFIED | vault-guard (9/9); declines to synthetic when unsigned |
 | Multi-format asset pipeline — month of media from a single input | 🔴 VISION | target content-repurposing flywheel (§2.4) |
@@ -280,11 +284,13 @@ is unreachable. Today this runs **gated → §6.3 local fallback** (safe: re-der
 
 ## 8.2 The Wave-1 staging handshake (flip Distribute→Measure 🔴→✅)
 Engine-side code is **frozen** (44 gates green). Closing Wave 1 is a deploy + intake + verify handshake:
-1. **Deploy & configure (infra):** deploy the live engine to Fly; map the custom domain; inject the real
-   tenant JWT + rotated `CONTINUUM_HANDOFF_TOKEN`; push the GCloud/Firebase scheduler deploy.
+1. **Deploy & configure (infra):** ✅ engine live on Fly in JWT mode (2026-08-07, commit `db87d4a`
+   deploy fixes); ✅ custom domain + open JWKS; ✅ tenant JWT minted on-target. Still open: rotate
+   `CONTINUUM_HANDOFF_TOKEN` (PodGeni env); push the GCloud/Firebase scheduler deploy.
 2. **Ingest & intake (pod-geni):** deploy the intake gate wall (mirrors `verify-campaign-handoff`);
-   consume the sealed bundle; verify `contentHash` + `decisionId` against the **live** API; wire the
-   post-publish telemetry POST back to the engine.
+   consume the sealed bundle; verify `contentHash` + `decisionId` against the **live** API; **expose**
+   the engagement pull endpoint (`GET /api/genome/engagement?since&tenant`, `x-telemetry-key` header)
+   — the engine **pulls** via `telemetry-sync.mjs`; PodGeni never POSTs to the engine.
 3. **Verify & report (CONTINUUM, here):** confirm the JIT gate fires green (`ok`, not `gated`) at schedule
    time; confirm the first telemetry event triggers `feedbackWeight()` (fb 1.0→1.3); re-run `make smoke` (44/44).
 

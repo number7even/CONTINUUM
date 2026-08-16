@@ -13,8 +13,11 @@
  *  - "fun" is a documented heuristic (points + weighted comments, recency-
  *    decayed), NOT the ML "Fun Judge" of the full spec. Labelled as such in UI.
  *  - Only real signals are returned; X / TikTok / YouTube counts are NOT
- *    fabricated. Agent-Reach (cookie scraping of walled gardens) is held pending
- *    operator ToS review, so those sources are absent by design.
+ *    fabricated. Agent-Reach (cookie scraping of walled gardens) is
+ *    PERMANENTLY REJECTED by operator decision 2026-08-10 (P7/P8 — see
+ *    CROOMA_TERMINAL_BRIEF §II.10): no session-cookie scraping, no credential
+ *    reuse, no HTML scraping around explicit blocks. Official platform APIs
+ *    and compliant public keyless feeds (RSS, HN API) only.
  *  - If both sources fail, returns ok:false; the UI shows a "source unreachable"
  *    state and never falls back to fake data.
  */

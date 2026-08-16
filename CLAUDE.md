@@ -115,6 +115,16 @@ The machine is built and safely gated: the loops close in code, the walls enforc
 nothing is claimed live beyond what a `verifyCommand` proves. Flip the switches when
 the keys and the voice fuel land.
 
+**Wave-1 engine-side CLOSED (2026-08-07, live-fire):** engine redeployed to Fly in
+JWT mode (`api.continuum.rest`, open JWKS, `sqlite` pinned — commit `db87d4a` fixed
+the Dockerfile workspace rename + hybrid-default regression); tenant JWT minted
+on-target; authenticated public JIT probe of `GET /api/observation/:id` returned the
+seal projection only (raw body shielded), 404/401 fail-closed, local sha256 ==
+`subject.contentHash`. Witness row `jit-probe-wave1-001` in the live ledger. The
+shared-bearer console is retired (JWT mode is exclusive). Remaining 🟡s are PodGeni's:
+the intake gate (Seam 1) and the engagement **pull** endpoint (Seam 2 —
+`telemetry-sync.mjs` PULLS `GET /api/genome/engagement`; PodGeni never POSTs).
+
 ---
 
 ## What's true RIGHT NOW (verify in code before claiming)
@@ -137,14 +147,22 @@ the keys and the voice fuel land.
     abstraction, **`AgentHandoffMetadata` type + `createAgentHandoffObservation()`
     helper** (V0-compatible RecursiveMAS intent capture per Issue #3, commit
     `31fe885`, 2026-05-23)
-  - `packages/mcp-server/` — **9 MCP tools** + **4 Resources** + **2 Prompts**:
-    - Tools: `continuum_record_checkpoint`, `continuum_get_state`,
-      `continuum_get_digest`, `continuum_search_docs` (Layer-1, V0 baseline);
-      `continuum_get_todos`, `continuum_create_todo`,
-      `continuum_update_todo` (added 2026-05-15, commit `c9def2c`);
-      `continuum_timeline` (Layer-2 chronological context),
-      `continuum_get_observations` (Layer-3 batch full-text fetch) —
-      completes the Progressive Disclosure 3-layer surface (added 2026-05-28).
+  - `packages/mcp-server/` — **24 tool modules** (audited on disk 2026-08-11:
+    `ls packages/mcp-server/src/tools/ | grep -v index.ts | wc -l`) + **4 Resources**
+    + **2 Prompts**:
+    - V0 baseline 9 (history above per-commit): `continuum_record_checkpoint`,
+      `continuum_get_state`, `continuum_get_digest`, `continuum_search_docs`
+      (Layer-1); `continuum_get_todos` / `continuum_create_todo` /
+      `continuum_update_todo` (`c9def2c`); `continuum_timeline` (Layer-2),
+      `continuum_get_observations` (Layer-3) — the Progressive Disclosure
+      3-layer surface.
+    - Post-V1 additions (15 more modules in `src/tools/`): `attest`,
+      `ask-context`, `check-brand`, `codebase-context`, `delete-observation`
+      (Issue #10), `documents` (create/get/list/search/update + templates),
+      `graph`, `kaizen-record`, `next-tasks`, `open-claim`,
+      `record-brand-dna`, `record-decision`, `session-review`, `snapshots`,
+      `validate` (120s-timeout verify surface — CLI `continuum verify`
+      keeps the strict 30s per-command gate).
     - Resources: `continuum://todos/open` (2026-05-15, `c9def2c`);
       `continuum://state/current`, `continuum://digest/latest`,
       `continuum://session/briefing` — Layer-0 markdown brief composing
@@ -294,12 +312,12 @@ the keys and the voice fuel land.
   (WebSocket) + V2.2 (Postgres RLS + OAuth — see architectural flag below)
   in the `vc-hospitality` pipeline (2026-05-15).
 
-**Open architectural flag (2026-05-15):** V2.2 todo title says "Postgres
-RLS" but D2 locks RuVector as the V0.5+ unified persistence engine. Two
-coherent reconciliations: (a) RuVector holds data, Postgres wraps it as the
-auth/tenancy directory (common SaaS pattern, no D2 revision needed); or
-(b) V2 reverts to Postgres which would require a D2 lock-revision conversation
-in ARCHITECTURE.md §14. Decide before V2.2 work begins.
+**Architectural flag RESOLVED (2026-08-10):** the 2026-05-15 V2.2 flag is
+closed — **D-V2.2 locked in ARCHITECTURE.md §14** as reconciliation (a):
+per-tenant SQLite+RuVector data plane (isolated under
+`$CONTINUUM_DATA_DIR/<tenantId>/`), thin Postgres **control plane only**
+(tenancy directory, OAuth, billing webhooks, quotas — never tenant content).
+No D2 revision. Founder-locked, this session.
 
 ---
 
@@ -367,7 +385,7 @@ The architecture is identical across all three. Only configuration changes.
 
 ---
 
-_Last updated: 2026-07-03 — AMF engine session · checkpoint `49bd2613` (8 verify-green)._
+_Last updated: 2026-08-07 — Wave-1 engine-side closed (live-fire JIT probe green on `api.continuum.rest`)._
 _Update this file whenever V0 polish lands, V0.5 begins, an AMF milestone lands, or any
 partner agreement clause is revised._
 

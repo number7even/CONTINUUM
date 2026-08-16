@@ -51,6 +51,24 @@ Before `createCampaign` schedules anything:
 3. **Confirm the `decisionId` resolves** to a real `type='decision'` Observation in Continuum whose
    `metadata.subject.contentHash === bundle.contentHash` (i.e. the seal binds *this* asset). Via the
    Continuum MCP/HTTP surface (`continuum_get_observations`), tenant-scoped. → else REJECT.
+
+   **Seam-1 REST payload contract (live + live-fire-proven 2026-08-08 — the exact wire shape):**
+   ```
+   GET https://api.continuum.rest/api/observation/{decisionId}
+   Authorization: Bearer <your tenant RS256 JWT>     # minted on-target; JWKS is public at
+                                                     # /.well-known/jwks.json (shared bearer is RETIRED)
+   → 200 (seal found in YOUR tenant):
+   {
+     "id": "<decisionId>", "type": "decision", "sourceId": "authorship",
+     "timestamp": "…", "refs": ["…"],
+     "contentHash": "<sha256>",                     // top-level convenience copy
+     "subject": { "contentHash": "<sha256>" },      // ← THE gate field: compare to your re-derived hash
+     "verdict": "accept", "operator": "<human who leapt>"
+   }                                                 // NEVER contains raw content (P1)
+   → 401 bad/absent token · 404 unknown id OR another tenant's id → in every non-200 case: FAIL CLOSED.
+   ```
+   Source of truth: `packages/mcp-server/src/http.ts` (`GET /api/observation/:id`). Fields beyond
+   these do not exist — do not wait for them.
 4. **Store the `decisionId` + `contentHash` as the asset's immutable provenance stamp** — the
    scheduler's "immutable provenance" IS this witness. Reference; never recompute a new seal.
 
@@ -88,7 +106,22 @@ loop against a fixture — telemetry → `ground_truth` → the same signal's ra
 — and it stays gated on `PODGENI_TELEMETRY_URL` + `PODGENI_TELEMETRY_KEY` until your half lands (P4/P6:
 wired, proven our-side, writes nothing live without the key).
 
-**Event shape** (POST the moment you have measured engagement; one event per asset):
+**Direction (do not build a POST client): Continuum PULLS.** You **expose** the endpoint below and
+serve events from it; `telemetry-sync.mjs` polls it on a schedule. There is **no** Continuum intake
+route to POST to — a push client fires at a non-existent path.
+
+**Seam-2 REST payload contract (the exact wire shape `telemetry-sync.mjs` calls):**
+```
+GET {your-base}/api/genome/engagement?tenant_id=<workspace_id>&since=<ISO8601>&limit=40
+x-telemetry-key: <the shared scoped key>          # header auth — reject requests without it
+→ 200: either a bare JSON array of events, or { "events": [...] }
+       ({ "telemetry": [...] } / { "items": [...] } also accepted — pick ONE and stay stable)
+```
+Query params: `tenant_id` (note: NOT `tenant`), `since` (return events after this timestamp —
+enables incremental polling), `limit`. Idempotency: stable per-event `id` — Continuum upserts, so
+re-serving an event is safe; renaming its `id` double-counts it.
+
+**Event shape** (serve one event per asset, the moment you have measured engagement):
 ```jsonc
 {
   "id": "<stable per-event id>",        // idempotency key

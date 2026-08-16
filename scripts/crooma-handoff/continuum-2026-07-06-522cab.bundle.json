@@ -1,0 +1,63 @@
+{
+  "ok": true,
+  "decisionId": "b782052e-e2ec-4980-aab3-29446f20f612",
+  "decisionProject": "amf",
+  "contentHash": "sha256:b70876e25d0d3b45ff69a2cc7825695e4bc31af34f1c4768a53d54300e445df2",
+  "verdict": "accept",
+  "operator": "riaan",
+  "sealedAt": "2026-08-11T11:19:18.923Z",
+  "asset": {
+    "id": "continuum-2026-07-06-522cab",
+    "slug": "continuum",
+    "brief": {
+      "brand": "Continuum",
+      "headline": "Codebase memory is now a race — can your AI agent prove what it remembers?",
+      "points": [
+        {
+          "stat": "codebase-memory-mcp",
+          "label": "Emerging MCP tool class racing to speed AI coding agent queries over large codebases"
+        },
+        {
+          "stat": "memory ≠ proof",
+          "label": "Faster retrieval still doesn't verify the agent actually executed — Continuum's gap"
+        }
+      ],
+      "cta": "VERIFY",
+      "angle": "The codebase-memory-mcp buzz confirms the market is obsessed with making AI agents remember faster — Continuum's differentiator is the next layer: memory that won't close a task until a shell command proves the work is real, not recalled.",
+      "drafted": "llm",
+      "sources": [
+        "https://news.google.com/rss/articles/CBMilwFBVV95cUxOVGtKZERvYXNfbmEzcG5XNDlOWnY2TFY2am9mbVNzUWxqU0hvdjVHMUlHak91dVhWSHNvZTd3U3c1LVZiRVFXaHU5b3RRcnpzbk1kVWpUYll5M2Ixa2IxVEdlakJNa05reFo4RUZSVWZTa094em9iYjBqZlg5ck51MDgyX0xSSzc3SHlOVEtWdDJZTjliSlZR?oc=5"
+      ],
+      "fromSignal": "cf2926cd-7a5f-aa87-6a4d-a971622bd7ec",
+      "score": 9.817,
+      "weights": {
+        "relevance": 11.759,
+        "authority": 1,
+        "sales": 1,
+        "engagement": 1,
+        "feedback": 1
+      },
+      "verify": "AI-drafted from a sourced signal — verify stats against the source + run continuum_check_brand before publish"
+    }
+  },
+  "sourceChain": [
+    {
+      "role": "decision",
+      "id": "b782052e-e2ec-4980-aab3-29446f20f612",
+      "project": "amf"
+    },
+    {
+      "role": "draft",
+      "id": "continuum-2026-07-06-522cab"
+    },
+    {
+      "role": "signal",
+      "id": "cf2926cd-7a5f-aa87-6a4d-a971622bd7ec",
+      "project": "continuum",
+      "sourceId": "googlenews",
+      "url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxOVGtKZERvYXNfbmEzcG5XNDlOWnY2TFY2am9mbVNzUWxqU0hvdjVHMUlHak91dVhWSHNvZTd3U3c1LVZiRVFXaHU5b3RRcnpzbk1kVWpUYll5M2Ixa2IxVEdlakJNa05reFo4RUZSVWZTa094em9iYjBqZlg5ck51MDgyX0xSSzc3SHlOVEtWdDJZTjliSlZR?oc=5",
+      "title": "codebase-memory-mcp speeds AI coding agent queries - Let's Data Science — codebase-memory-"
+    }
+  ],
+  "chainUnbroken": true
+}
