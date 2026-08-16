@@ -88,6 +88,7 @@ cross-tenant/unknown → 404, unauth → 401, hash re-derivation match (witness 
 | "File exists, so it's done." | Existence ≠ function; the witness tests logic (P4). |
 | "I updated the doc; state is active." | Docs aren't truth — proof from the artifact (P4). *Live case: three false cross-terminal "done" claims caught by witness commands, 2026-08-07/-10/-11.* |
 | "Env unstable; skipping verify." | Unstable → `broken[]`. Safety outranks helpfulness (P6). |
+| "The grep showed five, so there are five." | **Truncated measurement ≠ census.** A `head -N`ed result is a display window, not a total; counts come from scripts that walk the full set. *Live case 2026-08-17: "5 direct KB writers" was a `head -5`; the measured set was 17 (3.4× understated) — while the paired "live PII exposure" claim was simultaneously OVERstated (5 rows, zero PII markers on measurement). Both directions, one exchange, caught only when a script replaced the hand-count.* |
 
 - **Tool surface (audited 2026-08-11):** **24 tool modules** in
   `packages/mcp-server/src/tools/` (25 files − `index.ts`). The "9 tools" (CLAUDE.md,
