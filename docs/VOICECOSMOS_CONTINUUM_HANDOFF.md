@@ -30,7 +30,11 @@ is the anchor across 77 tables; `workspace_id` does not exist there). Corrected 
 - **The shared anchor is `tenant_id`:** VoiceCosmos `tenant_id` ≡ CONTINUUM `tenantId`,
   1:1, zero translation. (`workspace_id` is Crooma's name for the same slot — vocabulary,
   not a second scheme.) Every call carries the tenant JWT + `X-Continuum-Project`.
-- **⚖️ ID-1 — PENDING FOUNDER LOCK — the isolation boundary:** is the CONTINUUM tenant
+- **✅ ID-1 — LOCKED 2026-08-17 (founder, via VC-terminal session): the CONTINUUM tenant
+  is the VC ORG (`tenant_id`), with `property_id` as first-class scoping metadata** on
+  every Observation, filtered at retrieval. VC-1 (the tenant map) is unblocked on this
+  basis. Recorded in `ARCHITECTURE.md §14`. Original decision framing kept below for the
+  record: is the CONTINUUM tenant
   the VC **org** (`tenant_id`) or the **property**? **Engine recommendation: the org.**
   Rationale: the org is the legal/billing/liability boundary (matching Crooma's workspace
   and SM's studio); structural 404-isolation should separate *legal entities*, while
