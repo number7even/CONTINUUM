@@ -56,6 +56,12 @@ Before `createCampaign` schedules anything:
    ```
    GET https://api.continuum.rest/api/observation/{decisionId}
    Authorization: Bearer <your tenant RS256 JWT>     # minted on-target; JWKS is public at
+   X-Continuum-Project: <tenantId>                   # OPTIONAL in JWT mode (semantics
+                        # verified in auth.ts W27-3, 2026-08-17): the tenant is ALWAYS
+                        # resolved from the signed JWT claim — the header, when sent, must
+                        # EQUAL the claim (mismatch → 403) and is recommended as free
+                        # defense-in-depth. Value = the TENANT id, never decisionProject
+                        # ("Project" is legacy naming). Omit-when-unknown is safe.
                                                      # /.well-known/jwks.json (shared bearer is RETIRED)
    → 200 (seal found in YOUR tenant):
    {

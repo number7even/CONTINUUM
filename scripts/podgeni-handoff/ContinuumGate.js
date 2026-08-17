@@ -45,16 +45,23 @@ class ContinuumGate {
    * @param {string} tenantJwt    The workspace's RS256 tenant JWT (minted on-target).
    * @returns {Promise<true>}
    */
-  async verifyAsset(decisionId, expectedHash, tenantJwt) {
+  async verifyAsset(decisionId, expectedHash, tenantJwt, tenantId) {
     if (!decisionId) throw new Error('[ContinuumGate] Denied: missing decisionId. Fail closed.');
     if (!expectedHash) throw new Error('[ContinuumGate] Denied: missing expectedHash. Fail closed.');
     if (!tenantJwt) throw new Error('[ContinuumGate] Denied: missing tenant JWT. Fail closed.');
 
     const url = `${this.engineUrl}/api/observation/${encodeURIComponent(decisionId)}`;
+    // X-Continuum-Project is OPTIONAL in JWT mode (tenant resolves from the signed
+    // claim; a sent header must EQUAL the claim or the engine 403s). Sending it is
+    // free defense-in-depth: a wrong-tenant misconfiguration fails loudly at 403
+    // instead of surfacing later as a confusing 404. Value = tenant id, never a
+    // project name. Omit when unknown.
+    const headers = { Authorization: `Bearer ${tenantJwt}`, Accept: 'application/json' };
+    if (tenantId) headers['X-Continuum-Project'] = tenantId;
     let res;
     try {
       res = await fetch(url, {
-        headers: { Authorization: `Bearer ${tenantJwt}`, Accept: 'application/json' },
+        headers,
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (err) {
