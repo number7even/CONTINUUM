@@ -73,6 +73,31 @@ is the anchor across 77 tables; `workspace_id` does not exist there). Corrected 
    existing HITL line ("voice proposes; approve is a human click; `approved_by_human`
    DB-enforced") maps 1:1 onto P9 seals — same law, now cryptographic.
 
+### 4.1 The scrub boundary — RULING (2026-08-17, after cross-terminal review)
+
+**CONTINUUM is the audit-and-memory spine, NOT the operational system of record.** The
+choke-point scrubs **what enters the spine** (observations, KB content, anything that gets
+stored or embedded). It does **not** reach into the runtime's operational tables — a front
+desk must see who is in room 304; arrival boards, rosters, and reservation panels are the
+runtime's SoR and display real names. A compiled pack that writes `[REDACTED:NAME]` into
+an operational table has misplaced the boundary (an advisor-drafted spec did exactly this;
+it was never engine canon and is refused).
+
+Corollaries, binding:
+- **Personal names are NOT a scrub pattern and must never become one.** The engine's
+  patterns are secrets (11, always-on) + the opt-in guest-PII tier: **email, phone, card,
+  passport, IBAN — exactly, nothing more** (`hotel-kb` header is the contract). A
+  name-regex eats "Grand Ballroom" and "Signature Massage"; NER is wrong often enough to
+  matter; and **over-redaction is silent damage** — nothing goes red, the KB just stops
+  being able to answer. If name-minimization in *embedded* content is ever wanted, it is
+  a deliberate future design (pseudonymization with a tenant-scoped lookup), not a
+  pattern to sneak into the filter.
+- **`property_id` is metadata, not a column, and nullable by meaning** (ID-1): an
+  org-wide observation (a policy covering all properties) simply has no `property_id` in
+  its metadata. Any draft schema making it a NOT NULL column contradicts ID-1.
+- **Verification history is append-only** (Engine Obligations §1.5): one row per
+  *execution*, never one row per task — a re-run must never overwrite its predecessor.
+
 ## 5. What flows OUT of the brain (CONTINUUM → VoiceCosmos)
 
 1. **Grounded answers with citations:** ARIA retrieval follows Progressive Disclosure —
