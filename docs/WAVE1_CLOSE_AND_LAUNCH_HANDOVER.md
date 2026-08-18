@@ -90,13 +90,29 @@ Everything needed is published; both files are drop-in. Wire contract: `PODGENI_
 
 ---
 
-## 6. THE LAUNCH GATE — definition of done (all boxes, in evidence, or it isn't closed)
+## 6. THE LAUNCH GATE — ✅ CLOSED 2026-08-18, ON EVIDENCE
 
-1. ☐ First **P9-sealed** bundle (human-approved, F2) **schedules** through Crooma's live wall with
-   `decisionId` + `contentHash` provenance (C2).
-2. ☐ **Tampered + unsealed variants refused** by the live wall (C3).
-3. ☐ **Trace walk-back** verified end-to-end and independently re-checked (C4 + E1).
-4. ☐ Staging token file **burned** from the engine volume (F1 hygiene — necessary, not sufficient).
+1. ☑ First **P9-sealed** bundle scheduled through Crooma's live wall with provenance (C2):
+   `campaign_bundle 7354b58c-6891-4322-af92-c27678d841fa`, `engine_verified=TRUE`,
+   intake HTTP 200 against `www.crooma.cloud/api/podgeni/intake` (receipt §1).
+2. ☑ **Tampered + unsealed variants refused live** (C3): one-char tamper → 422 `tampered`;
+   unknown decision → 422 `decision_unresolved`; wrong hash → 422 `engine_hash_mismatch`;
+   row count after all refusals: exactly 1 (receipt §3). Two counterfeit hand-delivered
+   bundles refused before the git-committed emission was admitted (receipt §0).
+3. ☑ **Trace walk-back verified end-to-end and independently countersigned** (C4 + E1):
+   `post 7354b58c → decision b782052e (verdict=accept, operator=riaan) → draft
+   continuum-2026-07-06-522cab → signal cf2926cd (googlenews) → origin URL` — every hop
+   re-resolved by the Engine against its own stores AND the live surface on 2026-08-18:
+   hash re-derivation MATCH, live seal projection MATCH, ledger⇄store consistency MATCH
+   (residual item §5 of the receipt: closed).
+4. ☑ Staging token file burned (F1 — and its lesson encoded: outcome witnesses only).
+
+**Receipt:** `continuum-visual-ops` `docs/WAVE1_CLOSURE_RECEIPT.md` (commit `bb15021`).
+**Countersign:** Engine terminal, 2026-08-18 — E1.1 hash / E1.2 live seal / E1.3 trace
+walk all VERIFIED; E3 smoke re-run recorded in the closure commit.
+
+**Wave 1 (Marry) is CLOSED.** The produce → seal → distribute trust loop is live,
+cryptographic, and refused every forgery offered to it along the way.
 
 Wave 2 is armed (separately) when: ☐ first live telemetry event → `ground_truth` → ranker
 re-weight verified (P3 + P4 + E2).
