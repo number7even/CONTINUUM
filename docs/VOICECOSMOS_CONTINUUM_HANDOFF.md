@@ -110,6 +110,28 @@ Corollaries, binding:
    against the live surface and **fail closed** (the Crooma wall pattern: gate on
    `decisionId` + hash, never on names, never on a cached copy).
 
+### 5.1 The read path — BFF rule (RULING 2026-08-18)
+
+**Browser panels never talk to the engine, and never hold the tenant JWT.** The read path
+is: *panel (HTTP-only session cookie) → VC's own BFF routes (Next.js server — holds the
+tenant JWT server-side, validates the user session, enforces the user's `property_id`
+scope) → engine.* Shipping a tenant token into any browser context is a contract
+violation on sight — it is also exactly the storage-API drift the projection guard fails
+builds for. Precedent: the Brain console already works this way (`/api/ask` /
+`/api/observation` are its own server routes).
+
+**Cold start is a prerequisite, not a footnote:** a freshly minted tenant graph is empty;
+the first `hotel-kb` ingestion run (from VC-1's source inventory) must land before any
+panel projects, or the projection is an explicit absence-card by design.
+
+**Two engine build items, sequenced post-Wave-1 (tripwired todos):**
+1. `record_observation` — the generic event-ingest MCP tool (schema-free payload through
+   the choke-point). Its Observation `type` is minted in the spine's contract anchor when
+   the tool lands — never pre-specified in blueprints (§II.7 discipline).
+2. The **Claim-Render Gate library** — engine-authored, VC-deployed (the ContinuumGate.js
+   precedent): one implementation of certainty-grammar, consumed at the BFF/panel layer.
+   Truth-semantics must never fork across teams.
+
 ## 6. The rules VoiceCosmos inherits (non-negotiable)
 
 - **Honesty ledger discipline** — VoiceCosmos already lives this (`voiceos-ops`: runnable
