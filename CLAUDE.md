@@ -385,7 +385,14 @@ The architecture is identical across all three. Only configuration changes.
 
 ---
 
-_Last updated: 2026-08-07 — Wave-1 engine-side closed (live-fire JIT probe green on `api.continuum.rest`)._
+_Last updated: 2026-08-18 — **WAVE 1 (MARRY) CLOSED end-to-end**: Crooma's C2/C4 receipt
+(`continuum-visual-ops` `bb15021`, `docs/WAVE1_CLOSURE_RECEIPT.md`) E1-countersigned by the
+engine — hash re-derivation, live seal, and full trace walk-back all independently verified;
+tampered/counterfeit variants refused live (422s, row count 1). First production unit:
+`campaign_bundle 7354b58c` ← seal `b782052e` (operator=riaan) ← draft `522cab` ← signal
+`cf2926cd` ← origin. Post-Wave-1 queue now unblocked: record_observation tool, Claim-Render
+Gate, issuer key rotation (`f0f07d25`), seal-sync seam (`a61a4286`), Wave-2 credential
+exchange (PodGeni id → F4 mint → URL+key → E2)._
 _Update this file whenever V0 polish lands, V0.5 begins, an AMF milestone lands, or any
 partner agreement clause is revised._
 
