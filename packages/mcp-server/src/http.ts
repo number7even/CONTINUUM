@@ -2,9 +2,20 @@
 /**
  * Continuum MCP — HTTP/SSE transport entry point (V1).
  *
- * Exposes the same 7 tools + 4 Resources + 2 Prompts as the stdio entry,
- * but over HTTP + Server-Sent Events. This is the bridge a remote AI
- * client (Vercel frontend, hosted Claude Desktop, etc.) needs.
+ * Exposes the SAME tools, Resources and Prompts as the stdio entry — both call
+ * buildServer(), which registers TOOL_DEFINITIONS wholesale, so the two surfaces
+ * cannot drift apart. This is the bridge a remote AI client (Vercel frontend,
+ * hosted Claude Desktop, etc.) needs.
+ *
+ * NO COUNT IS STATED HERE ON PURPOSE. This line used to read "the same 7 tools",
+ * frozen from V1 while the registry grew to 30. That stale number was read as a
+ * gap and turned into a work order to "expose continuum_search_docs and
+ * continuum_get_digest over HTTP" — both of which had been served all along.
+ * Verified 2026-08-21 against a running instance: SSE handshake, tools/list
+ * returned 30, and search_docs / get_observations / get_digest each answered a
+ * real tools/call round trip (write → search by sentinel → digest window).
+ * A comment that counts things the code already counts will go stale again;
+ * `tools/list` is the answer, not this docstring.
  *
  * Endpoints:
  *
