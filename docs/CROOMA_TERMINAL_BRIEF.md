@@ -81,6 +81,20 @@ the full architecture; this brief is authoritative for **what to do next and wha
     "Agent-Reach" and every cookie-bypass variant are permanently rejected — this supersedes the old
     "held pending operator ToS review" placeholder everywhere it appears. Any spec re-proposing it is
     to be refused on sight, citing this clause.
+11. **The anti-fork law (founder-banked 2026-08-22).** Verticals are **authored, never forked** —
+    including experiments. A new vertical or experimental unit is a configuration-only playbook pack
+    bound to an isolated tenant id inside the unified runtime; kill-or-graduate operates on
+    pack+tenant, never on a codebase. Spawning a repo/folder fork for a vertical recreates the
+    legacy `VC-*` fleet this law buries (harvest, don't extend).
+12. **The copyleft clean-room rule (founder-banked 2026-08-22).** External *patterns* may be
+    clean-roomed from papers/READMEs; external **code under copyleft licenses is never vendored,
+    ported, or "adapted"** into this Apache-2.0 codebase — AGPL's network copyleft could compel
+    source disclosure of the hosted engine. Live case: OpenViking (AGPL-3.0) — its L0/L1/L2 tiered
+    sidecars, `continuum://` virtual-tree browsing, and session-end distillation are recorded as
+    clean-room **design inputs** for the retrieval workstream (behind the hybrid-promotion
+    benchmark gate), and **no external benchmark number is ever repeated as ours** — efficiency
+    claims come from our own `benchmark-token-savings.mjs` or they are not made (the "10x is dead"
+    rule, no exceptions for other people's decimals).
 
 ## III. Amalgamation Runbook — brand-first, backend-later
 
