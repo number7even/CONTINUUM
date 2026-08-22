@@ -23,6 +23,7 @@ import { getObservationsTool, handleGetObservations } from './get-observations.j
 import { deleteObservationTool, handleDeleteObservation } from './delete-observation.js';
 import { getTodosTool, handleGetTodos } from './get-todos.js';
 import { createTodoTool, handleCreateTodo } from './create-todo.js';
+import { p9ApproveTool, handleP9Approve } from './p9-approve.js';
 import { recordObservationTool, handleRecordObservation } from './record-observation.js';
 import { updateTodoTool, handleUpdateTodo } from './update-todo.js';
 import { recordBrandDnaTool, handleRecordBrandDna } from './record-brand-dna.js';
@@ -55,6 +56,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   getTodosTool,
   createTodoTool,
   recordObservationTool,
+  p9ApproveTool,
   updateTodoTool,
   recordBrandDnaTool,
   checkBrandTool,
@@ -83,6 +85,7 @@ const DISPATCH_TABLE: Record<string, ToolHandler> = {
   continuum_get_todos: handleGetTodos,
   continuum_create_todo: handleCreateTodo,
   continuum_record_observation: handleRecordObservation,
+  continuum_p9_approve: handleP9Approve,
   continuum_update_todo: handleUpdateTodo,
   continuum_record_brand_dna: handleRecordBrandDna,
   continuum_check_brand: handleCheckBrand,

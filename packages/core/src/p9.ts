@@ -83,6 +83,10 @@ const FREE_VERBS = new Set([
   // Its protection is anti-self-sealing — a seal whose operator is the proposing agent is
   // ignored by authorize(), so an agent calling this on its own behalf gains nothing.
   'record_decision',
+  // p9_approve is the ANSWER path, for the same reason: gating it behind P9 would require
+  // an approval in order to grant an approval. Its protection is that the BFF verifies the
+  // human before calling it, and anti-self-sealing discards a seal an agent signs itself.
+  'p9_approve',
 ]);
 
 /**
