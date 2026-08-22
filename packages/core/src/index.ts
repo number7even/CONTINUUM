@@ -181,6 +181,9 @@ export type { HotelKb, HotelRoom, HotelFaq, HotelPolicy, HotelProperty, HotelKbI
 export { SqliteTenancyDirectory, openTenancyDirectory } from './tenancy.js';
 export type { TenancyDirectory, TenantRecord, TenantStatus, RegisterTenantInput } from './tenancy.js';
 
+export { openP9Request, getP9Request, P9_REQUEST_SOURCE, P9_REQUEST_TYPE } from './p9-request.js';
+export type { P9Request, P9RequestInput, P9RequestStatus } from './p9-request.js';
+
 // — P9 carve-out: the categories no autonomy level may execute unattended.
 export { P9_PENDING_RULING, rule as p9Rule, authorize as p9Authorize, classify as p9Classify, actionHash as p9ActionHash, sealActionApproval, P9_CATEGORIES } from './p9.js';
 export type { ProposedAction, P9Ruling, P9Category, AuthorizeOptions as P9AuthorizeOptions } from './p9.js';

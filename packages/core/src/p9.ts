@@ -61,6 +61,28 @@ const FREE_VERBS = new Set([
   // ── federation verbs (Command Plane), read-only half ──────────────────────
   'pms_status', 'pms_room_types', 'pms_availability', 'pos_status',
   'price_quote',   // computes a figure; ACCEPTING one is 'accept_quote' → contract
+
+  // ── CONTINUUM's OWN MCP tools (the 'continuum_' prefix stripped) ───────────
+  // A DIFFERENT NAMESPACE from the federation verbs above, and it must be listed or the
+  // dispatcher suspends the whole server — measured: search_docs, get_digest and
+  // record_observation were all halted before this existed.
+  //
+  // These are memory primitives, not transactions: they move no money, publish nothing,
+  // bind nobody and mint no credentials. P9 governs external consequence; an internal
+  // write to the tenant brain is not that, and gating it behind a click would make
+  // automated ingest impossible — which is the feature.
+  'search_docs', 'search_documents', 'get_observations', 'get_digest', 'get_state',
+  'get_todos', 'get_document', 'list_documents', 'list_templates', 'timeline', 'graph',
+  'snapshots', 'codebase_context', 'ask_context', 'session_review', 'next_tasks',
+  'validate', 'check_brand',
+  'create_document', 'update_document', 'create_todo', 'update_todo',
+  'record_observation', 'record_checkpoint', 'record_brand_dna', 'kaizen_record',
+  'attest', 'open_claim',
+  // record_decision is FREE here on purpose, and it is not a hole: it is the sealing path
+  // itself, so restricting it behind P9 would require a seal in order to make a seal.
+  // Its protection is anti-self-sealing — a seal whose operator is the proposing agent is
+  // ignored by authorize(), so an agent calling this on its own behalf gains nothing.
+  'record_decision',
 ]);
 
 /**
@@ -122,6 +144,10 @@ const RESTRICTED_VERBS: Record<string, P9Category> = {
   // added rather than mislabelling this as billing. Rename or reject it — but it should
   // not be called something it is not.
   score_lead: 'data',
+
+  // CONTINUUM tool namespace: the one destructive primitive. Removing ledger content is
+  // not recoverable from inside the ledger.
+  delete_observation: 'data',
 };
 
 export interface ProposedAction {

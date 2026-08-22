@@ -187,3 +187,46 @@ test('14) the four formerly-pending verbs are now ruled RESTRICTED', () => {
   // ambiguous verb announces itself instead of looking like a typo.
   assert.equal(classify('a_verb_nobody_ruled').pendingRuling, undefined);
 });
+
+test('15) the ASK is not a decision — p9-request never enters the Authorship Ledger', async () => {
+  const { openP9Request, P9_REQUEST_SOURCE, P9_REQUEST_TYPE } = await import('./p9-request.js');
+  const s = open(`p9req-${randomUUID().slice(0, 8)}`);
+  const req = openP9Request(s, { action: CHARGE, tenantId: 't1', autonomyLevel: 'L4' });
+
+  const row = s.getObservations([req.id])[0] as any;
+  assert.ok(row, 'the request was not written');
+  assert.equal(row.sourceId, P9_REQUEST_SOURCE, 'request must not live under the authorship source');
+  assert.equal(row.type, P9_REQUEST_TYPE);
+  assert.notEqual(row.type, 'decision', 'an ask written as a decision is a forgery surface');
+
+  // And recording the ask grants nothing: authorize still reads the LEDGER.
+  assert.equal(authorize(s, CHARGE).allowed, false,
+    'an open request authorised execution — the queue is not consent');
+});
+
+test('16) re-proposing the same action updates the ask, it does not queue a duplicate', async () => {
+  const { openP9Request } = await import('./p9-request.js');
+  const s = open(`p9req-${randomUUID().slice(0, 8)}`);
+  const a = openP9Request(s, { action: CHARGE, tenantId: 't1' });
+  const b = openP9Request(s, { action: CHARGE, tenantId: 't1' });
+  assert.equal(a.id, b.id, 'same action produced two request ids');
+  assert.equal(s.getObservations([a.id]).length, 1, 'the ask fanned out into duplicates');
+});
+
+test('17) NO GRIDLOCK: CONTINUUM read + write tools are free, delete is restricted', () => {
+  for (const v of ['search_docs', 'get_digest', 'get_observations', 'record_observation',
+                   'create_document', 'record_decision']) {
+    assert.equal(rule({ verb: v }).allowed, true, `'${v}' must not suspend — it is a memory primitive`);
+  }
+  assert.equal(rule({ verb: 'delete_observation' }).allowed, false, 'destructive primitive must halt');
+});
+
+test('18) the risk badge is null rather than wrong where the enum has no honest member', async () => {
+  const { openP9Request } = await import('./p9-request.js');
+  const s = open(`p9req-${randomUUID().slice(0, 8)}`);
+  const billing = openP9Request(s, { action: CHARGE, tenantId: 't1' });
+  assert.equal(billing.riskClassification, 'HIGH_FINANCIAL');
+  const published = openP9Request(s, { action: { verb: 'send_campaign', target: 'c:1' }, tenantId: 't1' });
+  assert.equal(published.riskClassification, null,
+    "'publish' has no honest member of the frame's enum — a wrong badge trains operators to ignore badges");
+});

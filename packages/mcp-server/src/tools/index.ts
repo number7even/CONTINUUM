@@ -10,6 +10,7 @@
  *
  * IP by Riaan Kleynhans - Human in the Loop - Copyright Riaan Kleynhans
  */
+import { p9Authorize, openP9Request } from '@number7even/continuum-core';
 import type { StorageBackend } from '@number7even/continuum-core';
 import type { ToolDefinition, ToolHandler, ToolResult } from '../tool-types.js';
 
@@ -118,5 +119,49 @@ export async function dispatchTool(
   if (!handler) {
     throw new Error(`Unknown tool: ${name}`);
   }
+
+  // ── P9 interception ────────────────────────────────────────────────────────
+  // Voice proposes; the physical click seals. A restricted verb halts HERE, before the
+  // handler runs, because a handler that has already written cannot be un-run. The ask is
+  // recorded as a p9-request (never a decision — that is the seal) and a suspension is
+  // returned for the approval frame to render.
+  //
+  // The gate reads the LEDGER via p9Authorize, never the request table: an 'approved'
+  // request row is a queue state, not consent, and keying execution off it would make any
+  // writer to that source a consent-forgery primitive.
+  const p9Args = (args ?? {}) as Record<string, unknown>;
+  const ruling = p9Authorize(storage, {
+    verb: name.replace(/^continuum_/, ''),
+    target: typeof p9Args.target === 'string' ? p9Args.target : undefined,
+    params: p9Args,
+    origin: 'agent',
+    proposedBy: typeof p9Args._proposedBy === 'string' ? p9Args._proposedBy : undefined,
+  }, { autonomyLevel: typeof p9Args._autonomyLevel === 'string' ? p9Args._autonomyLevel : undefined });
+
+  if (!ruling.allowed) {
+    const req = openP9Request(storage, {
+      action: {
+        verb: name.replace(/^continuum_/, ''),
+        target: typeof p9Args.target === 'string' ? p9Args.target : undefined,
+        params: p9Args,
+        proposedBy: typeof p9Args._proposedBy === 'string' ? p9Args._proposedBy : undefined,
+      },
+      tenantId: typeof p9Args._tenantId === 'string' ? p9Args._tenantId : 'unknown',
+      autonomyLevel: typeof p9Args._autonomyLevel === 'string' ? p9Args._autonomyLevel : undefined,
+    });
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          ok: false,
+          suspended: true,
+          p9: { requestId: req.id, category: req.category, riskClassification: req.riskClassification,
+                reason: ruling.reason, autonomyLevel: ruling.autonomyLevel ?? null },
+          payload: req,
+        }, null, 2),
+      }],
+    };
+  }
+
   return handler(args, storage);
 }
