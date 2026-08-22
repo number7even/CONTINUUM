@@ -181,6 +181,10 @@ export type { HotelKb, HotelRoom, HotelFaq, HotelPolicy, HotelProperty, HotelKbI
 export { SqliteTenancyDirectory, openTenancyDirectory } from './tenancy.js';
 export type { TenancyDirectory, TenantRecord, TenantStatus, RegisterTenantInput } from './tenancy.js';
 
+// — P9 carve-out: the categories no autonomy level may execute unattended.
+export { rule as p9Rule, authorize as p9Authorize, classify as p9Classify, actionHash as p9ActionHash, sealActionApproval, P9_CATEGORIES } from './p9.js';
+export type { ProposedAction, P9Ruling, P9Category, AuthorizeOptions as P9AuthorizeOptions } from './p9.js';
+
 // — The Authorship Ledger: the single source of truth for sealing a human P9 decision.
 export { sealDecision, consentHash, AUTHORSHIP_SOURCE_ID, DECISION_VERDICTS } from './authorship.js';
 export type { SealDecisionInput, SealedDecision, DecisionSubject, DecisionBasis, DecisionVerdict } from './authorship.js';

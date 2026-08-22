@@ -1,0 +1,139 @@
+/**
+ * p9.test.ts — the carve-out is only a boundary if these hold.
+ *
+ * Leg 3 is the one that justifies the module existing: L4 AUTONOMOUS must NOT satisfy P9.
+ * If it did, the carve-out would be a rung on the ladder and the ladder's own escalation
+ * path would be the bypass — the tenants who turned the dial all the way up would be the
+ * ones with no boundary left.
+ *
+ * IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans
+ */
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { openStorage } from './factory.js';
+import type { StorageBackend } from './storage.js';
+import { sealDecision } from './authorship.js';
+import { rule, authorize, classify, actionHash, sealActionApproval, P9_CATEGORIES } from './p9.js';
+
+let dataDir: string;
+let prevDir: string | undefined;
+let prevBackend: string | undefined;
+const opened: StorageBackend[] = [];
+const open = (t: string) => { const s = openStorage(t); opened.push(s); return s; };
+
+before(() => {
+  prevDir = process.env.CONTINUUM_DATA_DIR;
+  prevBackend = process.env.CONTINUUM_STORAGE_BACKEND;
+  dataDir = mkdtempSync(join(tmpdir(), 'continuum-p9-'));
+  process.env.CONTINUUM_DATA_DIR = dataDir;
+  process.env.CONTINUUM_STORAGE_BACKEND = 'sqlite';
+});
+after(() => {
+  for (const s of opened) { try { s.close(); } catch { /* ignore */ } }
+  if (dataDir) rmSync(dataDir, { recursive: true, force: true });
+  if (prevDir === undefined) delete process.env.CONTINUUM_DATA_DIR; else process.env.CONTINUUM_DATA_DIR = prevDir;
+  if (prevBackend === undefined) delete process.env.CONTINUUM_STORAGE_BACKEND; else process.env.CONTINUUM_STORAGE_BACKEND = prevBackend;
+});
+
+const CHARGE = { verb: 'charge', target: 'booking:7781', params: { amountEur: 40 }, origin: 'voice' as const, proposedBy: 'arian' };
+
+test('1) voice may read and stage without a seal — the proposing half stays frictionless', () => {
+  for (const verb of ['search', 'browse', 'preview', 'stage', 'draft']) {
+    const r = rule({ verb, origin: 'voice' });
+    assert.equal(r.allowed, true, `'${verb}' should not need a seal`);
+  }
+});
+
+test('2) every restricted category refuses without a seal', () => {
+  const seen = new Set<string>();
+  for (const verb of ['charge', 'publish', 'sign', 'rotate_key']) {
+    const r = rule({ verb, origin: 'voice' });
+    assert.equal(r.allowed, false, `'${verb}' must require a seal`);
+    assert.ok(r.category, `'${verb}' should carry a category`);
+    seen.add(r.category as string);
+  }
+  assert.deepEqual([...seen].sort(), [...P9_CATEGORIES].sort(), 'not all four categories exercised');
+});
+
+test('3) THE CARVE-OUT: L4 AUTONOMOUS does not satisfy P9 — no level does', () => {
+  for (const level of ['L0', 'L1', 'L2', 'L3', 'L4', 'AUTONOMOUS', undefined]) {
+    const r = rule(CHARGE, level);
+    assert.equal(r.allowed, false, `autonomy level ${level} must NOT unlock a billing action`);
+    assert.equal(r.autonomyLevel, level, 'the level should be recorded for audit');
+  }
+  // And the refusal reason names the invariant, so an operator reading a log understands
+  // this is deliberate rather than a misconfigured permission.
+  assert.match(rule(CHARGE, 'L4').reason, /every autonomy level/i);
+});
+
+test('4) unknown verbs fail CLOSED', () => {
+  const c = classify('frobnicate_the_ledger');
+  assert.equal(c.known, false);
+  assert.equal(c.restricted, true, 'an unrecognised verb must not be assumed safe');
+  assert.match(rule({ verb: 'frobnicate_the_ledger' }).reason, /fail closed/i);
+});
+
+test('5) a matching human seal authorises exactly that action', () => {
+  const s = open(`p9-${randomUUID().slice(0, 8)}`);
+  assert.equal(authorize(s, CHARGE).allowed, false, 'should refuse before sealing');
+
+  const { actionHash: h } = sealActionApproval(s, CHARGE, { operator: 'riaan', rationale: 'confirmed by phone' });
+  const after = authorize(s, CHARGE);
+  assert.equal(after.allowed, true, `still refused after sealing: ${after.reason}`);
+  assert.ok(after.sealId, 'no seal id returned');
+  assert.equal(after.actionHash, h, 'ruling and seal disagree on the action hash');
+});
+
+test('6) REPLAY: a seal for €40 does not authorise €4000', () => {
+  const s = open(`p9-${randomUUID().slice(0, 8)}`);
+  sealActionApproval(s, CHARGE, { operator: 'riaan' });
+  const bigger = { ...CHARGE, params: { amountEur: 4000 } };
+  assert.notEqual(actionHash(bigger), actionHash(CHARGE), 'changing the amount must change the hash');
+  assert.equal(authorize(s, bigger).allowed, false, 'a seal was replayed onto a different amount');
+  // A different target is likewise a different action.
+  assert.equal(authorize(s, { ...CHARGE, target: 'booking:9999' }).allowed, false);
+});
+
+test('7) SELF-SEALING: the proposing agent cannot mint its own consent', () => {
+  const s = open(`p9-${randomUUID().slice(0, 8)}`);
+  sealActionApproval(s, CHARGE, { operator: 'arian' });   // arian === CHARGE.proposedBy
+  const r = authorize(s, CHARGE);
+  assert.equal(r.allowed, false, 'an agent sealed its own action and was allowed');
+  assert.match(r.reason, /no matching human seal/i);
+});
+
+test('8) a rejection is not consent', () => {
+  const s = open(`p9-${randomUUID().slice(0, 8)}`);
+  sealDecision(s, {
+    verdict: 'reject', operator: 'riaan',
+    subject: { kind: 'p9-action', id: actionHash(CHARGE).replace(/^sha256:/, ''),
+               title: actionHash(CHARGE).replace(/^sha256:/, ''), contentHash: actionHash(CHARGE) },
+  });
+  assert.equal(authorize(s, CHARGE).allowed, false, "a 'reject' verdict was read as approval");
+});
+
+test('9) origin does not decide — a typed instruction gets the same treatment as a spoken one', () => {
+  const spoken = rule({ ...CHARGE, origin: 'voice' });
+  const typed = rule({ ...CHARGE, origin: 'text' });
+  const scheduled = rule({ ...CHARGE, origin: 'scheduler' });
+  assert.equal(spoken.allowed, false);
+  assert.equal(typed.allowed, false);
+  assert.equal(scheduled.allowed, false, 'a scheduler is not a human click');
+  // Same action, same binding, regardless of how it arrived.
+  assert.equal(spoken.actionHash, typed.actionHash);
+  assert.equal(spoken.actionHash, scheduled.actionHash);
+});
+
+test('10) an unreadable ledger refuses rather than assuming consent', () => {
+  const broken = {
+    searchObservations() { throw new Error('db gone'); },
+    getObservations() { return []; },
+  } as unknown as StorageBackend;
+  const r = authorize(broken, CHARGE);
+  assert.equal(r.allowed, false);
+  assert.match(r.reason, /unreadable/i);
+});
