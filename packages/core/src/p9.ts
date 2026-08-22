@@ -46,7 +46,7 @@ import { AUTHORSHIP_SOURCE_ID } from './observation.js';
 import { sealDecision } from './authorship.js';
 
 /** Categories no autonomy level may execute unattended. */
-export const P9_CATEGORIES = ['billing', 'publish', 'contract', 'credentials'] as const;
+export const P9_CATEGORIES = ['billing', 'publish', 'contract', 'credentials', 'data'] as const;
 export type P9Category = (typeof P9_CATEGORIES)[number];
 
 /**
@@ -78,8 +78,9 @@ const FREE_VERBS = new Set([
  *                     Cost without a seal is a billing question wearing a data costume.
  *   score_lead        mutates a lead record. Low blast radius, but not read-only.
  */
-export const P9_PENDING_RULING = new Set([
-  'pms_reservations', 'pos_menu_sync', 'source_leads', 'score_lead',
+export const P9_PENDING_RULING = new Set<string>([
+  // Empty: all four were ruled RESTRICTED on 2026-08-22. Kept as a mechanism so the next
+  // ambiguous verb is visibly pending rather than silently indistinguishable from a typo.
 ]);
 
 /** Verb → restricted category. Matched on the verb itself, not on free text. */
@@ -105,6 +106,22 @@ const RESTRICTED_VERBS: Record<string, P9Category> = {
   activity_book: 'billing',
   send_report: 'publish',            // outbound to recipients; unsendable once sent
   teams_notify: 'publish',           // outbound message
+
+  // ── ruled 2026-08-22, previously pending ──────────────────────────────────
+  // pms_reservations covers listing AND creating. Restricted until it is SPLIT into
+  // pms_list_reservations (free) and pms_create_reservation (billing) — one verb cannot
+  // safely be both, and the safe reading of an ambiguous verb is the dangerous one.
+  pms_reservations: 'billing',
+  // Pushing a menu changes what guests can order and what they are charged. Treating a
+  // directionless "sync" as a read invites price tampering.
+  pos_menu_sync: 'billing',
+  // Executes paid third-party discovery queries and writes CRM rows at scale.
+  source_leads: 'billing',
+  // Mutates XENOS CRM lead records. Money does not move and nothing goes outbound, so
+  // none of the directive's four categories fits honestly; 'data' is a PROPOSED fifth,
+  // added rather than mislabelling this as billing. Rename or reject it — but it should
+  // not be called something it is not.
+  score_lead: 'data',
 };
 
 export interface ProposedAction {

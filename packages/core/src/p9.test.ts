@@ -50,7 +50,7 @@ test('1) voice may read and stage without a seal — the proposing half stays fr
 
 test('2) every restricted category refuses without a seal', () => {
   const seen = new Set<string>();
-  for (const verb of ['charge', 'publish', 'sign', 'rotate_key']) {
+  for (const verb of ['charge', 'publish', 'sign', 'rotate_key', 'score_lead']) {
     const r = rule({ verb, origin: 'voice' });
     assert.equal(r.allowed, false, `'${verb}' must require a seal`);
     assert.ok(r.category, `'${verb}' should carry a category`);
@@ -179,9 +179,11 @@ test('13) generate_magic_link is credentials — minting auth by voice is not a 
   assert.equal(r.category, 'credentials');
 });
 
-test('14) a pending verb refuses, and says a ruling is owed rather than "unrecognised"', () => {
+test('14) the four formerly-pending verbs are now ruled RESTRICTED', () => {
   const r = rule({ verb: 'pms_reservations', target: 'stay:88' });
   assert.equal(r.allowed, false);
-  assert.match(r.reason, /awaiting a P9 ruling/i);
-  assert.equal(classify('pms_reservations').pendingRuling, true);
+  assert.equal(classify('pms_reservations').category, 'billing', 'ruled billing 2026-08-22');
+  // The pending MECHANISM must survive the set being emptied — it is how the next
+  // ambiguous verb announces itself instead of looking like a typo.
+  assert.equal(classify('a_verb_nobody_ruled').pendingRuling, undefined);
 });
