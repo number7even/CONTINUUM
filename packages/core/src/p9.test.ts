@@ -137,3 +137,51 @@ test('10) an unreadable ledger refuses rather than assuming consent', () => {
   assert.equal(r.allowed, false);
   assert.match(r.reason, /unreadable/i);
 });
+
+/**
+ * The Command Plane's RUNNABLE_VERBS registry, mirrored. It cannot be imported —
+ * number7evencrm and CONTINUUM communicate over HTTP only, never by shared module — so
+ * this list is a COPY and copies drift. Source of truth:
+ *   number7evencrm/src/lib/dictionary/runnable-verbs.ts
+ * Leg 11 exists so a verb added there and mirrored here cannot ship unclassified. It
+ * cannot detect a verb added there and NOT mirrored here; that gap is real and the seam
+ * is why. Fail-closed covers it at runtime — an unmirrored verb refuses.
+ */
+const FEDERATION_VERBS = [
+  'source_leads', 'score_lead', 'send_campaign', 'send_report', 'generate_magic_link',
+  'pms_connect', 'pms_status', 'pms_room_types', 'pms_availability', 'pms_reservations',
+  'pos_connect', 'pos_status', 'pos_menu_sync', 'pos_create_ticket',
+  'spa_book', 'activity_book', 'price_quote', 'teams_notify',
+];
+
+test('11) every federation verb is explicitly classified or explicitly pending', () => {
+  assert.equal(FEDERATION_VERBS.length, 18, 'the mirrored registry changed size');
+  const unhandled: string[] = [];
+  for (const v of FEDERATION_VERBS) {
+    const c = classify(v);
+    if (!c.known && !c.pendingRuling) unhandled.push(v);
+  }
+  assert.deepEqual(unhandled, [],
+    `these federation verbs are neither classified nor marked pending, so they refuse for ` +
+    `no stated reason: ${unhandled.join(', ')}`);
+});
+
+test('12) the read-only federation verbs do NOT require a seal — no operational gridlock', () => {
+  for (const v of ['pms_status', 'pms_room_types', 'pms_availability', 'pos_status', 'price_quote']) {
+    assert.equal(rule({ verb: v, origin: 'voice' }).allowed, true,
+      `'${v}' is a pure read and must not need a click`);
+  }
+});
+
+test('13) generate_magic_link is credentials — minting auth by voice is not a convenience', () => {
+  const r = rule({ verb: 'generate_magic_link', target: 'user:42' }, 'L4');
+  assert.equal(r.allowed, false);
+  assert.equal(r.category, 'credentials');
+});
+
+test('14) a pending verb refuses, and says a ruling is owed rather than "unrecognised"', () => {
+  const r = rule({ verb: 'pms_reservations', target: 'stay:88' });
+  assert.equal(r.allowed, false);
+  assert.match(r.reason, /awaiting a P9 ruling/i);
+  assert.equal(classify('pms_reservations').pendingRuling, true);
+});

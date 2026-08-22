@@ -58,6 +58,28 @@ export type P9Category = (typeof P9_CATEGORIES)[number];
 const FREE_VERBS = new Set([
   'search', 'browse', 'read', 'get', 'list', 'query', 'summarise', 'summarize',
   'preview', 'stage', 'draft', 'simulate', 'explain', 'digest', 'observe',
+  // ── federation verbs (Command Plane), read-only half ──────────────────────
+  'pms_status', 'pms_room_types', 'pms_availability', 'pos_status',
+  'price_quote',   // computes a figure; ACCEPTING one is 'accept_quote' → contract
+]);
+
+/**
+ * Federation verbs whose P9 disposition is a PRODUCT decision, not an engineering one.
+ * Listed rather than omitted so they are visibly pending instead of indistinguishable
+ * from a typo — classify() reports these separately. They remain RESTRICTED meanwhile,
+ * because fail-closed is the safe direction while someone decides.
+ *
+ *   pms_reservations  the name covers both listing and creating. If it only reads, it
+ *                     belongs in FREE_VERBS; if it can create or modify a stay, it is
+ *                     billing. One verb cannot be both.
+ *   pos_menu_sync     "sync" is directionless. Pulling a menu is a read; pushing one
+ *                     changes what guests can order and what they are charged.
+ *   source_leads      writes rows at scale AND spends real money on paid discovery APIs.
+ *                     Cost without a seal is a billing question wearing a data costume.
+ *   score_lead        mutates a lead record. Low blast radius, but not read-only.
+ */
+export const P9_PENDING_RULING = new Set([
+  'pms_reservations', 'pos_menu_sync', 'source_leads', 'score_lead',
 ]);
 
 /** Verb → restricted category. Matched on the verb itself, not on free text. */
@@ -70,6 +92,19 @@ const RESTRICTED_VERBS: Record<string, P9Category> = {
   countersign: 'contract',
   rotate_key: 'credentials', set_secret: 'credentials', grant_role: 'credentials',
   revoke_role: 'credentials', reset_password: 'credentials', issue_token: 'credentials',
+
+  // ── federation verbs (Command Plane), restricted half ─────────────────────
+  // generate_magic_link is the sharpest of these and the easiest to overlook: it MINTS
+  // AN AUTH TOKEN. A voice agent able to call it unattended can hand out account access
+  // by saying a sentence. It is a credentials action, not a convenience.
+  generate_magic_link: 'credentials',
+  pms_connect: 'credentials',        // stores PMS integration credentials
+  pos_connect: 'credentials',        // stores POS integration credentials
+  pos_create_ticket: 'billing',      // opens an order — money follows
+  spa_book: 'billing',
+  activity_book: 'billing',
+  send_report: 'publish',            // outbound to recipients; unsendable once sent
+  teams_notify: 'publish',           // outbound message
 };
 
 export interface ProposedAction {
@@ -152,11 +187,14 @@ export function sealActionApproval(
 }
 
 /** Classify a verb. Unknown → restricted with a null category (fail closed). */
-export function classify(verb: string): { restricted: boolean; category: P9Category | null; known: boolean } {
+export function classify(verb: string): { restricted: boolean; category: P9Category | null; known: boolean; pendingRuling?: boolean } {
   const v = String(verb ?? '').trim().toLowerCase();
   if (FREE_VERBS.has(v)) return { restricted: false, category: null, known: true };
   const cat = RESTRICTED_VERBS[v];
   if (cat) return { restricted: true, category: cat, known: true };
+  // Awaiting a product ruling is not the same as never having been considered. Both
+  // refuse, but only one of them tells the operator a decision is owed.
+  if (P9_PENDING_RULING.has(v)) return { restricted: true, category: null, known: false, pendingRuling: true };
   return { restricted: true, category: null, known: false };
 }
 
@@ -167,7 +205,7 @@ export function classify(verb: string): { restricted: boolean; category: P9Categ
  * `autonomyLevel` is accepted and echoed back, and is deliberately not consulted.
  */
 export function rule(action: ProposedAction, autonomyLevel?: string): P9Ruling {
-  const { restricted, category, known } = classify(action.verb);
+  const { restricted, category, known, pendingRuling } = classify(action.verb);
   const hash = actionHash(action);
   if (!restricted) {
     return { allowed: true, category: null, actionHash: hash, autonomyLevel,
@@ -180,7 +218,9 @@ export function rule(action: ProposedAction, autonomyLevel?: string): P9Ruling {
     autonomyLevel,
     reason: known
       ? `'${action.verb}' is a ${category} action — requires a human seal at every autonomy level, including L4`
-      : `'${action.verb}' is not on the read-only allowlist — unrecognised verbs fail closed and require a human seal`,
+      : pendingRuling
+        ? `'${action.verb}' is awaiting a P9 ruling (read-only or mutating?) — refusing until classified`
+        : `'${action.verb}' is not on the read-only allowlist — unrecognised verbs fail closed and require a human seal`,
   };
 }
 
