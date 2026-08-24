@@ -131,4 +131,25 @@ better lighting." Projection integrity is now gate-checked: `scripts/
 verify-brain-projection.mjs` (GREEN at commit) fails the build the moment a browser-storage
 API enters the Brain surface.
 
-Sequencing unchanged: **all of §6 waits behind Wave-1 closure.**
+Sequencing unchanged: **all of §6 waits behind Wave-1 closure.** _(Wave 1 closed
+2026-08-18 — §6 items now queue normally behind the standing engine board.)_
+
+## 7. The canonised end-state (founder-banked 2026-08-22)
+
+**"The interface does not exist until an utterance summons it, and then it recedes."**
+Speech is the request substrate; the HyperFrame is the ephemeral answer; the screen is a
+servant. Execution path maps entirely onto existing primitives: panels as brain-views
+(summon = two brain reads), the L1→L3 ask-back ladder (feature ⑥), and the Claim-Render
+Gate in front of whatever appears. 🔴 VISION, correctly — but a vision with named
+dependencies rather than vibes.
+
+**Two constitutional constraints ride with it, banked as law:**
+1. **The P9 voice carve-out:** voice proposes — it may browse, query, and stage visual
+   previews; any mutation involving currency, publishing, contracts, or credentials is
+   programmatically blocked from auto-execution and halts for the physical human click
+   that writes the sealed decision. This is enforced at the existing gates (`review.mjs`,
+   DB-level `approved_by_human`, the fail-closed walls); new voice surfaces inherit it
+   through the Claim-Render Gate library — never via a duplicate enforcement point.
+2. **SONA horizon tag:** what is active is Wave-2 machinery (`ground_truth` rewards →
+   `feedbackWeight`, bounded 0.8–1.3). Full SONA-class adaptation is 🔴 VISION and is
+   never described in present tense.
