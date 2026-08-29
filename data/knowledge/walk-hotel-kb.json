@@ -1,0 +1,87 @@
+{
+  "property": {
+    "name": "Walk Hotel",
+    "address": "Bavarian Alps, Germany",
+    "checkIn": "15:00",
+    "checkOut": "11:00",
+    "phone": "+49 89 2154 8700",
+    "description": "Boutique alpine lifestyle hotel featuring 42 luxury rooms and suites, a dedicated wellness spa, and an artisanal restaurant. Amenities: Alpine Wellness Spa, Farm-to-Table Restaurant, High-Speed WiFi, Heated Ski & Boot Storage, Complimentary Mountain Shuttles, EV Charging Stations."
+  },
+  "rooms": [
+    {
+      "code": "classic_queen",
+      "name": "Classic Queen Room",
+      "description": "Comfortable alpine-inspired room with queen bed, ensuite rain shower, and forest views. (12 of this type at the property.)",
+      "rateNightly": 180,
+      "maxOccupancy": 2
+    },
+    {
+      "code": "deluxe_king",
+      "name": "Deluxe King Room",
+      "description": "Spacious king room featuring a private balcony with panoramic mountain views and seating area. (14 of this type at the property.)",
+      "rateNightly": 240,
+      "maxOccupancy": 2
+    },
+    {
+      "code": "alpine_double",
+      "name": "Alpine Double Room",
+      "description": "Cozy twin/double room crafted with reclaimed larch wood and modern minimalist decor. (8 of this type at the property.)",
+      "rateNightly": 210,
+      "maxOccupancy": 2
+    },
+    {
+      "code": "panorama_studio",
+      "name": "Panorama Studio",
+      "description": "Open-plan studio with floor-to-ceiling glass, kitchenette, king bed, and convertible sofa. (6 of this type at the property.)",
+      "rateNightly": 320,
+      "maxOccupancy": 3
+    },
+    {
+      "code": "penthouse_suite",
+      "name": "Penthouse Suite",
+      "description": "Top-floor dual-room suite with private sauna, open fireplace, wraparound terrace, and dedicated butler call service. (2 of this type at the property.)",
+      "rateNightly": 550,
+      "maxOccupancy": 4
+    }
+  ],
+  "faqs": [
+    {
+      "question": "What are the reception and check-in hours?",
+      "answer": "Standard check-in starts at 15:00, and check-out is by 11:00. The reception desk is staffed 24/7. Express digital arrival and keyless entry are enabled via ARIAN."
+    },
+    {
+      "question": "What are the hours and booking rules for the Alpine Spa?",
+      "answer": "The Alpine Spa is open daily from 10:00 to 15:00. Signature 60-minute alpine massages are priced at EUR 150. Advance reservation is mandatory to manage therapist coverage. Treatments must be cleared for medical contraindications during intake."
+    },
+    {
+      "question": "What are the restaurant opening hours and reservation policies?",
+      "answer": "Dinner service runs daily from 18:30 to 21:30 across 12 indoor tables. Reservations are strongly recommended and can be confirmed instantly by voice. Special dietary requirements and allergen notices must be submitted prior to seating."
+    },
+    {
+      "question": "Is parking available on site?",
+      "answer": "Underground secure parking is available for hotel guests at EUR 25 per night. Four 22kW EV chargers are available on a first-come basis."
+    },
+    {
+      "question": "Are pets allowed at the property?",
+      "answer": "Dogs are welcome in designated Classic Queen and Alpine Double rooms with prior notification. A cleaning fee of EUR 35 per stay applies. Dogs must remain leashed in public areas and are not permitted inside the Alpine Spa."
+    }
+  ],
+  "policies": [
+    {
+      "name": "check_in_check_out",
+      "body": "Standard arrival: 15:00. Standard departure: 11:00. Late check-out until 14:00 is subject to availability and a EUR 50 surcharge. Unannounced arrivals after 22:00 trigger late-arrival automated concierge routing."
+    },
+    {
+      "name": "cancellation",
+      "body": "Flexible bookings may be cancelled free of charge up to 48 hours prior to the 15:00 check-in window. Cancellations within 48 hours or no-shows incur a 100% charge for the first night."
+    },
+    {
+      "name": "spa_wellness",
+      "body": "Spa appointments must be cancelled at least 4 hours in advance to avoid a 50% cancellation fee. Guests must disclose skin treatments, active medications (e.g., retinol), or pregnancy during intake."
+    },
+    {
+      "name": "smoking_damage",
+      "body": "Walk Hotel is a 100% non-smoking property across all indoor areas and balconies. Violation incurs an immediate EUR 250 deep-cleaning fee plus room downtime charges."
+    }
+  ]
+}
