@@ -24,6 +24,17 @@ primary_region = "iad"  # US East. Change with `fly regions set <region>`.
   # factory.ts now defaults to the V0.5 hybrid backend (ruvector + MiniLM),
   # which needs >512MB + native modules. This VM is sized for SQLite-only.
   CONTINUUM_STORAGE_BACKEND = "sqlite"
+  # Arms the 5 GUEST-PII scrubber patterns (email, credit card, IBAN, passport,
+  # phone). observation.ts compares === "1" EXACTLY -- "true"/"yes"/"01" all
+  # silently leave them off. The 11 SECRET patterns (keys/tokens/PEM/JWT) run
+  # unconditionally and do not depend on this.
+  #
+  # Without this, hotel-KB ingestion writes guest emails and card numbers into a
+  # vector space that cannot be selectively deleted -- the remedy is destroying
+  # and rebuilding the tenant's database. scripts/ingest-hotel-kb.mjs refuses to
+  # run without it, and proves the shield with a live canary rather than trusting
+  # this line.
+  CONTINUUM_PRIVACY_PII = "1"
   NODE_ENV             = "production"
 
 # Secrets (NOT in env above — set via `fly secrets set ...` so they're encrypted):
