@@ -101,6 +101,23 @@ jobs:
       - name: Build better-sqlite3 native addon
         run: npm rebuild better-sqlite3 --workspace=@number7even/continuum-core
 
+      - name: Install ffmpeg — verify-fuel-path synthesizes a real MP4
+        # ubuntu-latest ships no ffmpeg. verify-fuel-path.mjs generates a phone-style clip
+        # (testsrc2 + a 440Hz sine) and proves the video intake seam against it: cover-crop
+        # to 1080x1920, ORIGINAL audio survival, probe + sha pin. Its header declares the
+        # requirement outright — "needs ffmpeg; no network, no LLM" — so this is a missing
+        # runner dependency, not a network test, and it does NOT belong in smoke-integration.
+        #
+        # Without this step the gate dies at `/bin/sh: 1: ffmpeg: not found` (status 127).
+        # Measured on the runner 2026-09-14: gate 37 of 44, 31 gates green before it, while
+        # passing on any dev machine that happens to have ffmpeg installed — the same
+        # ambient-environment trap that kept the teleprompter gate red.
+        #
+        # This is the ONLY smoke gate needing an external binary: verify-render-hang shells
+        # bash/sleep, publish-wire and matcher-dedup spawn node, and verify-artifact (the
+        # other ffmpeg consumer) is not in the smoke target.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: make smoke — the referee (deterministic gates; any fail → exit 1)
         # Runs in its OWN job, independent of the security-audit gate, so functional
         # regressions are caught even while a security advisory is being triaged (separate
