@@ -50,6 +50,9 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Per-instance build dir so parallel tenant instances (e.g. hotel-demo on :3001)
+  // never share .next — shared caches corrupted the chunk graph on 2026-08-26.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // Strip `x-powered-by: Next.js` (information leak flagged in the audit).
   poweredByHeader: false,
   // Default to Node runtime everywhere (the MCP SDK SSE client needs
