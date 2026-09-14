@@ -1570,6 +1570,108 @@ async function commandProvisionTenant(): Promise<void> {
   out.write(`  matching JWKS and validates this token. Never commit the token (P1).\n\n`);
 }
 
+// ── continuum approve-decision — the P9 seal, minted ON the engine ────────────
+//
+// The on-engine twin of the worker's review.mjs approve: seals a human
+// decision into a named tenant's Authorship Ledger through the SAME core
+// choke-point (`sealDecision` → `storage.insertObservation`), so the seal the
+// PodGeni/Crooma walls re-verify via GET /api/observation/:id was minted by
+// the engine itself — never hand-inserted (the E1 anti-pattern this command
+// exists to retire).
+//
+// P9 discipline: `--operator` is REQUIRED with no default — the human who
+// leaps is named, or nothing seals. The machine may stage this command; only
+// a person may run it.
+//
+//   continuum approve-decision <tenantId> --brief draft.json \
+//     --operator "Riaan Kleynhans" [--draft-id <id>] [--verdict accept] \
+//     [--rationale "why"]
+//
+// The contentHash binds the exact brief the human saw: consentHash(brief) —
+// byte-identical to the worker's draftContentHash (same canonical JSON, same
+// sha256), proven by scripts/verify-approve-decision.mjs.
+async function commandApproveDecision(): Promise<void> {
+  const argv = process.argv.slice(3);
+  let tenantId = '';
+  let briefPath = '';
+  let operator = '';
+  let rationale = '';
+  let draftId = '';
+  let verdict = 'accept';
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] ?? '';
+    const val = (): string => (a.includes('=') ? a.slice(a.indexOf('=') + 1) : (argv[++i] ?? ''));
+    if (a.startsWith('-')) {
+      if (a === '--brief' || a.startsWith('--brief=')) briefPath = val();
+      else if (a === '--operator' || a.startsWith('--operator=')) operator = val();
+      else if (a === '--rationale' || a.startsWith('--rationale=')) rationale = val();
+      else if (a === '--draft-id' || a.startsWith('--draft-id=')) draftId = val();
+      else if (a === '--verdict' || a.startsWith('--verdict=')) verdict = val();
+    } else if (!tenantId) {
+      tenantId = a;
+    }
+  }
+  if (!tenantId || !briefPath || !operator.trim()) {
+    process.stderr.write(
+      'continuum approve-decision: <tenantId> --brief <draft.json> --operator "<name>" required.\n' +
+      '  The operator is the human sealing the decision — there is no default (P9).\n',
+    );
+    process.exit(1);
+  }
+
+  const { readFileSync } = await import('node:fs');
+  let rec: { id?: string; brief?: unknown; slug?: string };
+  try {
+    rec = JSON.parse(readFileSync(briefPath, 'utf8')) as typeof rec;
+  } catch (err) {
+    process.stderr.write(`continuum approve-decision: cannot read brief JSON at ${briefPath}: ${String(err)}\n`);
+    process.exit(1);
+    return;
+  }
+  const brief = (rec.brief ?? rec) as Record<string, unknown>;
+  if (!brief || typeof brief !== 'object' || Object.keys(brief).length === 0) {
+    process.stderr.write('continuum approve-decision: brief is empty — nothing to seal.\n');
+    process.exit(1);
+  }
+  const subjectId = draftId || rec.id || '';
+  if (!subjectId) {
+    process.stderr.write('continuum approve-decision: no draft id (--draft-id or .id in the brief file).\n');
+    process.exit(1);
+  }
+
+  const { openStorage, sealDecision, consentHash } = await import('@number7even/continuum-core');
+  // Same algorithm as the worker's draftContentHash: sha256 over canonical
+  // JSON of the brief the human saw (consentHash IS that function in core).
+  const contentHash = consentHash(brief);
+  const storage = openStorage(tenantId);
+  try {
+    const sealed = sealDecision(storage, {
+      verdict,
+      subject: {
+        kind: 'amf-draft',
+        id: subjectId,
+        title: String((brief as { headline?: unknown }).headline ?? rec.slug ?? subjectId),
+        contentHash,
+      },
+      operator: operator.trim(),
+      rationale: rationale || undefined,
+      refs: [],
+    });
+    const out = process.stdout;
+    out.write(`\n✓ P9 decision sealed — ${sealed.id}\n`);
+    out.write(`  tenant      ${tenantId}\n`);
+    out.write(`  verdict     ${sealed.verdict.toUpperCase()}\n`);
+    out.write(`  operator    ${sealed.operator}\n`);
+    out.write(`  subject     ${subjectId}\n`);
+    out.write(`  contentHash ${contentHash}\n`);
+    out.write(`  sealed at   ${sealed.timestamp}\n`);
+    out.write(`\n  Verify: GET /api/observation/${sealed.id} (tenant-scoped) — the walls\n`);
+    out.write(`  re-derive this contentHash over the bundle's brief and gate on equality.\n\n`);
+  } finally {
+    storage.close?.();
+  }
+}
+
 // ── continuum observe — capture terminal output as a live Observation ─────────
 //
 // The CAPTURE seam of the qualifying loop. Pipe any command's output in and it
@@ -1810,6 +1912,10 @@ async function main(): Promise<void> {
 
     case 'provision-tenant':
       await commandProvisionTenant();
+      return;
+
+    case 'approve-decision':
+      await commandApproveDecision();
       return;
 
     case 'import-state':

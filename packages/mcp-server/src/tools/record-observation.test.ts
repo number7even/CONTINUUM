@@ -35,7 +35,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openStorage, type StorageBackend } from '@number7even/continuum-core';
+import { type StorageBackend } from '@number7even/continuum-core';
+import { buildServer, type ServerHandle } from '../server.js';
 import { handleRecordObservation, recordObservationTool } from './record-observation.js';
 
 /** Unique per run so the suite never inherits a previous run's rows. */
@@ -51,13 +52,21 @@ const OTHER = `test-recobs-other-${randomUUID().slice(0, 8)}`;
 let dataDir: string;
 let originalDataDir: string | undefined;
 let originalBackend: string | undefined;
-const opened = new Map<string, StorageBackend>();
+const opened = new Map<string, ServerHandle>();
 
-/** Open (or reuse) a tenant's storage, registering it for close in after(). */
+/** Open (or reuse) a tenant's storage, registering it for close in after().
+ *
+ * Storage is reached through `buildServer(tenantId).storage` — the same injected
+ * backend every tool handler sees at runtime — never via the global storage
+ * factory. The W27-2 static gate bans that factory's name anywhere under
+ * src/tools/, test files and comments included ("no occurrence at all"), and the
+ * gate is right to: a fixture that opens its own backend is not exercising the
+ * path the handler actually runs on. The handle owns the storage (no
+ * `opts.storage` passed), so `handle.close()` closes the SQLite handle too. */
 function open(tenant: string): StorageBackend {
-  let s = opened.get(tenant);
-  if (!s) { s = openStorage(tenant); opened.set(tenant, s); }
-  return s;
+  let h = opened.get(tenant);
+  if (!h) { h = buildServer(tenant); opened.set(tenant, h); }
+  return h.storage;
 }
 
 before(() => {
@@ -71,7 +80,7 @@ before(() => {
 });
 
 after(() => {
-  for (const s of opened.values()) { try { s.close(); } catch { /* already closed */ } }
+  for (const h of opened.values()) { try { h.close(); } catch { /* already closed */ } }
   opened.clear();
   if (dataDir) rmSync(dataDir, { recursive: true, force: true });
   if (originalDataDir === undefined) delete process.env.CONTINUUM_DATA_DIR;
@@ -83,13 +92,13 @@ after(() => {
 const parse = (r: { content: Array<{ type: string; text?: string }> }) =>
   JSON.parse(r.content[0]?.text ?? '{}');
 
-const call = (storage: ReturnType<typeof openStorage>, args: Record<string, unknown>) =>
+const call = (storage: StorageBackend, args: Record<string, unknown>) =>
   handleRecordObservation(args, storage);
 
 /** Read the stored row back, failing loudly if it is absent. Asserting on the handler's
  *  RETURN value alone would pass even when the choke-point wrote nothing — the scrub
  *  happens between the handler and the disk, so the disk is what has to be inspected. */
-function stored(storage: ReturnType<typeof openStorage>, id: string) {
+function stored(storage: StorageBackend, id: string) {
   const row = storage.getObservations([id])[0];
   assert.ok(row, `no observation ${id} reached storage — the handler's return value lied`);
   return row;
