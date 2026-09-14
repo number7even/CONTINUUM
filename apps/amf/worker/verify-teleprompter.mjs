@@ -8,12 +8,20 @@
 //   3. a day without hook/topic is refused (no empty prompter)
 //   4. the served page mounts: enforces the skeleton (segment bar + windows), shows the hook,
 //      carries the shot checklist, exposes /api/session
-//   5. the calendar loader finds the latest generated calendar
+//   5. the calendar loader finds a generated calendar — built HERMETICALLY by this gate from
+//      git-tracked inputs into a temp dir, never read from the gitignored worker/out/
 //
 //   node verify-teleprompter.mjs
 //
 // IP by Riaan Kleynhans — Human in the Loop — Copyright Riaan Kleynhans
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { HPIPA, buildSession, latestCalendar, html, makeServer } from './teleprompter.mjs';
+import { parseAtlasCore, topicPool, buildCalendar, gateCalendar } from './calendar.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const results = [];
 const check = (name, ok, detail) => { results.push(ok); console.log(`  ${ok ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`); };
@@ -47,8 +55,43 @@ check('server serves the prompter page', root.includes('W&T PROMPTER'));
 check('/api/session returns the structured session', api.segments?.length === 5 && api.topic === 'booking recovery');
 
 console.log('── calendar loader ─────────────────────────────────────────────────────');
-const cal = latestCalendar('voicecosmos', 'company');
-check('finds the latest generated voicecosmos calendar', !!cal && cal.days?.length === 30, cal ? `start ${cal.start}` : 'none');
+// HERMETIC BY CONSTRUCTION. This leg used to call latestCalendar('voicecosmos','company'),
+// which defaults to apps/amf/worker/out/ — a directory apps/amf/worker/.gitignore ignores.
+// So the calendar it needed could only ever exist on a machine that had previously run
+// `node calendar.mjs`, and NEVER on a clean checkout. It passed locally and was structurally
+// unpassable in CI. Measured on the runner 2026-09-14: "✗ finds the latest generated
+// voicecosmos calendar — none", 12/13, TELEPROMPTER_VERIFY: RED. It had never once run green
+// in CI — the smoke suite aborted at an earlier gate before reaching it.
+//
+// The fix is to generate what we load, from inputs that ARE tracked (the Demand Atlas +
+// portfolio-universe.json) via the same in-memory path verify-calendar.mjs already proves on
+// CI, then hand latestCalendar its existing third parameter. The loader — the glob, the sort,
+// the parse — is still exactly what is under test; only the ambient dependency is gone.
+// Nothing is written to out/, so a developer's real calendars are neither read nor disturbed.
+const calDir = mkdtempSync(join(tmpdir(), 'amf-prompter-cal-'));
+try {
+  const atlas = readFileSync(resolve(HERE, '..', '..', '..', 'docs', 'DEMAND_ATLAS_2026-07-01.md'), 'utf8');
+  const uni = JSON.parse(readFileSync(join(HERE, 'portfolio-universe.json'), 'utf8'));
+  const vc = uni.products.find(p => p.slug === 'voicecosmos');
+  const pool = topicPool(parseAtlasCore(atlas, 'voicecosmos'), vc.topics);
+  const START = '2026-08-01';
+  const days = buildCalendar({ brand: 'voicecosmos', profile: 'company', start: START, pool });
+
+  // Self-gate the fixture before trusting it: a malformed calendar must fail loudly here
+  // rather than quietly weaken the assertion below into a tautology.
+  const issues = gateCalendar(days);
+  if (issues.length) throw new Error(`calendar self-gate RED: ${issues.join('; ')}`);
+
+  writeFileSync(
+    join(calDir, `calendar-voicecosmos-company-${START}.json`),
+    JSON.stringify({ brand: 'voicecosmos', profile: 'company', start: START, days }, null, 2),
+  );
+
+  const cal = latestCalendar('voicecosmos', 'company', calDir);
+  check('finds the generated voicecosmos calendar', !!cal && cal.days?.length === 30, cal ? `start ${cal.start}` : 'none');
+} finally {
+  rmSync(calDir, { recursive: true, force: true });
+}
 
 const passed = results.filter(Boolean).length;
 console.log(`\n${passed}/${results.length} gates green`);
