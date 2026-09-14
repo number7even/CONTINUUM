@@ -418,6 +418,65 @@ export class HybridStorageBackend implements StorageBackend {
     return this.vectorDbPath;
   }
 
+  // ── Admin: orphan recovery ──────────────────────────────────────────────
+  //
+  // deleteObservation gates the vector delete on the SQLite delete succeeding:
+  //     const deleted = this.sqlite.deleteObservation(id);
+  //     if (deleted) this.queueVectorDelete(id);
+  // so the moment a row disappears out-of-band, its embedding becomes
+  // unreachable through the public API. Drift is one-way — vectors outlive
+  // rows, never the reverse — and the index becomes append-only.
+  //
+  // rebuildVectorStore() does NOT fix this. It iterates listAllObservationIds()
+  // and re-embeds those, enforcing SQLite ⊆ vectors. An orphan is absent from
+  // that list, so it is never visited. Measured on a 15-record tenant
+  // 2026-08-31: rebuild reported 15/15 while the index stayed at 17, and the
+  // orphans ranked SECOND on real queries at distance 0.868 — inside the band
+  // being used to calibrate the retrieval threshold. A ghost was setting the
+  // cutoff.
+  //
+  // These two methods close that: an unconditional delete, and a reconcile pass
+  // that enforces the other direction (vectors ⊆ SQLite).
+
+  /**
+   * Delete a vector by id WITHOUT requiring its SQLite row to exist. The
+   * underlying VectorDb.delete is already unconditional — only the wrapper was
+   * gated. This is the recovery path for an embedding whose row is already gone.
+   */
+  async deleteVector(id: string): Promise<boolean> {
+    const db = await this.getVectorDb();
+    return db.delete(id);
+  }
+
+  /**
+   * Drop every vector with no corresponding SQLite row.
+   *
+   * VectorDb exposes no key enumeration (search / delete / len only), so ids are
+   * recovered by searching at k = len(). That returns every id the index holds,
+   * ranked by distance to an arbitrary probe — ranking is irrelevant here, only
+   * the id set is. If the index is large this is a full scan; it is an admin
+   * verb, not a hot path.
+   */
+  async pruneOrphanVectors(): Promise<{ scanned: number; pruned: number; kept: number }> {
+    const db = await this.getVectorDb();
+    const total = await db.len();
+    if (total === 0) return { scanned: 0, pruned: 0, kept: 0 };
+
+    // Any probe vector works — we want the id set, not relevance.
+    const probe = await embed('.');
+    const all = await db.search({ vector: probe, k: total });
+
+    const live = new Set(this.sqlite.listAllObservationIds());
+    let pruned = 0;
+    for (const hit of all) {
+      if (live.has(hit.id)) continue;
+      // Unconditional: the row is already gone, which is precisely why the
+      // gated path cannot reach this vector.
+      if (await db.delete(hit.id)) pruned++;
+    }
+    return { scanned: all.length, pruned, kept: all.length - pruned };
+  }
+
   // ── Admin: rebuild vector store from SQLite ground-truth ────────────────
   //
   // W23-1 sub-deliverables 2 + 3 (Issue #20). Iterates every observation
