@@ -4,6 +4,7 @@
  *
  * Usage:
  *   node scripts/ingest-hotel-kb.mjs --tenant <uuid> --kb <path.json> [--dry-run] [--force]
+ *   node scripts/ingest-hotel-kb.mjs --tenant <uuid> --rebuild-vectors
  *
  * ┌──────────────────────────────────────────────────────────────────────────┐
  * │ WHY THIS WRAPPER EXISTS                                                  │
@@ -59,12 +60,13 @@ const TENANT = opt('tenant');
 const KB_PATH = opt('kb');
 const DRY_RUN = flag('dry-run');
 const FORCE = flag('force');
+const REBUILD = flag('rebuild-vectors');
 
 const die = (code, msg) => { console.error(`\n  ✗ ${msg}\n`); process.exit(code); };
 const ok = (msg) => console.log(`  ✅ ${msg}`);
 
 if (!TENANT) die(3, 'missing --tenant <uuid>');
-if (!KB_PATH && !DRY_RUN) die(3, 'missing --kb <path.json>');
+if (!KB_PATH && !DRY_RUN && !REBUILD) die(3, 'missing --kb <path.json>');
 
 console.log(`\n🏨 hotel-kb ingestion — tenant ${TENANT}${DRY_RUN ? '  (DRY RUN)' : ''}\n`);
 
@@ -124,7 +126,32 @@ try {
     if (survivors.length === 0) ok('GATE 2 — canary PII scrubbed on disk (email, card, IBAN, passport, phone)');
   }
 } finally {
-  try { storage.deleteObservation?.(canaryId); } catch { /* best effort */ }
+  // Delete the canary from BOTH stores, deterministically.
+  //
+  // The previous attempt called deleteObservation + flushVectorWrites and did
+  // NOT work: deleteObservation only QUEUES the vector delete, and
+  // flushVectorWrites drains the EMBED queue, not the delete queue. Measured
+  // 2026-08-31 — the canary survived and became ghost #2 in a 15-record index,
+  // ranking above real content at distance 0.868 and corrupting the retrieval
+  // threshold being calibrated. A canary that pollutes the store it verifies is
+  // the hazard it was written to detect.
+  //
+  // deleteVector is unconditional and awaited, so the vector is gone before the
+  // process can exit. Both calls run: the SQLite row and the embedding are
+  // separate stores and each needs its own teardown.
+  // ORDER MATTERS. The embed is QUEUED at upsertObservation and lands
+  // asynchronously. Deleting first removes a vector that does not exist yet, and
+  // the pending embed then resurrects it — measured 2026-08-31: index went
+  // 15 → 16 on a run whose prune had just reported a clean 15/15.
+  //
+  // So: flush the WRITE queue until the canary's embedding exists, THEN delete
+  // it unconditionally. Not deleteObservation + flushVectorWrites (that flushes
+  // writes but leaves the delete queued), and not deleteVector alone.
+  try {
+    if (typeof storage.flushVectorWrites === 'function') await storage.flushVectorWrites();
+    storage.deleteObservation?.(canaryId);
+    if (typeof storage.deleteVector === 'function') await storage.deleteVector(canaryId);
+  } catch { /* best effort — the drift warning below is the backstop */ }
 }
 
 if (survivors.length > 0) {
@@ -147,6 +174,56 @@ if (prior > 0 && !FORCE) {
   console.log('     idempotent — but pass --force to say you meant it.\n');
   try { storage.close(); } catch { /* ignore */ }
   process.exit(2);
+}
+
+// ── --rebuild-vectors · reconcile the index against SQLite ──────────────────
+// Vectors can outlive their rows but never the reverse. deleteObservation gates
+// the vector delete on the SQLite delete succeeding (storage-hybrid.ts:311-313),
+// so once a row is gone its embedding is unreachable through the public API —
+// a one-way ratchet that turns the index into an append-only graveyard.
+//
+// Measured on Walk Hotel 2026-08-31: 16 vectors for 15 records. The orphan
+// ranked SECOND on both 'golden retriever' and 'dogs' at distance 0.868,
+// resolving to (no row) — and sat squarely inside the ~0.85 band we were trying
+// to calibrate. A ghost was setting the retrieval threshold.
+//
+// This calls rebuildVectorStore(), which treats SQLite as ground truth and
+// re-embeds every row. It does NOT rm the .db file: deleting it by hand loses
+// the index's own structures and leaves the recovery path as folklore rather
+// than a verb. Idempotent — safe to re-run.
+if (REBUILD) {
+  if (typeof storage.rebuildVectorStore !== 'function') {
+    console.error('\n  ✗ --rebuild-vectors needs the hybrid backend.');
+    console.error('    CONTINUUM_STORAGE_BACKEND=sqlite has no vector store to rebuild.\n');
+    try { storage.close(); } catch { /* ignore */ }
+    process.exit(3);
+  }
+  const before = typeof storage.vectorCount === 'function' ? await storage.vectorCount() : null;
+
+  // Two-way sync, in this order. prune enforces vectors ⊆ SQLite; rebuild
+  // enforces SQLite ⊆ vectors. rebuild ALONE is a blind upsert — it iterates
+  // listAllObservationIds() and never visits an orphan, so it reported 15/15
+  // while the index stayed at 17. Prune must run first or the rebuild re-ranks
+  // against ghosts it cannot see.
+  if (typeof storage.pruneOrphanVectors === 'function') {
+    const p = await storage.pruneOrphanVectors();
+    console.log(`  ✅ pruned ${p.pruned} orphan vector(s) · ${p.kept} kept of ${p.scanned} scanned`);
+  }
+
+  const r = await storage.rebuildVectorStore({
+    onProgress: (done, total) => process.stdout.write(`\r  rebuilding vectors ${done}/${total}   `),
+  });
+  if (typeof storage.flushVectorWrites === 'function') await storage.flushVectorWrites();
+  const after = typeof storage.vectorCount === 'function' ? await storage.vectorCount() : null;
+  console.log(`\n  ✅ rebuilt ${r.rebuilt}/${r.total}${r.failed ? ` · ${r.failed} FAILED` : ''}`);
+  if (before !== null && after !== null) {
+    console.log(`     vectors ${before} → ${after}${before > after ? `  (${before - after} orphan(s) cleared)` : ''}`);
+    // A count above the row total means reconciliation did not converge. Say so
+    // rather than reporting a rebuild that left the drift in place.
+    if (after > r.total) console.log(`     ⚠️  ${after - r.total} vector(s) still exceed ${r.total} rows — drift remains`);
+  }
+  if (r.failed > 0) { try { storage.close(); } catch { /* ignore */ } process.exit(2); }
+  if (!KB_PATH) { try { storage.close(); } catch { /* ignore */ } console.log(''); process.exit(0); }
 }
 
 if (DRY_RUN) {
